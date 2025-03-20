@@ -36,7 +36,7 @@ ALLOWED_HOSTS = [
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    "https://matchgen-backend-production.up.railway.app/",  # Replace with your actual Railway URL
+    "https://matchgen-backend-production.up.railway.app",  # Trusted CSRF origin
 ]
 
 CORS_ALLOW_ALL_ORIGINS = True

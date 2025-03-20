@@ -30,7 +30,9 @@ SECRET_KEY = 'django-insecure-14k-bd&@uce*9^)(3ysp9ao$(10)-0ckur9%_k@4et&$n0y=j=
 DEBUG = True
 
 ALLOWED_HOSTS = [
-    "matchgen-backend-production.up.railway.app/",  # Replace with your actual Railway URL
+    "matchgen-backend-production.up.railway.app",  # Your Railway backend domain
+    "127.0.0.1",  # Local development
+    "localhost",
 ]
 
 CSRF_TRUSTED_ORIGINS = [

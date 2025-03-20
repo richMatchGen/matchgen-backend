@@ -27,13 +27,12 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = 'django-insecure-14k-bd&@uce*9^)(3ysp9ao$(10)-0ckur9%_k@4et&$n0y=j='
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
 
-ALLOWED_HOSTS = [
-    "matchgen-backend-production.up.railway.app",  # Your Railway backend domain
-    "127.0.0.1",  # Local development
-    "localhost",
-]
+DEBUG = os.getenv("DEBUG", "False") == "True"
+
+
+ALLOWED_HOSTS = ["matchgen-backend-production.up.railway.app", "localhost", "127.0.0.1"]
+
 
 CSRF_TRUSTED_ORIGINS = [
     "https://matchgen-backend-production.up.railway.app",  # Trusted CSRF origin

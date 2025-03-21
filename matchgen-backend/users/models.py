@@ -21,7 +21,7 @@ class UserManager(BaseUserManager):
 
 class User(AbstractUser):
     email = models.EmailField(unique=True)
-    username = models.CharField(max_length=255, blank=True, null=True, unique=False)
+    username = None
     profile_picture = models.URLField(blank=True, null=True)
 
     USERNAME_FIELD = 'email'

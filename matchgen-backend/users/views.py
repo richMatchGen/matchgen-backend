@@ -11,8 +11,6 @@ User = get_user_model()
 
 class RegisterView(APIView):
     def post(self, request):
-        print("Received Data:", request.data)  # ✅ Log request data
-        
         email = request.data.get("email")
         password = request.data.get("password")
 
@@ -20,15 +18,13 @@ class RegisterView(APIView):
             return Response({"error": "Email and password are required."}, status=400)
 
         try:
+            # ✅ Do NOT pass 'username' to create_user
             user = User.objects.create_user(
                 email=email,
-                username=email,  # ✅ Django requires a username field
                 password=password
             )
             return Response({"message": "User created successfully!"}, status=201)
         except Exception as e:
-            import traceback
-            print(traceback.format_exc())  # ✅ Log full error in Railway
             return Response({"error": str(e)}, status=500)
 
 class LoginView(generics.GenericAPIView):

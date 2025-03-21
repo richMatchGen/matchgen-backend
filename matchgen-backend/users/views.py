@@ -15,11 +15,16 @@ class RegisterView(APIView):
         password = request.data.get("password")
 
         if not email or not password:
-            return Response({"error": "Email and password required."}, status=400)
+            return Response({"error": "Email and password are required."}, status=400)
 
         try:
-            user = User.objects.create_user(email=email, username=email, password=password)
-            return Response({"message": "User created"}, status=201)
+            # ✅ Use email as username to satisfy AbstractUser fields
+            user = User.objects.create_user(
+                email=email,
+                username=email,
+                password=password
+            )
+            return Response({"message": "User created successfully!"}, status=201)
         except Exception as e:
             return Response({"error": str(e)}, status=500)
 

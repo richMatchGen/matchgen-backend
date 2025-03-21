@@ -14,17 +14,16 @@ class RegisterView(APIView):
         email = request.data.get("email")
         password = request.data.get("password")
 
+        print("Received Data:", request.data)  # ✅ Log received data
+
         if not email or not password:
             return Response({"error": "Email and password are required."}, status=400)
 
         try:
-            # ✅ Do NOT pass 'username' to create_user
-            user = User.objects.create_user(
-                email=email,
-                password=password
-            )
+            user = User.objects.create_user(email=email, password=password)
             return Response({"message": "User created successfully!"}, status=201)
         except Exception as e:
+            print("Error:", str(e))  # ✅ Log the error in Railway logs
             return Response({"error": str(e)}, status=500)
 
 class LoginView(generics.GenericAPIView):

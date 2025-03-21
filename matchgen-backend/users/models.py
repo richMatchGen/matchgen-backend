@@ -20,14 +20,12 @@ class UserManager(BaseUserManager):
         return self.create_user(email, password, **extra_fields)
 
 class User(AbstractUser):
-    """Custom User model that uses email as the primary login field"""
-    username = None  # Remove username field
-    email = models.EmailField(unique=True)  # Make email unique
+    email = models.EmailField(unique=True)
+    username = models.CharField(max_length=255, blank=True, null=True, unique=False)
+    profile_picture = models.URLField(blank=True, null=True)
 
-    USERNAME_FIELD = "email"  # Use email for authentication
-    REQUIRED_FIELDS = []  # No username required
-
-    objects = UserManager()
+    USERNAME_FIELD = 'email'
+    REQUIRED_FIELDS = []
 
     def __str__(self):
         return self.email

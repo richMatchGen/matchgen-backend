@@ -186,4 +186,10 @@ SIMPLE_JWT = {
     "SIGNING_KEY": "your-secret-key",
 }
 
+ACCOUNT_SIGNUP_FIELDS = {
+    'username': {'required': False, 'enabled': False},
+    'email': {'required': True, 'enabled': True},
+    'password1': {'required': True, 'enabled': True},
+    'password2': {'required': True, 'enabled': True},
+}
 SITE_ID = 1

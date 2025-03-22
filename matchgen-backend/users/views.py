@@ -42,4 +42,5 @@ class UserDetailView(generics.RetrieveAPIView):
 class UserListView(APIView):
     def get(self, request):
         users = User.objects.all()
-        return Response(UserSerializer(users, many=True).data)
+        serializer = UserSerializer(users, many=True)
+        return Response(serializer.data)

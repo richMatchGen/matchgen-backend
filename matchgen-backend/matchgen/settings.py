@@ -73,7 +73,7 @@ INSTALLED_APPS = [
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',
 
-
+    'rest_framework_simplejwt'
     'rest_framework.authtoken',
     'users',  # Our custom user app
 ]

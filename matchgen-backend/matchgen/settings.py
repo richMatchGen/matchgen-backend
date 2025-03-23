@@ -186,6 +186,10 @@ SIMPLE_JWT = {
     "SIGNING_KEY": "your-secret-key",
 }
 
+ACCOUNT_AUTHENTICATION_METHOD = 'email'
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_USERNAME_REQUIRED = False  # still needed for older versions
+
 ACCOUNT_SIGNUP_FIELDS = {
     'username': {'required': False, 'enabled': False},
     'email': {'required': True, 'enabled': True},

@@ -187,6 +187,8 @@ SIMPLE_JWT = {
 }
 
 
+ACCOUNT_LOGIN_METHOD = "email"
+
 ACCOUNT_SIGNUP_FIELDS = {
     "username": {"required": False, "enabled": False},
     "email": {"required": True, "enabled": True},
@@ -194,7 +196,6 @@ ACCOUNT_SIGNUP_FIELDS = {
     "password2": {"required": True, "enabled": True},
 }
 
-ACCOUNT_LOGIN_METHODS = ["email"]
-
 
 SITE_ID = 1
+print("ACCOUNT_LOGIN_METHOD:", ACCOUNT_LOGIN_METHOD)

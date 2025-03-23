@@ -187,15 +187,11 @@ SIMPLE_JWT = {
 }
 
 
-ACCOUNT_LOGIN_METHOD = "email"
+ACCOUNT_USERNAME_REQUIRED = False
+ACCOUNT_EMAIL_REQUIRED = True
+ACCOUNT_AUTHENTICATION_METHOD = "email"
 
-ACCOUNT_SIGNUP_FIELDS = {
-    "username": {"required": False, "enabled": False},
-    "email": {"required": True, "enabled": True},
-    "password1": {"required": True, "enabled": True},
-    "password2": {"required": True, "enabled": True},
-}
+SILENCED_SYSTEM_CHECKS = ["account.W001"]
 
 
 SITE_ID = 1
-print("ACCOUNT_LOGIN_METHOD:", ACCOUNT_LOGIN_METHOD)

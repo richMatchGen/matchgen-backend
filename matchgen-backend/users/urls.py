@@ -24,6 +24,6 @@ urlpatterns = [
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
 
     # ✅ Club
-    path("club/create/", CreateClubView.as_view(), name="create-club"),
+    path("club/", CreateClubView.as_view(), name="create-club"),
     path('clubs/<int:pk>/', ClubDetailView.as_view(), name='club-detail'),
 ]

@@ -1,11 +1,12 @@
-from rest_framework import generics, status
+from rest_framework import generics, status,viewsets, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny,IsAuthenticated
 from rest_framework_simplejwt.views import TokenObtainPairView
-from .serializers import RegisterSerializer, LoginSerializer, UserSerializer
-from .models import User
+from .serializers import RegisterSerializer, LoginSerializer, UserSerializer,ClubSerializer
+from .models import User,Club
 from django.contrib.auth import get_user_model
+
 
 User = get_user_model()
 
@@ -44,3 +45,43 @@ class UserListView(APIView):
         users = User.objects.all()
         serializer = UserSerializer(users, many=True)
         return Response(serializer.data)
+
+
+class ClubViewSet(viewsets.ModelViewSet):
+    serializer_class = ClubSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Club.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
+
+class ClubListView(generics.ListAPIView):
+    queryset = Club.objects.all()
+    serializer_class = ClubSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+
+class ClubDetailView(generics.RetrieveUpdateDestroyAPIView):
+    queryset = Club.objects.all()
+    serializer_class = ClubSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        # Only allow access to clubs the current user owns
+        return self.queryset.filter(user=self.request.user)
+
+    def perform_update(self, serializer):
+        # Ensure the user doesn't change ownership accidentally
+        serializer.save(user=self.request.user)
+
+class CreateClubView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        serializer = ClubSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(user=request.user)
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

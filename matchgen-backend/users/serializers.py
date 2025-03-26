@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import User
+from .models import User, Club
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
@@ -37,3 +37,8 @@ class LoginSerializer(serializers.Serializer):
             }
         raise serializers.ValidationError("Invalid email or password")
 
+
+class ClubSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Club
+        fields = "__all__"

@@ -25,5 +25,5 @@ urlpatterns = [
 
     # ✅ Club
     path("club/", CreateClubView.as_view(), name="create-club"),
-    path('clubs/<int:pk>/', ClubDetailView.as_view(), name='club-detail'),
+    path('club/<int:pk>/', ClubDetailView.as_view(), name='club-detail'),
 ]

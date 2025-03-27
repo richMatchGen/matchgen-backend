@@ -83,8 +83,14 @@ class ClubDetailView(generics.RetrieveUpdateDestroyAPIView):
         # Ensure the user doesn't change ownership accidentally
         serializer.save(user=self.request.user)
 
-class CreateClubView(APIView):
+
+class ClubListCreateView(generics.ListCreateAPIView):
+    serializer_class = ClubSerializer
     permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Only return the current user's club(s)
+        return Club.objects.filter(user=self.request.user)
 
     def post(self, request):
         serializer = ClubSerializer(data=request.data)

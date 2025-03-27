@@ -41,4 +41,4 @@ class LoginSerializer(serializers.Serializer):
 class ClubSerializer(serializers.ModelSerializer):
     class Meta:
         model = Club
-        fields = "__all__"
+        fields = ['id', 'name', 'sport', 'logo']

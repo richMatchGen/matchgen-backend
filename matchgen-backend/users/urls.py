@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import RegisterView, LoginView,UserDetailView,UserListView,ClubViewSet,ClubDetailView,CreateClubView
+from .views import RegisterView, LoginView,UserDetailView,UserListView,ClubViewSet,ClubDetailView,CreateClubView,MyClubView
 from dj_rest_auth.registration.views import SocialLoginView
 from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
@@ -25,7 +25,7 @@ urlpatterns = [
 
     # ✅ Club
     path("club/", CreateClubView.as_view(), name="club-list-create"),
-    path('club/<int:pk>/', ClubDetailView.as_view(), name='club-detail')
-    path("my-club/", MyClubView.as_view(), name="my-club"),
+    path('club/<int:pk>/', ClubDetailView.as_view(), name='club-detail'),
+    path("my-club/", MyClubView.as_view(), name="my-club")
 
 ]

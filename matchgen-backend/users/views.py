@@ -36,16 +36,9 @@ class LoginView(generics.GenericAPIView):
         serializer.is_valid(raise_exception=True)
         return Response(serializer.validated_data, status=status.HTTP_200_OK)
 
-class UserDetailView(APIView):
-    permission_classes = [IsAuthenticated]
-
-    def get(self, request):
-        user = request.user
-        return Response({
-            "id": user.id,
-            "email": user.email,
-            "profile_picture": user.profile_picture,
-        })
+class UserDetailView(generics.RetrieveAPIView):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
 
 class UserListView(APIView):
     def get(self, request):
@@ -74,23 +67,14 @@ class ClubDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Club.objects.all()
     serializer_class = ClubSerializer
     permission_classes = [permissions.IsAuthenticated]
+    lookup_field = 'id'
 
     def get_queryset(self):
-        # Only allow access to clubs the current user owns
-        return self.queryset.filter(user=self.request.user)
-
-    def perform_update(self, serializer):
-        # Ensure the user doesn't change ownership accidentally
-        serializer.save(user=self.request.user)
-
-
-class ClubListCreateView(generics.ListCreateAPIView):
-    serializer_class = ClubSerializer
-    permission_classes = [IsAuthenticated]
-
-    def get_queryset(self):
-        # Only return the current user's club(s)
+        # Optional: limit access to the clubs the user created
         return Club.objects.filter(user=self.request.user)
+
+class CreateClubView(APIView):
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
         serializer = ClubSerializer(data=request.data)
@@ -98,4 +82,3 @@ class ClubListCreateView(generics.ListCreateAPIView):
             serializer.save(user=request.user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    

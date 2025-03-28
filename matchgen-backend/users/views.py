@@ -85,3 +85,14 @@ class CreateClubView(APIView):
             serializer.save(user=request.user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    
+    
+class MyClubView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        club = Club.objects.filter(user=request.user).first()
+        if not club:
+            return Response({"detail": "No club found"}, status=status.HTTP_404_NOT_FOUND)
+        serializer = ClubSerializer(club)
+        return Response(serializer.data)

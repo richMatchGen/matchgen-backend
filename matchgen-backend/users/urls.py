@@ -25,7 +25,7 @@ urlpatterns = [
 
     # ✅ Club
     path("club/", CreateClubView.as_view(), name="club-list-create"),
-    path('club/<int:pk>/', ClubDetailView.as_view(), name='club-detail'),
+    path('club/<int:id>/', ClubDetailView.as_view(), name='club-detail'),
     path("my-club/", MyClubView.as_view(), name="my-club")
 
 ]

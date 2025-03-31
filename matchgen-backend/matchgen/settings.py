@@ -76,6 +76,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',
     'rest_framework.authtoken',
     'users',  # Our custom user app
+    'content',  # Our custom user app
 ]
 
 MIDDLEWARE = [

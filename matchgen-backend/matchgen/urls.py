@@ -25,5 +25,6 @@ def home_view(request):
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/users/', include('users.urls')),
+    path("api/content/", include("content.urls")),
     path("", home_view),  # Add this to fix "Not Found" issue
 ]

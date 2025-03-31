@@ -17,9 +17,13 @@ class MatchListCreateView(generics.ListCreateAPIView):
         return Match.objects.filter(club__user=self.request.user)
     
     def perform_create(self, serializer):
-        # Auto-assign club based on the current logged-in user
-        club = Club.objects.get(user=self.request.user)
-        serializer.save(club=club)
+        try:
+            club = Club.objects.get(user=self.request.user)
+            serializer.save(club=club)
+        except Exception as e:
+            import logging
+            logging.error(f"Error assigning club: {e}")
+            raise
 
     def create(self, request, *args, **kwargs):
         # Handle both single and bulk upload

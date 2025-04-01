@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Match
+from .models import Match, Player
 
 class MatchSerializer(serializers.ModelSerializer):
     formatted_date = serializers.SerializerMethodField()
@@ -12,3 +12,13 @@ class MatchSerializer(serializers.ModelSerializer):
 
     def get_formatted_date(self, obj):
         return obj.date.strftime("%d/%m/%Y")
+    
+
+class PlayerSerializer(serializers.ModelSerializer):
+    formatted_date = serializers.SerializerMethodField()
+    class Meta:
+        model = Player
+        fields = [
+            "name", "squad_no", "player_pic", "formatted_pic", "position",
+            "sponsor"
+        ]

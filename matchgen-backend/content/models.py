@@ -5,7 +5,7 @@ from django.conf import settings
 
 # Create your models here.
 class Match(models.Model):
-    club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name='content')
+    club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name='matches')
     match_type = models.CharField(max_length=255, default="League")
     opponent = models.CharField(max_length=255)
     club_logo = models.URLField(blank=True, null=True)
@@ -18,3 +18,18 @@ class Match(models.Model):
 
     def __str__(self):
         return f"{self.club.name} vs {self.opponent} on {self.date.strftime('%Y-%m-%d')}"
+    
+
+# Create your models here.
+class Player(models.Model):
+    club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name='players')
+    name = models.CharField(max_length=255)
+    squad_no = models.CharField(max_length=4)
+    player_pic = models.URLField(blank=True, null=True)
+    formatted_pic = models.URLField(blank=True, null=True)
+    sponsor = models.URLField(blank=True, null=True)
+    position = models.CharField(max_length=255)
+
+    
+    def __str__(self):
+        return self.name

@@ -15,7 +15,6 @@ class MatchSerializer(serializers.ModelSerializer):
     
 
 class PlayerSerializer(serializers.ModelSerializer):
-    formatted_date = serializers.SerializerMethodField()
     class Meta:
         model = Player
         fields = [

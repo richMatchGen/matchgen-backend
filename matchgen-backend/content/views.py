@@ -84,8 +84,6 @@ class PlayerListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        print('SelfUser')
-        print(self.request.user)
         return Player.objects.filter(club__user=self.request.user)
         
     def perform_create(self, serializer):

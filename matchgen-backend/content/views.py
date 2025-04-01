@@ -28,16 +28,24 @@ class MatchListCreateView(generics.ListCreateAPIView):
             raise
 
     def create(self, request, *args, **kwargs):
-        # Handle both single and bulk upload
         data = request.data
         print('Data')
         print(data)
+
         if isinstance(data, list):
             serializer = self.get_serializer(data=data, many=True)
         else:
             serializer = self.get_serializer(data=data)
+
         serializer.is_valid(raise_exception=True)
-        serializer.save()
+
+        try:
+            club = Club.objects.get(user=request.user)
+        except Club.DoesNotExist:
+            return Response({"error": "Club not found for this user."}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer.save(club=club)
+
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 

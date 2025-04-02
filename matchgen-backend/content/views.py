@@ -115,3 +115,19 @@ class PlayerListCreateView(generics.ListCreateAPIView):
         serializer.save(club=club)
 
         return Response(serializer.data, status=status.HTTP_201_CREATED)     
+    
+
+class LastMatchView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        club = user.club  # Adjust depending on your structure
+        last_match = (
+            Match.objects.filter(club=club)
+            .order_by('-date', '-time_start')
+            .first()
+        )
+        if last_match:
+            return Response(MatchSerializer(last_match).data)
+        return Response({}, status=200)

@@ -121,13 +121,27 @@ class LastMatchView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
-        user = request.user
-        club = user.club  # Adjust depending on your structure
-        last_match = (
-            Match.objects.filter(club=club)
-            .order_by('-date', '-time_start')
-            .first()
-        )
-        if last_match:
-            return Response(MatchSerializer(last_match).data)
-        return Response({}, status=200)
+        try:
+            # Make sure the user is linked to a club
+            user = request.user
+            club = getattr(user, "club", None)
+
+            if not club:
+                return Response({"detail": "User is not associated with a club."}, status=status.HTTP_200_OK)
+
+            last_match = (
+                Match.objects.filter(club=club)
+                .order_by("-date", "-time_start")
+                .first()
+            )
+
+            if last_match:
+                serialized = MatchSerializer(last_match).data
+                return Response(serialized)
+
+            return Response({"detail": "No matches found."}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            import traceback
+            print(traceback.format_exc())  # This prints full error to Railway logs
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -122,26 +122,24 @@ class LastMatchView(APIView):
 
     def get(self, request):
         try:
-            # Make sure the user is linked to a club
             user = request.user
-            club = getattr(user, "id", None)
+            club = user.clubs.first()  # ✅ This is the correct line
 
             if not club:
-                return Response({"detail": "User is not associated with a club."}, status=status.HTTP_200_OK)
+                return Response({"detail": "User is not associated with any clubs."}, status=status.HTTP_200_OK)
 
             last_match = (
-                Match.objects.filter(club=id)
+                Match.objects.filter(club=club)
                 .order_by("-date", "-time_start")
                 .first()
             )
 
             if last_match:
-                serialized = MatchSerializer(last_match).data
-                return Response(serialized)
+                return Response(MatchSerializer(last_match).data)
 
-            return Response({"detail": "No matches found."}, status=status.HTTP_200_OK)
+            return Response({"detail": "No matches found for this club."}, status=status.HTTP_200_OK)
 
         except Exception as e:
             import traceback
-            print(traceback.format_exc())  # This prints full error to Railway logs
+            print(traceback.format_exc())
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

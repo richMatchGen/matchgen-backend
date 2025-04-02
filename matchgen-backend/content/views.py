@@ -5,6 +5,7 @@ from .models import Match, Player
 from users.models import Club
 from .serializers import MatchSerializer,PlayerSerializer
 from rest_framework.parsers import JSONParser, MultiPartParser
+from django.utils import timezone
 from rest_framework.views import APIView
 import csv, io
 
@@ -138,6 +139,37 @@ class LastMatchView(APIView):
                 return Response(MatchSerializer(last_match).data)
 
             return Response({"detail": "No matches found for this club."}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            import traceback
+            print(traceback.format_exc())
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+class MatchdayView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            user = request.user
+            club = user.clubs.first()
+
+            if not club:
+                return Response({"detail": "User is not associated with any clubs."}, status=status.HTTP_200_OK)
+
+            now = timezone.now()
+
+            next_match = (
+                Match.objects.filter(club=club)
+                .filter(date__gte=now.date())  # upcoming matches (today or later)
+                .order_by("date", "time_start")  # soonest first
+                .first()
+            )
+
+            if next_match:
+                return Response(MatchSerializer(next_match).data)
+
+            return Response({"detail": "No upcoming matches found."}, status=status.HTTP_200_OK)
 
         except Exception as e:
             import traceback

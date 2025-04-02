@@ -124,13 +124,13 @@ class LastMatchView(APIView):
         try:
             # Make sure the user is linked to a club
             user = request.user
-            club = getattr(user, "club", None)
+            club = getattr(user, "id", None)
 
             if not club:
                 return Response({"detail": "User is not associated with a club."}, status=status.HTTP_200_OK)
 
             last_match = (
-                Match.objects.filter(club=club)
+                Match.objects.filter(club=id)
                 .order_by("-date", "-time_start")
                 .first()
             )

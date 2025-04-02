@@ -124,21 +124,24 @@ class LastMatchView(APIView):
     def get(self, request):
         try:
             user = request.user
-            club = user.clubs.first()  # ✅ This is the correct line
+            club = user.clubs.first()
 
             if not club:
                 return Response({"detail": "User is not associated with any clubs."}, status=status.HTTP_200_OK)
 
+            today = timezone.now().date()
+
             last_match = (
                 Match.objects.filter(club=club)
-                .order_by("-date", "-time_start")
+                .filter(date__lt=today)  # ✅ only matches before today
+                .order_by("-date", "-time_start")  # latest first
                 .first()
             )
 
             if last_match:
                 return Response(MatchSerializer(last_match).data)
 
-            return Response({"detail": "No matches found for this club."}, status=status.HTTP_200_OK)
+            return Response({"detail": "No past matches found."}, status=status.HTTP_200_OK)
 
         except Exception as e:
             import traceback

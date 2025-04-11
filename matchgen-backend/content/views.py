@@ -178,3 +178,36 @@ class MatchdayView(APIView):
             import traceback
             print(traceback.format_exc())
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+
+class UpcomingMatchView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            user = request.user
+            club = user.clubs.first()
+
+            if not club:
+                return Response({"detail": "User is not associated with any clubs."}, status=status.HTTP_200_OK)
+
+            now = timezone.now()
+
+            upcoming_matches = (
+                Match.objects.filter(club=club)
+                .filter(date__gte=now.date())
+                .order_by("date", "time_start")
+            )
+
+            if upcoming_matches.count() > 1:
+                second_match = upcoming_matches[1]
+                return Response(MatchSerializer(second_match).data)
+            elif upcoming_matches.exists():
+                return Response({"detail": "Only one upcoming match found."}, status=status.HTTP_200_OK)
+            else:
+                return Response({"detail": "No upcoming matches found."}, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            import traceback
+            print(traceback.format_exc())
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

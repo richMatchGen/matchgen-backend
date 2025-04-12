@@ -77,6 +77,7 @@ INSTALLED_APPS = [
     'rest_framework.authtoken',
     'users',  # Our custom user app
     'content',  # Our custom user app
+    'graphicpack'
 ]
 
 MIDDLEWARE = [

@@ -15,8 +15,6 @@ class MatchListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        print('SelfUser')
-        print(self.request.user)
         return Match.objects.filter(club__user=self.request.user)
         
     def perform_create(self, serializer):
@@ -30,9 +28,6 @@ class MatchListCreateView(generics.ListCreateAPIView):
 
     def create(self, request, *args, **kwargs):
         data = request.data
-        print('Data')
-        print(data)
-
         if isinstance(data, list):
             serializer = self.get_serializer(data=data, many=True)
         else:
@@ -98,9 +93,6 @@ class PlayerListCreateView(generics.ListCreateAPIView):
 
     def create(self, request, *args, **kwargs):
         data = request.data
-        print('Data')
-        print(data)
-
         if isinstance(data, list):
             serializer = self.get_serializer(data=data, many=True)
         else:

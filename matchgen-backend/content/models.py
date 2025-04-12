@@ -1,6 +1,6 @@
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.db import models
-from users.models import Club
+from users.models import Club, User
 from django.conf import settings
 
 # Create your models here.
@@ -32,3 +32,5 @@ class Player(models.Model):
     
     def __str__(self):
         return self.name
+    
+

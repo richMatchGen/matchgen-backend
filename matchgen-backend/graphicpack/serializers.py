@@ -4,8 +4,6 @@ from .models import GraphicPack, UserSelection
 class GraphicPackSerializer(serializers.ModelSerializer):
     class Meta:
         model = GraphicPack
-        fields = [
-            "name","description", "preview_image", "zip_file"
-        ]
+        fields = '__all__'
 
 

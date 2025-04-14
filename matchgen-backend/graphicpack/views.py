@@ -13,8 +13,7 @@ import csv, io
 
 
 
-# Create your views here.
-class GraphicPackListView(generics.ListAPIView):
+class GraphicPackListView(ListAPIView):
     queryset = GraphicPack.objects.all()
     serializer_class = GraphicPackSerializer
 

@@ -26,6 +26,6 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('api/users/', include('users.urls')),
     path("api/content/", include("content.urls")),
-    path("api/graphicpack/", include("graphicpack.urls")),
+    path("api/graphicpacks/", include("graphicpack.urls")),
     path("", home_view),  # Add this to fix "Not Found" issue
 ]

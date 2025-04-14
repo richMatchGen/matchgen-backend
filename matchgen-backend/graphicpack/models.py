@@ -1,6 +1,6 @@
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.db import models
-from users.models import Club, User
+from users.models import User
 from django.conf import settings
 
 # Create your models here.

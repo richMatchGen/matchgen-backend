@@ -17,9 +17,26 @@ class GraphicPackListView(ListAPIView):
     queryset = GraphicPack.objects.all()
     serializer_class = GraphicPackSerializer
 
+# class SelectGraphicPackView(APIView):
+#     def post(self, request):
+#         pack_id = request.data.get("pack_id")
+#         pack = get_object_or_404(GraphicPack, id=pack_id)
+#         UserSelection.objects.update_or_create(user=request.user, defaults={"selected_pack": pack})
+#         return Response({"status": "selected", "pack": pack_id})
+    
 class SelectGraphicPackView(APIView):
+    permission_classes = [IsAuthenticated]
+
     def post(self, request):
         pack_id = request.data.get("pack_id")
+        if not pack_id:
+            return Response({"error": "pack_id is required"}, status=400)
+
         pack = get_object_or_404(GraphicPack, id=pack_id)
-        UserSelection.objects.update_or_create(user=request.user, defaults={"selected_pack": pack})
+
+        # Assume user is linked to a club
+        club = request.user.userprofile.club
+        club.selected_pack = pack
+        club.save()
+
         return Response({"status": "selected", "pack": pack_id})

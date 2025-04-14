@@ -1,6 +1,7 @@
 from django.contrib.auth.models import AbstractBaseUser, PermissionsMixin, BaseUserManager
 from django.db import models
 from django.conf import settings
+from graphicpack.models import GraphicPack
 
 class UserManager(BaseUserManager):
     def create_user(self, email, password=None, username=None,**extra_fields):
@@ -50,6 +51,7 @@ class Club(models.Model):
     secondary_color = models.CharField(max_length=7, blank=True, null=True)
     bio = models.TextField(blank=True, null=True)
     league = models.CharField(max_length=100, blank=True, null=True)
+    selected_pack = models.ForeignKey(GraphicPack, on_delete=models.SET_NULL, null=True, blank=True)
 
 
     def __str__(self):

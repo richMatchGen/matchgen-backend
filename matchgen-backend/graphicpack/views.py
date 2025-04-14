@@ -30,13 +30,16 @@ class SelectGraphicPackView(APIView):
     def post(self, request):
         pack_id = request.data.get("pack_id")
         if not pack_id:
-            return Response({"error": "pack_id is required"}, status=400)
+            return Response({"error": "pack_id is required"}, status=status.HTTP_400_BAD_REQUEST)
 
         pack = get_object_or_404(GraphicPack, id=pack_id)
 
-        # Assume user is linked to a club
-        club = request.user.userprofile.club
+        try:
+            club = Club.objects.get(user=request.user)
+        except Club.DoesNotExist:
+            return Response({"error": "Club not found for this user"}, status=status.HTTP_404_NOT_FOUND)
+
         club.selected_pack = pack
         club.save()
 
-        return Response({"status": "selected", "pack": pack_id})
+        return Response({"status": "selected", "pack": pack_id}, status=status.HTTP_200_OK)

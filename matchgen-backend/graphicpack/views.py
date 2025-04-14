@@ -1,10 +1,10 @@
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, render
 from rest_framework import generics, status
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .models import GraphicPack, UserSelection
 from users.models import Club
-from .serializers import MatchSerializer,PlayerSerializer
+from .serializers import GraphicPackSerializer
 from rest_framework.parsers import JSONParser, MultiPartParser
 from django.utils import timezone
 from rest_framework.views import APIView

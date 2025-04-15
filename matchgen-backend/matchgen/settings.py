@@ -191,9 +191,6 @@ ACCOUNT_AUTHENTICATION_METHOD = "email"
 
 SILENCED_SYSTEM_CHECKS = ["account.W001"]
 
-import cloudinary
-import os
-
 cloudinary.config(
     cloud_name = os.environ.get("CLOUDINARY_CLOUD_NAME"),
     api_key = os.environ.get("CLOUDINARY_API_KEY"),

@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import MatchListCreateView,PlayerListCreateView,LastMatchView,MatchdayView,UpcomingMatchView
+from .views import MatchListCreateView,PlayerListCreateView,LastMatchView,MatchdayView,UpcomingMatchView,MatchListView
 
 urlpatterns = [
     path("matches/", MatchListCreateView.as_view(), name="match-list-create"),
@@ -7,5 +7,6 @@ urlpatterns = [
     path('matches/last/', LastMatchView.as_view(), name='last-match'),
     path('matches/matchday/', MatchdayView.as_view(), name='match-day'),
     path('matches/upcoming/', UpcomingMatchView.as_view(), name='fixture'),
+    path('fixtures/', MatchListView.as_view(), name='fixtures')
 
 ]

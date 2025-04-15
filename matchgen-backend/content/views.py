@@ -7,7 +7,17 @@ from .serializers import MatchSerializer,PlayerSerializer
 from rest_framework.parsers import JSONParser, MultiPartParser
 from django.utils import timezone
 from rest_framework.views import APIView
+from rest_framework.generics import ListAPIView
 import csv, io
+
+
+class MatchListView(ListAPIView):
+    serializer_class = MatchSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        return Match.objects.filter(club__user=user).order_by("date")
 
 class MatchListCreateView(generics.ListCreateAPIView):
     queryset = Match.objects.all()

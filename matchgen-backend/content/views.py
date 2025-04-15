@@ -3,7 +3,7 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from .models import Match, Player
 from users.models import Club
-from .serializers import MatchSerializer,PlayerSerializer
+from .serializers import MatchSerializer,PlayerSerializer,FixturesSerializer
 from rest_framework.parsers import JSONParser, MultiPartParser
 from django.utils import timezone
 from rest_framework.views import APIView
@@ -12,7 +12,7 @@ import csv, io
 
 
 class MatchListView(ListAPIView):
-    serializer_class = MatchSerializer
+    serializer_class = FixturesSerializer
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):

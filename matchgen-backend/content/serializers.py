@@ -21,3 +21,16 @@ class PlayerSerializer(serializers.ModelSerializer):
             "id","name", "squad_no", "player_pic", "formatted_pic", "position",
             "sponsor"
         ]
+
+
+class FixturesSerializer(serializers.ModelSerializer):
+    formatted_date = serializers.SerializerMethodField()
+    class Meta:
+        model = Match
+        fields = [
+            'id',"match_type", "opponent", "club_logo", "opponent_logo", "sponsor",
+            "date","formatted_date" ,"time_start", "venue", "location",'matchday_post_url'
+        ]
+
+    def get_formatted_date(self, obj):
+        return obj.date.strftime("%d/%m/%Y")

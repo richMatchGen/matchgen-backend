@@ -10,7 +10,12 @@ from rest_framework.parsers import JSONParser, MultiPartParser
 from django.utils import timezone
 from rest_framework.views import APIView
 import csv, io
-
+from django.http import JsonResponse
+from content.models import Match
+from io import BytesIO
+from PIL import Image, ImageDraw, ImageFont
+import requests
+import cloudinary.uploader
 
 
 class GraphicPackListView(ListAPIView):
@@ -43,3 +48,59 @@ class SelectGraphicPackView(APIView):
         club.save()
 
         return Response({"status": "selected", "pack": pack_id}, status=status.HTTP_200_OK)
+    
+
+
+
+
+def generate_matchday(request, match_id):
+    match = get_object_or_404(Match, id=match_id)
+    club = match.club
+    selected_pack = club.selected_pack
+
+    if not selected_pack:
+        return JsonResponse({"error": "Club has no selected graphic pack."}, status=400)
+
+    try:
+        template = selected_pack.templates.get(content_type="matchday")
+    except:
+        return JsonResponse({"error": "Matchday template not found in selected pack."}, status=404)
+
+    # Load base image from URL
+    response = requests.get(template.image_url)
+    base_image = Image.open(BytesIO(response.content)).convert("RGBA")
+    draw = ImageDraw.Draw(base_image)
+
+    # Load font
+    try:
+        font_large = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 64)
+        font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 36)
+    except:
+        font_large = ImageFont.load_default()
+        font_small = ImageFont.load_default()
+
+    # Draw match info
+    draw.text((520, 80), match.opponent or "Opponent", font=font_large, fill="white")
+    draw.text((520, 160), match.date.strftime("%A, %b %d"), font=font_small, fill="white")
+    draw.text((520, 210), match.time_start or match.date.strftime("%I:%M %p"), font=font_small, fill="white")
+    draw.text((520, 260), match.venue or "Venue", font=font_small, fill="white")
+
+    # Save to in-memory file
+    buffer = BytesIO()
+    base_image.save(buffer, format="PNG")
+    buffer.seek(0)
+
+    # Upload to Cloudinary
+    upload_result = cloudinary.uploader.upload(
+        buffer,
+        folder=f"matchday_posts/club_{club.id}/",
+        public_id=f"match_{match.id}",
+        overwrite=True,
+        resource_type="image"
+    )
+
+    # Save URL to model (optional)
+    match.matchday_post_url = upload_result['secure_url']
+    match.save()
+
+    return JsonResponse({"url": upload_result['secure_url']})

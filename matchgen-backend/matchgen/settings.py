@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 import os
+import cloudinary
 import dj_database_url
 from pathlib import Path
 from dotenv import load_dotenv
@@ -189,6 +190,15 @@ ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_AUTHENTICATION_METHOD = "email"
 
 SILENCED_SYSTEM_CHECKS = ["account.W001"]
+
+import cloudinary
+import os
+
+cloudinary.config(
+    cloud_name = os.environ.get("CLOUDINARY_CLOUD_NAME"),
+    api_key = os.environ.get("CLOUDINARY_API_KEY"),
+    api_secret = os.environ.get("CLOUDINARY_API_SECRET")
+)
 
 
 SITE_ID = 1

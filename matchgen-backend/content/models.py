@@ -15,6 +15,7 @@ class Match(models.Model):
     time_start =models.CharField(max_length=20, blank=True, null=True)
     venue = models.CharField(max_length=255, blank=True, null=True)
     location = models.CharField(max_length=255, blank=True, null=True)
+    matchday_post_url = models.URLField(blank=True, null=True)
     def __str__(self):
         return f"{self.club.name} vs {self.opponent} on {self.date.strftime('%Y-%m-%d')}"
     

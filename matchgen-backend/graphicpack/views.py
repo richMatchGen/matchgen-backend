@@ -81,7 +81,7 @@ def generate_matchday(request, match_id):
 
     # Draw match info
     draw.text((520, 80), match.opponent or "Opponent", font=font_large, fill="white")
-    draw.text((520, 160), match.date.strftime("%A, %b %d"), font=font_small, fill="white")
+    draw.text((633, 740), match.date.strftime("%A, %b %d"), font=font_large, fill="black")
     draw.text((520, 210), match.time_start or match.date.strftime("%I:%M %p"), font=font_small, fill="white")
     draw.text((520, 260), match.venue or "Venue", font=font_small, fill="white")
 

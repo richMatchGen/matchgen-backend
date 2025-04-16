@@ -3,7 +3,7 @@ from rest_framework import generics, status
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from .models import GraphicPack, UserSelection
+from .models import GraphicPack, UserSelection, TextElement
 from users.models import Club
 from .serializers import GraphicPackSerializer
 from rest_framework.parsers import JSONParser, MultiPartParser
@@ -66,31 +66,49 @@ def generate_matchday(request, match_id):
     except:
         return JsonResponse({"error": "Matchday template not found in selected pack."}, status=404)
 
-    # Load base image from URL
-    response = requests.get(template.image_url)
+    # Load base image
+    response = requests.get(template.background_image.url)
     base_image = Image.open(BytesIO(response.content)).convert("RGBA")
     draw = ImageDraw.Draw(base_image)
+    image_width, image_height = base_image.size
 
-    # Load font
-    try:
-        font_large = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", 164)
-        font_small = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", 36)
-    except:
-        font_large = ImageFont.load_default()
-        font_small = ImageFont.load_default()
+    # Fetch dynamic text elements
+    text_elements = TextElement.objects.filter(template=template)
 
-    # Draw match info
-    draw.text((520, 80), match.opponent or "Opponent", font=font_large, fill="white")
-    draw.text((633, 740), match.date.strftime("%A, %b %d"), font=font_large, fill="black")
-    draw.text((520, 210), match.time_start or match.date.strftime("%I:%M %p"), font=font_small, fill="white")
-    draw.text((520, 260), match.venue or "Venue", font=font_small, fill="white")
+    # Mapping placeholders to actual match data
+    content_map = {
+        "opponent": match.opponent or "Opponent",
+        "date": match.date.strftime("%A, %b %d"),
+        "time": match.time_start or match.date.strftime("%I:%M %p"),
+        "venue": match.venue or "Venue",
+    }
 
-    # Save to in-memory file
+    for element in text_elements:
+        text = content_map.get(element.placeholder, f"[{element.placeholder}]")
+        
+        try:
+            font = ImageFont.truetype(f"/usr/share/fonts/truetype/dejavu/{element.font_family}.ttf", element.font_size)
+        except:
+            font = ImageFont.load_default()
+
+        # Calculate position
+        x = int(element.position_x * image_width)
+        y = int(element.position_y * image_height)
+
+        # Text alignment
+        text_size = draw.textsize(text, font=font)
+        if element.alignment == "center":
+            x -= text_size[0] // 2
+        elif element.alignment == "right":
+            x -= text_size[0]
+
+        draw.text((x, y), text, font=font, fill=element.text_color)
+
+    # Save & upload
     buffer = BytesIO()
     base_image.save(buffer, format="PNG")
     buffer.seek(0)
 
-    # Upload to Cloudinary
     upload_result = cloudinary.uploader.upload(
         buffer,
         folder=f"matchday_posts/club_{club.id}/",
@@ -99,7 +117,6 @@ def generate_matchday(request, match_id):
         resource_type="image"
     )
 
-    # Save URL to model (optional)
     match.matchday_post_url = upload_result['secure_url']
     match.save()
 

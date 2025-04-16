@@ -37,3 +37,27 @@ class Template(models.Model):
 
     def __str__(self):
         return f"{self.graphic_pack.name} - {self.content_type}"
+
+
+class TextElement(models.Model):
+    template = models.ForeignKey(Template, on_delete=models.CASCADE, related_name="text_elements")
+    placeholder = models.CharField(max_length=100)  # e.g., "name", "role", etc.
+    primary_font_family = models.CharField(max_length=300)
+    secondary_font_family = models.CharField(max_length=300)
+    primary_font_size = models.IntegerField()
+    secondary_font_size = models.IntegerField()
+    primary_text_color = models.CharField(max_length=7)  # Hex like "#FFFFFF"
+    secondary_text_color = models.CharField(max_length=7)
+    primary_position_x = models.FloatField()  # Percent (0.0 to 1.0) or absolute pixels
+    primary_position_y = models.FloatField()
+    secondary_position_x = models.FloatField()  # Percent (0.0 to 1.0) or absolute pixels
+    secondary_position_y = models.FloatField()
+    tertiary_position_x = models.FloatField()  # Percent (0.0 to 1.0) or absolute pixels
+    tertiary_position_y = models.FloatField()
+    quaternary_position_x = models.FloatField()  # Percent (0.0 to 1.0) or absolute pixels
+    quaternary_position_y = models.FloatField()
+    alignment = models.CharField(max_length=20, choices=[("left", "Left"), ("center", "Center"), ("right", "Right")], default="left")
+    max_width = models.FloatField(null=True, blank=True)  # Optional: to wrap text
+
+    def __str__(self):
+        return f"{self.template.name} - {self.placeholder}"

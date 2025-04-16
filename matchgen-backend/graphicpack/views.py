@@ -16,7 +16,7 @@ from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 import requests
 import cloudinary.uploader
-from utils import get_static_font_path
+from .utils import get_static_font_path
 
 
 class GraphicPackListView(ListAPIView):

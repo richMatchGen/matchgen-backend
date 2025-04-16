@@ -87,16 +87,15 @@ def generate_matchday(request, match_id):
     for element in text_elements:
         text = content_map.get(element.placeholder, f"[{element.placeholder}]")
         
-        font_path = get_static_font_path(
-            font_family=element.primary_font_family
-            # bold=getattr(element, "bold", False),
-            # italic=getattr(element, "italic", False),
-        )
+
 
         try:
-            font = ImageFont.truetype(font_path, element.primary_font_size)
+            font_path = get_static_font_path(
+                font_family=element.primary_font_family,
+            )
+            font = ImageFont.truetype(font_path, element.font_size)
         except Exception as e:
-            print(f"Font load failed for {font_path}: {e}")
+            print(f"[FONT ERROR] Failed to load font for element '{element.placeholder}': {e}")
             font = ImageFont.load_default()
 
         # Calculate position

@@ -16,6 +16,7 @@ from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 import requests
 import cloudinary.uploader
+from utils import get_static_font_path
 
 
 class GraphicPackListView(ListAPIView):
@@ -86,14 +87,21 @@ def generate_matchday(request, match_id):
     for element in text_elements:
         text = content_map.get(element.placeholder, f"[{element.placeholder}]")
         
+        font_path = get_static_font_path(
+            font_family=element.primary_font_family
+            # bold=getattr(element, "bold", False),
+            # italic=getattr(element, "italic", False),
+        )
+
         try:
-            font = ImageFont.truetype(f"/usr/share/fonts/truetype/dejavu/{element.font_family}.ttf", element.font_size)
-        except:
+            font = ImageFont.truetype(font_path, element.primary_font_size)
+        except Exception as e:
+            print(f"Font load failed for {font_path}: {e}")
             font = ImageFont.load_default()
 
         # Calculate position
-        x = int(element.position_x * image_width)
-        y = int(element.position_y * image_height)
+        x = int(element.primary_position_x)
+        y = int(element.primary_position_y)
 
         # Text alignment
         text_size = draw.textsize(text, font=font)
@@ -102,7 +110,7 @@ def generate_matchday(request, match_id):
         elif element.alignment == "right":
             x -= text_size[0]
 
-        draw.text((x, y), text, font=font, fill=element.text_color)
+        draw.text((x, y), text, font=font, fill=element.secondary_text_color)
 
     # Save & upload
     buffer = BytesIO()

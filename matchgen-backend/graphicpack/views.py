@@ -16,7 +16,8 @@ from io import BytesIO
 from PIL import Image, ImageDraw, ImageFont
 import requests
 import cloudinary.uploader
-from .utils import get_static_font_path
+import os
+from .utils import get_font
 
 
 class GraphicPackListView(ListAPIView):
@@ -51,7 +52,14 @@ class SelectGraphicPackView(APIView):
         return Response({"status": "selected", "pack": pack_id}, status=status.HTTP_200_OK)
     
 
-
+def get_font(font_path, size):
+    try:
+        # Resolve relative paths based on BASE_DIR
+        if not os.path.isabs(font_path):
+            font_path = os.path.join(settings.BASE_DIR, font_path.lstrip("/"))
+        return ImageFont.truetype(font_path, size)
+    except:
+        return ImageFont.load_default()
 
 
 def generate_matchday(request, match_id):
@@ -75,14 +83,10 @@ def generate_matchday(request, match_id):
 
 
     text_element = TextElement.objects.get(template=template, placeholder="matchday")
-    # Load font
-    try:
-        font_primary = ImageFont.truetype(text_element.primary_font_family, text_element.primary_font_size)
-        font_secondary = ImageFont.truetype(text_element.secondary_font_family, text_element.secondary_font_size)
-    except:
-        font_primary = ImageFont.load_default()
-        font_secondary = ImageFont.load_default()
 
+    # Load font
+    font_primary = get_font(text_element.primary_font_family, text_element.primary_font_size)
+    font_secondary = get_font(text_element.secondary_font_family, text_element.secondary_font_size)
     
     # Draw match info
     draw.text(
@@ -96,7 +100,7 @@ def generate_matchday(request, match_id):
         (text_element.primary_position_x, text_element.primary_position_y),
         match.date.strftime("%A, %b %d"),
         font=font_primary,
-        fill=text_element.primary_text_color
+        fill=text_element.secondary_text_color
     )
 
     draw.text(

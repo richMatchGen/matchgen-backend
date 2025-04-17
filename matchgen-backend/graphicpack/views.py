@@ -88,7 +88,7 @@ def generate_matchday(request, match_id):
 
     draw.text(
         (text_element.primary_position_x, text_element.primary_position_y),
-        match.date.strftime("%A, %b %d"),
+        match.date.strftime("%d.%m.%Y"),
         font=font_primary,
         fill=text_element.secondary_text_color
     )

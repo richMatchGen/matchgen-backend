@@ -54,11 +54,12 @@ class SelectGraphicPackView(APIView):
 
 
 
-def generate_matchday(request, match_id):
+def generate_matchday_cloudinary(request, match_id):
     match = get_object_or_404(Match, id=match_id)
     club = match.club
     selected_pack = club.selected_pack
 
+    
     if not selected_pack:
         return JsonResponse({"error": "Club has no selected graphic pack."}, status=400)
 
@@ -67,55 +68,57 @@ def generate_matchday(request, match_id):
     except:
         return JsonResponse({"error": "Matchday template not found in selected pack."}, status=404)
 
-    # Load base image
-    response = requests.get(template.background_image.url)
+    # Load base image from URL
+    response = requests.get(template.image_url)
     base_image = Image.open(BytesIO(response.content)).convert("RGBA")
     draw = ImageDraw.Draw(base_image)
-    image_width, image_height = base_image.size
-
-    # Fetch dynamic text elements
-    text_elements = TextElement.objects.filter(template=template)
-
-    # Mapping placeholders to actual match data
-    content_map = {
-        "opponent": match.opponent or "Opponent",
-        "date": match.date.strftime("%A, %b %d"),
-        "time": match.time_start or match.date.strftime("%I:%M %p"),
-        "venue": match.venue or "Venue",
-    }
-
-    for element in text_elements:
-        text = content_map.get(element.placeholder, f"[{element.placeholder}]")
-        
 
 
-        try:
-            font_path = get_static_font_path(
-                font_family=element.primary_font_family,
-            )
-            font = ImageFont.truetype(font_path, element.font_size)
-        except Exception as e:
-            print(f"[FONT ERROR] Failed to load font for element '{element.placeholder}': {e}")
-            font = ImageFont.load_default()
+    text_element = TextElement.objects.get(template=template, placeholder="matchday")
+    # Load font
+    try:
+        font_primary = ImageFont.truetype(text_element.primary_font_family, text_element.primary_font_size)
+        font_secondary = ImageFont.truetype(text_element.secondary_font_family, text_element.secondary_font_size)
+    except:
+        font_primary = ImageFont.load_default()
+        font_secondary = ImageFont.load_default()
 
-        # Calculate position
-        x = int(element.primary_position_x)
-        y = int(element.primary_position_y)
+    
+    # Draw match info
+    draw.text(
+        (text_element.secondary_position_x, text_element.secondary_position_y),
+        match.opponent or "Opponent",
+        font=font_secondary,
+        fill=text_element.secondary_text_color
+    )
 
-        # Text alignment
-        text_size = draw.textsize(text, font=font)
-        if element.alignment == "center":
-            x -= text_size[0] // 2
-        elif element.alignment == "right":
-            x -= text_size[0]
+    draw.text(
+        (text_element.primary_position_x, text_element.primary_position_y),
+        match.date.strftime("%A, %b %d"),
+        font=font_primary,
+        fill=text_element.primary_text_color
+    )
 
-        draw.text((x, y), text, font=font, fill=element.secondary_text_color)
+    draw.text(
+        (text_element.tertiary_position_x, text_element.tertiary_position_y),
+        match.time_start or match.date.strftime("%I:%M %p"),
+        font=font_secondary,
+        fill=text_element.secondary_text_color
+    )
 
-    # Save & upload
+    draw.text(
+        (text_element.quaternary_position_x, text_element.quaternary_position_y),
+        match.venue or "Venue",
+        font=font_secondary,
+        fill=text_element.secondary_text_color
+    )
+
+    # Save to in-memory file
     buffer = BytesIO()
     base_image.save(buffer, format="PNG")
     buffer.seek(0)
 
+    # Upload to Cloudinary
     upload_result = cloudinary.uploader.upload(
         buffer,
         folder=f"matchday_posts/club_{club.id}/",
@@ -124,6 +127,7 @@ def generate_matchday(request, match_id):
         resource_type="image"
     )
 
+    # Save URL to model (optional)
     match.matchday_post_url = upload_result['secure_url']
     match.save()
 

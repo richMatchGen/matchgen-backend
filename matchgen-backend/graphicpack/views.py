@@ -54,7 +54,7 @@ class SelectGraphicPackView(APIView):
 
 
 
-def generate_matchday_cloudinary(request, match_id):
+def generate_matchday(request, match_id):
     match = get_object_or_404(Match, id=match_id)
     club = match.club
     selected_pack = club.selected_pack

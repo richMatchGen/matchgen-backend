@@ -56,6 +56,12 @@ class TextElement(models.Model):
     tertiary_position_y = models.FloatField()
     quaternary_position_x = models.FloatField()  # Percent (0.0 to 1.0) or absolute pixels
     quaternary_position_y = models.FloatField()
+    quinary_position_x = models.FloatField(default=0) # Percent (0.0 to 1.0) or absolute pixels
+    quinary_position_y = models.FloatField(default=0)
+    senary_position_x = models.FloatField(default=0) # Percent (0.0 to 1.0) or absolute pixels
+    senary_position_y = models.FloatField(default=0)
+    septenary_position_x = models.FloatField(default=0)  # Percent (0.0 to 1.0) or absolute pixels
+    septenary_position_y = models.FloatField(default=0)
     alignment = models.CharField(max_length=20, choices=[("left", "Left"), ("center", "Center"), ("right", "Right")], default="left")
     max_width = models.FloatField(null=True, blank=True)  # Optional: to wrap text
 

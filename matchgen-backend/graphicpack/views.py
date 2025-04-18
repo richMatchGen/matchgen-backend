@@ -81,14 +81,14 @@ def generate_matchday(request, match_id):
     # Draw match info
     draw.text(
         (text_element.secondary_position_x, text_element.secondary_position_y),
-        match.club,
-        font=font_secondary,
+        club.name,
+        font=font_primary,
         fill=text_element.secondary_text_color
     )
     draw.text(
-        (text_element.secondary_position_x, text_element.secondary_position_y),
+        (text_element.quaternary_position_x, text_element.quaternary_position_y),
         match.opponent or "Opponent",
-        font=font_secondary,
+        font=font_primary,
         fill=text_element.primary_text_color
     )
 
@@ -102,15 +102,15 @@ def generate_matchday(request, match_id):
     draw.text(
         (text_element.tertiary_position_x, text_element.tertiary_position_y),
         match.time_start or match.date.strftime("%I:%M %p"),
-        font=font_secondary,
-        fill=text_element.secondary_text_color
+        font=font_primary,
+        fill=text_element.primary_text_color
     )
 
     draw.text(
         (text_element.quaternary_position_x, text_element.quaternary_position_y),
         match.venue or "Venue",
-        font=font_secondary,
-        fill=text_element.secondary_text_color
+        font=font_primary,
+        fill=text_element.primary_text_color
     )
 
     # Save to in-memory file

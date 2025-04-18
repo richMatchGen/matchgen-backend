@@ -81,9 +81,15 @@ def generate_matchday(request, match_id):
     # Draw match info
     draw.text(
         (text_element.secondary_position_x, text_element.secondary_position_y),
-        match.opponent or "Opponent",
+        match.club,
         font=font_secondary,
         fill=text_element.secondary_text_color
+    )
+    draw.text(
+        (text_element.secondary_position_x, text_element.secondary_position_y),
+        match.opponent or "Opponent",
+        font=font_secondary,
+        fill=text_element.primary_text_color
     )
 
     draw.text(

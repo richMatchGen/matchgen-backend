@@ -3,7 +3,7 @@ from rest_framework import generics, status
 from rest_framework.generics import ListAPIView
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
-from .models import GraphicPack, UserSelection, TextElement
+from .models import GraphicPack, UserSelection, TextElement,Template,StringElement,ImageElement
 from users.models import Club
 from .serializers import GraphicPackSerializer
 from rest_framework.parsers import JSONParser, MultiPartParser
@@ -61,67 +61,73 @@ def wrap_text(draw, text, font, max_width):
     return lines
 
 
-def get_element_content(match, club, key):
-    return {
-        "club_name": club.name,
-        "opponent": match.opponent or "Opponent",
-        "match_date": match.date.strftime("%d.%m.%Y"),
-        "kickoff_time": match.time_start or match.date.strftime("%I:%M %p"),
-        "venue": match.venue or "Venue",
-        # Add more keys here as needed
-    }.get(key)
-
-
-logger = logging.getLogger(__name__)
 
 def generate_matchday(request, match_id):
     match = get_object_or_404(Match, id=match_id)
     club = match.club
     selected_pack = club.selected_pack
-    logger.debug(f"Generating matchday for match ID: {match_id}")
 
     if not selected_pack:
         return JsonResponse({"error": "Club has no selected graphic pack."}, status=400)
 
-    template = selected_pack.templates.filter(content_type="matchday").first()
-    if not template:
-        return JsonResponse({"error": "No matchday template found in selected pack."}, status=404)
+    try:
+        template = selected_pack.templates.get(content_type="matchday")
+    except Template.DoesNotExist:
+        return JsonResponse({"error": "Matchday template not found in selected pack."}, status=404)
 
-    # Load base image
+    # Load base image from URL
     response = requests.get(template.image_url)
     base_image = Image.open(BytesIO(response.content)).convert("RGBA")
     draw = ImageDraw.Draw(base_image)
 
+    # Content mapping
+    content = {
+        "club_name": club.name,
+        "opponent": match.opponent,
+        "date": match.date.strftime("%d.%m.%Y"),
+        "time": match.time_start or match.date.strftime("%I:%M %p"),
+        "venue": match.venue or "Venue",
+        "club_logo": match.club_logo,
+        "opponent_logo": match.opponent_logo,
+    }
+
     # Render text elements
-    for element in template.string_elements.all():
-        content = get_element_content(match, club, element.content_key)
-        if not content:
-            continue
+    for element in template.elements.filter(type="text"):
+        for string in element.string_elements.all():
+            value = content.get(string.content_key, "")
+            if not value:
+                continue
 
-        font = get_font(element.font_family, element.font_size)
-        x, y = element.x, element.y
-        color = element.color or "#FFFFFF"
+            font = get_font(string.font_family, string.font_size)
 
-        if element.max_width:
-            lines = wrap_text(draw, str(content), font, element.max_width)
-            line_height = font.getsize("Ay")[1]
-            for i, line in enumerate(lines):
-                line_x = x
-                if element.alignment == "center":
-                    line_x = x - draw.textlength(line, font=font) / 2
-                elif element.alignment == "right":
-                    line_x = x - draw.textlength(line, font=font)
+            draw.text(
+                (element.x, element.y),
+                value,
+                font=font,
+                fill=string.color
+            )
 
-                draw.text((line_x, y + i * line_height), line, font=font, fill=color)
-        else:
-            if element.alignment == "center":
-                x -= draw.textlength(str(content), font=font) / 2
-            elif element.alignment == "right":
-                x -= draw.textlength(str(content), font=font)
+    # Render image elements
+    for element in template.elements.filter(type="image"):
+        for image in element.image_elements.all():
+            image_url = content.get(image.content_key)
+            if not image_url:
+                continue
+            try:
+                img_response = requests.get(image_url)
+                img = Image.open(BytesIO(img_response.content)).convert("RGBA")
 
-            draw.text((x, y), str(content), font=font, fill=color)
+                if image.maintain_aspect_ratio:
+                    img.thumbnail((element.width, element.height))
+                else:
+                    img = img.resize((int(element.width), int(element.height)))
 
-    # Save image to buffer
+                base_image.paste(img, (int(element.x), int(element.y)), img)
+            except Exception as e:
+                print(f"Error loading image: {e}")
+                continue
+
+    # Save to buffer
     buffer = BytesIO()
     base_image.save(buffer, format="PNG")
     buffer.seek(0)

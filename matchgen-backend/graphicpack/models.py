@@ -67,3 +67,29 @@ class TextElement(models.Model):
 
     def __str__(self):
         return f"{self.template.name} - {self.placeholder}"
+    
+
+class TemplateElement(models.Model):
+    template = models.ForeignKey(Template, related_name='elements', on_delete=models.CASCADE)
+    type = models.CharField(max_length=10, choices=[("text", "Text"), ("image", "Image")])
+    x = models.FloatField()  # Use % or pixel, depending on your rendering logic
+    y = models.FloatField()
+    width = models.FloatField(blank=True, null=True)  # Only used for images
+    height = models.FloatField(blank=True, null=True)
+    rotation = models.FloatField(default=0.0)
+
+# Text elements
+class StringElement(models.Model):
+    template = models.ForeignKey(TemplateElement, related_name='string_elements', on_delete=models.CASCADE)
+    content_key = models.CharField(max_length=50)  # e.g., "match_title"
+    font_family = models.CharField(max_length=100, default="Arial.ttf")
+    font_size = models.IntegerField(default=24)
+    color = models.CharField(max_length=7, default="#FFFFFF")
+    alignment = models.CharField(max_length=10, choices=[("left", "Left"), ("center", "Center"), ("right", "Right")], default="left")
+    max_width = models.FloatField(null=True, blank=True)
+
+# Image elements
+class ImageElement(models.Model):
+    template = models.ForeignKey(TemplateElement, related_name='image_elements', on_delete=models.CASCADE)
+    content_key = models.CharField(max_length=50)  # e.g., "team_logo"
+    maintain_aspect_ratio = models.BooleanField(default=True)

@@ -24,13 +24,7 @@ class GraphicPackListView(ListAPIView):
     queryset = GraphicPack.objects.all()
     serializer_class = GraphicPackSerializer
 
-# class SelectGraphicPackView(APIView):
-#     def post(self, request):
-#         pack_id = request.data.get("pack_id")
-#         pack = get_object_or_404(GraphicPack, id=pack_id)
-#         UserSelection.objects.update_or_create(user=request.user, defaults={"selected_pack": pack})
-#         return Response({"status": "selected", "pack": pack_id})
-    
+  
 class SelectGraphicPackView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -50,76 +44,81 @@ class SelectGraphicPackView(APIView):
         club.save()
 
         return Response({"status": "selected", "pack": pack_id}, status=status.HTTP_200_OK)
-    
+
+def wrap_text(draw, text, font, max_width):
+    words = text.split()
+    lines = []
+    line = ""
+    for word in words:
+        test_line = f"{line} {word}".strip()
+        if draw.textlength(test_line, font=font) <= max_width:
+            line = test_line
+        else:
+            lines.append(line)
+            line = word
+    lines.append(line)
+    return lines
+
+
+def get_element_content(match, club, key):
+    return {
+        "club_name": club.name,
+        "opponent": match.opponent or "Opponent",
+        "match_date": match.date.strftime("%d.%m.%Y"),
+        "kickoff_time": match.time_start or match.date.strftime("%I:%M %p"),
+        "venue": match.venue or "Venue",
+        # Add more keys here as needed
+    }.get(key)
+
+
 
 def generate_matchday(request, match_id):
     match = get_object_or_404(Match, id=match_id)
     club = match.club
     selected_pack = club.selected_pack
 
-    
     if not selected_pack:
         return JsonResponse({"error": "Club has no selected graphic pack."}, status=400)
 
-    try:
-        template = selected_pack.templates.get(content_type="matchday")
-    except:
-        return JsonResponse({"error": "Matchday template not found in selected pack."}, status=404)
+    template = selected_pack.templates.filter(content_type="matchday").first()
+    if not template:
+        return JsonResponse({"error": "No matchday template found in selected pack."}, status=404)
 
-    # Load base image from URL
+    # Load base image
     response = requests.get(template.image_url)
     base_image = Image.open(BytesIO(response.content)).convert("RGBA")
     draw = ImageDraw.Draw(base_image)
 
+    # Render text elements
+    for element in template.string_elements.all():
+        content = get_element_content(match, club, element.content_key)
+        if not content:
+            continue
 
-    text_element = TextElement.objects.get(template=template, placeholder="matchday")
+        font = get_font(element.font_family, element.font_size)
+        x, y = element.x, element.y
+        color = element.color or "#FFFFFF"
 
-    # Load font
-    font_primary = get_font(text_element.primary_font_family, text_element.primary_font_size)
-    font_secondary = get_font(text_element.secondary_font_family, text_element.secondary_font_size)
-    
-    # Draw match info
-    draw.text(
-        (text_element.secondary_position_x, text_element.secondary_position_y),
-        club.name,
-        font=font_primary,
-        fill=text_element.secondary_text_color
-    )
-    draw.text(
-        (text_element.secondary_position_x, text_element.secondary_position_y),
-        club.name,
-        font=font_primary,
-        fill=text_element.primary_text_color
-    )    
-    draw.text(
-        (text_element.tertiary_position_x, text_element.tertiary_position_y),
-        match.opponent or "Opponent",
-        font=font_primary,
-        fill=text_element.primary_text_color
-    )
+        if element.max_width:
+            lines = wrap_text(draw, str(content), font, element.max_width)
+            line_height = font.getsize("Ay")[1]
+            for i, line in enumerate(lines):
+                line_x = x
+                if element.alignment == "center":
+                    line_x = x - draw.textlength(line, font=font) / 2
+                elif element.alignment == "right":
+                    line_x = x - draw.textlength(line, font=font)
 
-    draw.text(
-        (text_element.quaternary_position_x, text_element.quaternary_position_y),
-        match.date.strftime("%d.%m.%Y"),
-        font=font_primary,
-        fill=text_element.secondary_text_color
-    )   
+                draw.text((line_x, y + i * line_height), line, font=font, fill=color)
+        else:
+            if element.alignment == "center":
+                x -= draw.textlength(str(content), font=font) / 2
+            elif element.alignment == "right":
+                x -= draw.textlength(str(content), font=font)
 
-    draw.text(
-        (text_element.quinary_position_x, text_element.quinary_position_x),
-        match.time_start or match.date.strftime("%I:%M %p"),
-        font=font_primary,
-        fill=text_element.primary_text_color
-    )
+            draw.text((x, y), str(content), font=font, fill=color)
 
-    draw.text(
-        (text_element.senary_position_x, text_element.senary_position_y),
-        match.venue or "Venue",
-        font=font_primary,
-        fill=text_element.primary_text_color
-    )
-
-    # Save to in-memory file
+    # Save image to buffer
     buffer = BytesIO()
     base_image.save(buffer, format="PNG")
     buffer.seek(0)
@@ -133,8 +132,6 @@ def generate_matchday(request, match_id):
         resource_type="image"
     )
 
-
-    # Save URL to model (optional)
     match.matchday_post_url = upload_result['secure_url']
     match.save()
 

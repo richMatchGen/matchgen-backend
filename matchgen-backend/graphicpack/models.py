@@ -50,17 +50,6 @@ class TextElement(models.Model):
     secondary_text_color = models.CharField(max_length=7)
     primary_position_x = models.FloatField()  # Percent (0.0 to 1.0) or absolute pixels
     primary_position_y = models.FloatField()
-    secondary_position_x = models.FloatField()  # Percent (0.0 to 1.0) or absolute pixels
-    secondary_position_y = models.FloatField()
-    tertiary_position_x = models.FloatField()  # Percent (0.0 to 1.0) or absolute pixels
-    tertiary_position_y = models.FloatField()
-    quaternary_position_x = models.FloatField()  # Percent (0.0 to 1.0) or absolute pixels
-    quaternary_position_y = models.FloatField()
-    quinary_position_x = models.FloatField(default=0) # Percent (0.0 to 1.0) or absolute pixels
-    quinary_position_y = models.FloatField(default=0)
-    senary_position_x = models.FloatField(default=0) # Percent (0.0 to 1.0) or absolute pixels
-    senary_position_y = models.FloatField(default=0)
-    septenary_position_x = models.FloatField(default=0)  # Percent (0.0 to 1.0) or absolute pixels
     septenary_position_y = models.FloatField(default=0)
     alignment = models.CharField(max_length=20, choices=[("left", "Left"), ("center", "Center"), ("right", "Right")], default="left")
     max_width = models.FloatField(null=True, blank=True)  # Optional: to wrap text
@@ -72,6 +61,7 @@ class TextElement(models.Model):
 class TemplateElement(models.Model):
     template = models.ForeignKey(Template, related_name='elements', on_delete=models.CASCADE)
     type = models.CharField(max_length=10, choices=[("text", "Text"), ("image", "Image")])
+    content_key = models.CharField(max_length=50,null=True, blank=True) # e.g., "match_title"
     x = models.FloatField()  # Use % or pixel, depending on your rendering logic
     y = models.FloatField()
     width = models.FloatField(blank=True, null=True)  # Only used for images

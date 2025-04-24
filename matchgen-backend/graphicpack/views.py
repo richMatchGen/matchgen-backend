@@ -18,6 +18,7 @@ import requests
 import cloudinary.uploader
 import os
 from .utils import get_font
+import logging
 
 
 class GraphicPackListView(ListAPIView):
@@ -71,11 +72,13 @@ def get_element_content(match, club, key):
     }.get(key)
 
 
+logger = logging.getLogger(__name__)
 
 def generate_matchday(request, match_id):
     match = get_object_or_404(Match, id=match_id)
     club = match.club
     selected_pack = club.selected_pack
+    logger.debug(f"Generating matchday for match ID: {match_id}")
 
     if not selected_pack:
         return JsonResponse({"error": "Club has no selected graphic pack."}, status=400)

@@ -84,7 +84,9 @@ def generate_matchday(request, match_id):
     content = {
         "club_name": club.name,
         "opponent": match.opponent,
+        "Versus":"Versus",
         "date": match.date.strftime("%d.%m.%Y"),
+        "start": "Kick Off",
         "time": match.time_start or match.date.strftime("%I:%M %p"),
         "venue": match.venue or "Venue",
         "club_logo": match.club_logo,

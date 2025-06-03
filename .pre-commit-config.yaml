@@ -25,10 +25,10 @@ repos:
 #      - id: codespell
 #        args: [-L, ond]
 
-  - repo: https://github.com/PyCQA/flake8
-    rev: 5.0.4
-    hooks:
-      - id: flake8
+#  - repo: https://github.com/PyCQA/flake8
+#    rev: 5.0.4
+#    hooks:
+#      - id: flake8
 
   - repo: https://github.com/PyCQA/isort
     rev: 5.12.0

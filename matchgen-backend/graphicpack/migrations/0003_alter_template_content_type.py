@@ -6,13 +6,24 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('graphicpack', '0002_remove_graphicpack_preview_image_and_more'),
+        ("graphicpack", "0002_remove_graphicpack_preview_image_and_more"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='template',
-            name='content_type',
-            field=models.CharField(choices=[('matchday', 'Matchday'), ('result', 'Result'), ('lineup', 'Lineup'), ('fixture', 'Fixture'), ('upcomingFixtures', 'Upcoming Fixtures'), ('alert', 'Alert'), ('player', 'Player')], max_length=100),
+            model_name="template",
+            name="content_type",
+            field=models.CharField(
+                choices=[
+                    ("matchday", "Matchday"),
+                    ("result", "Result"),
+                    ("lineup", "Lineup"),
+                    ("fixture", "Fixture"),
+                    ("upcomingFixtures", "Upcoming Fixtures"),
+                    ("alert", "Alert"),
+                    ("player", "Player"),
+                ],
+                max_length=100,
+            ),
         ),
     ]

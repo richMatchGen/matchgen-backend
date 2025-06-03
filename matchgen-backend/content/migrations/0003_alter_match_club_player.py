@@ -7,27 +7,49 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('content', '0002_match_club_logo_match_match_type_match_opponent_logo_and_more'),
-        ('users', '0006_club'),
+        (
+            "content",
+            "0002_match_club_logo_match_match_type_match_opponent_logo_and_more",
+        ),
+        ("users", "0006_club"),
     ]
 
     operations = [
         migrations.AlterField(
-            model_name='match',
-            name='club',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='matches', to='users.club'),
+            model_name="match",
+            name="club",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="matches",
+                to="users.club",
+            ),
         ),
         migrations.CreateModel(
-            name='Player',
+            name="Player",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=255)),
-                ('squad_no', models.CharField(max_length=4)),
-                ('player_pic', models.URLField(blank=True, null=True)),
-                ('formatted_pic', models.URLField(blank=True, null=True)),
-                ('sponsor', models.URLField(blank=True, null=True)),
-                ('position', models.CharField(max_length=255)),
-                ('club', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='players', to='users.club')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("squad_no", models.CharField(max_length=4)),
+                ("player_pic", models.URLField(blank=True, null=True)),
+                ("formatted_pic", models.URLField(blank=True, null=True)),
+                ("sponsor", models.URLField(blank=True, null=True)),
+                ("position", models.CharField(max_length=255)),
+                (
+                    "club",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="players",
+                        to="users.club",
+                    ),
+                ),
             ],
         ),
     ]

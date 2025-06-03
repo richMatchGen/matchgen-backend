@@ -7,14 +7,19 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('graphicpack', '0003_alter_template_content_type'),
-        ('users', '0006_club'),
+        ("graphicpack", "0003_alter_template_content_type"),
+        ("users", "0006_club"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='club',
-            name='selected_pack',
-            field=models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, to='graphicpack.graphicpack'),
+            model_name="club",
+            name="selected_pack",
+            field=models.ForeignKey(
+                blank=True,
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                to="graphicpack.graphicpack",
+            ),
         ),
     ]

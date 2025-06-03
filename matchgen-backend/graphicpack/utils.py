@@ -1,10 +1,13 @@
 import os
+
 from django.conf import settings
 from PIL import Image, ImageDraw, ImageFont
 
+
 def get_font(font_filename, size):
-    from django.conf import settings
     import os
+
+    from django.conf import settings
     from PIL import ImageFont
 
     try:

@@ -1,50 +1,62 @@
+import csv
+import io
+import logging
+import os
+from io import BytesIO
+
+import cloudinary.uploader
+import requests
+from content.models import Match
+from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
+from django.utils import timezone
+from PIL import Image, ImageDraw, ImageFont
 from rest_framework import generics, status
 from rest_framework.generics import ListAPIView
-from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
-from .models import GraphicPack, UserSelection, TextElement,Template,StringElement,ImageElement
-from users.models import Club
-from .serializers import GraphicPackSerializer
 from rest_framework.parsers import JSONParser, MultiPartParser
-from django.utils import timezone
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
 from rest_framework.views import APIView
-import csv, io
-from django.http import JsonResponse
-from content.models import Match
-from io import BytesIO
-from PIL import Image, ImageDraw, ImageFont
-import requests
-import cloudinary.uploader
-import os
+from users.models import Club
+
+from .models import (GraphicPack, ImageElement, StringElement, Template,
+                     TextElement, UserSelection)
+from .serializers import GraphicPackSerializer
 from .utils import get_font
-import logging
 
 
 class GraphicPackListView(ListAPIView):
     queryset = GraphicPack.objects.all()
     serializer_class = GraphicPackSerializer
 
-  
+
 class SelectGraphicPackView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         pack_id = request.data.get("pack_id")
         if not pack_id:
-            return Response({"error": "pack_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(
+                {"error": "pack_id is required"}, status=status.HTTP_400_BAD_REQUEST
+            )
 
         pack = get_object_or_404(GraphicPack, id=pack_id)
 
         try:
             club = Club.objects.get(user=request.user)
         except Club.DoesNotExist:
-            return Response({"error": "Club not found for this user"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"error": "Club not found for this user"},
+                status=status.HTTP_404_NOT_FOUND,
+            )
 
         club.selected_pack = pack
         club.save()
 
-        return Response({"status": "selected", "pack": pack_id}, status=status.HTTP_200_OK)
+        return Response(
+            {"status": "selected", "pack": pack_id}, status=status.HTTP_200_OK
+        )
+
 
 def wrap_text(draw, text, font, max_width):
     words = text.split()
@@ -61,7 +73,6 @@ def wrap_text(draw, text, font, max_width):
     return lines
 
 
-
 def generate_matchday(request, match_id):
     match = get_object_or_404(Match, id=match_id)
     club = match.club
@@ -73,7 +84,9 @@ def generate_matchday(request, match_id):
     try:
         template = selected_pack.templates.get(content_type="matchday")
     except Template.DoesNotExist:
-        return JsonResponse({"error": "Matchday template not found in selected pack."}, status=404)
+        return JsonResponse(
+            {"error": "Matchday template not found in selected pack."}, status=404
+        )
 
     # Load base image from URL
     response = requests.get(template.image_url)
@@ -84,7 +97,7 @@ def generate_matchday(request, match_id):
     content = {
         "club_name": club.name,
         "opponent": match.opponent,
-        "Versus":"Versus",
+        "Versus": "Versus",
         "date": match.date.strftime("%d.%m.%Y"),
         "start": "Kick Off",
         "time": match.time_start or match.date.strftime("%I:%M %p"),
@@ -102,12 +115,7 @@ def generate_matchday(request, match_id):
 
             font = get_font(string.font_family, string.font_size)
 
-            draw.text(
-                (element.x, element.y),
-                value,
-                font=font,
-                fill=string.color
-            )
+            draw.text((element.x, element.y), value, font=font, fill=string.color)
 
     # Render image elements
     for element in template.elements.filter(type="image"):
@@ -140,12 +148,10 @@ def generate_matchday(request, match_id):
         folder=f"matchday_posts/club_{club.id}/",
         public_id=f"match_{match.id}",
         overwrite=True,
-        resource_type="image"
+        resource_type="image",
     )
 
-    match.matchday_post_url = upload_result['secure_url']
+    match.matchday_post_url = upload_result["secure_url"]
     match.save()
 
-    return JsonResponse({"url": upload_result['secure_url']})
-
-
+    return JsonResponse({"url": upload_result["secure_url"]})

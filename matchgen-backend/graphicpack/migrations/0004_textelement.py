@@ -7,32 +7,58 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('graphicpack', '0003_alter_template_content_type'),
+        ("graphicpack", "0003_alter_template_content_type"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='TextElement',
+            name="TextElement",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('placeholder', models.CharField(max_length=100)),
-                ('primary_font_family', models.CharField(max_length=300)),
-                ('secondary_font_family', models.CharField(max_length=300)),
-                ('primary_font_size', models.IntegerField()),
-                ('secondary_font_size', models.IntegerField()),
-                ('primary_text_color', models.CharField(max_length=7)),
-                ('secondary_text_color', models.CharField(max_length=7)),
-                ('primary_position_x', models.FloatField()),
-                ('primary_position_y', models.FloatField()),
-                ('secondary_position_x', models.FloatField()),
-                ('secondary_position_y', models.FloatField()),
-                ('tertiary_position_x', models.FloatField()),
-                ('tertiary_position_y', models.FloatField()),
-                ('quaternary_position_x', models.FloatField()),
-                ('quaternary_position_y', models.FloatField()),
-                ('alignment', models.CharField(choices=[('left', 'Left'), ('center', 'Center'), ('right', 'Right')], default='left', max_length=20)),
-                ('max_width', models.FloatField(blank=True, null=True)),
-                ('template', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='text_elements', to='graphicpack.template')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("placeholder", models.CharField(max_length=100)),
+                ("primary_font_family", models.CharField(max_length=300)),
+                ("secondary_font_family", models.CharField(max_length=300)),
+                ("primary_font_size", models.IntegerField()),
+                ("secondary_font_size", models.IntegerField()),
+                ("primary_text_color", models.CharField(max_length=7)),
+                ("secondary_text_color", models.CharField(max_length=7)),
+                ("primary_position_x", models.FloatField()),
+                ("primary_position_y", models.FloatField()),
+                ("secondary_position_x", models.FloatField()),
+                ("secondary_position_y", models.FloatField()),
+                ("tertiary_position_x", models.FloatField()),
+                ("tertiary_position_y", models.FloatField()),
+                ("quaternary_position_x", models.FloatField()),
+                ("quaternary_position_y", models.FloatField()),
+                (
+                    "alignment",
+                    models.CharField(
+                        choices=[
+                            ("left", "Left"),
+                            ("center", "Center"),
+                            ("right", "Right"),
+                        ],
+                        default="left",
+                        max_length=20,
+                    ),
+                ),
+                ("max_width", models.FloatField(blank=True, null=True)),
+                (
+                    "template",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="text_elements",
+                        to="graphicpack.template",
+                    ),
+                ),
             ],
         ),
     ]

@@ -8,26 +8,47 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('users', '0005_user_username'),
+        ("users", "0005_user_username"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='Club',
+            name="Club",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('name', models.CharField(max_length=100)),
-                ('logo', models.URLField(blank=True, null=True)),
-                ('sport', models.CharField(max_length=50)),
-                ('location', models.CharField(blank=True, max_length=500, null=True)),
-                ('founded_year', models.PositiveIntegerField(blank=True, null=True)),
-                ('venue_name', models.CharField(blank=True, max_length=100, null=True)),
-                ('website', models.URLField(blank=True, null=True)),
-                ('primary_color', models.CharField(blank=True, max_length=7, null=True)),
-                ('secondary_color', models.CharField(blank=True, max_length=7, null=True)),
-                ('bio', models.TextField(blank=True, null=True)),
-                ('league', models.CharField(blank=True, max_length=100, null=True)),
-                ('user', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='clubs', to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("name", models.CharField(max_length=100)),
+                ("logo", models.URLField(blank=True, null=True)),
+                ("sport", models.CharField(max_length=50)),
+                ("location", models.CharField(blank=True, max_length=500, null=True)),
+                ("founded_year", models.PositiveIntegerField(blank=True, null=True)),
+                ("venue_name", models.CharField(blank=True, max_length=100, null=True)),
+                ("website", models.URLField(blank=True, null=True)),
+                (
+                    "primary_color",
+                    models.CharField(blank=True, max_length=7, null=True),
+                ),
+                (
+                    "secondary_color",
+                    models.CharField(blank=True, max_length=7, null=True),
+                ),
+                ("bio", models.TextField(blank=True, null=True)),
+                ("league", models.CharField(blank=True, max_length=100, null=True)),
+                (
+                    "user",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="clubs",
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
         ),
     ]

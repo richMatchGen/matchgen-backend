@@ -6,52 +6,52 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('graphicpack', '0007_templateelement_alter_imageelement_template_and_more'),
+        ("graphicpack", "0007_templateelement_alter_imageelement_template_and_more"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='textelement',
-            name='quaternary_position_x',
+            model_name="textelement",
+            name="quaternary_position_x",
         ),
         migrations.RemoveField(
-            model_name='textelement',
-            name='quaternary_position_y',
+            model_name="textelement",
+            name="quaternary_position_y",
         ),
         migrations.RemoveField(
-            model_name='textelement',
-            name='quinary_position_x',
+            model_name="textelement",
+            name="quinary_position_x",
         ),
         migrations.RemoveField(
-            model_name='textelement',
-            name='quinary_position_y',
+            model_name="textelement",
+            name="quinary_position_y",
         ),
         migrations.RemoveField(
-            model_name='textelement',
-            name='secondary_position_x',
+            model_name="textelement",
+            name="secondary_position_x",
         ),
         migrations.RemoveField(
-            model_name='textelement',
-            name='secondary_position_y',
+            model_name="textelement",
+            name="secondary_position_y",
         ),
         migrations.RemoveField(
-            model_name='textelement',
-            name='senary_position_x',
+            model_name="textelement",
+            name="senary_position_x",
         ),
         migrations.RemoveField(
-            model_name='textelement',
-            name='senary_position_y',
+            model_name="textelement",
+            name="senary_position_y",
         ),
         migrations.RemoveField(
-            model_name='textelement',
-            name='septenary_position_x',
+            model_name="textelement",
+            name="septenary_position_x",
         ),
         migrations.RemoveField(
-            model_name='textelement',
-            name='tertiary_position_x',
+            model_name="textelement",
+            name="tertiary_position_x",
         ),
         migrations.RemoveField(
-            model_name='textelement',
-            name='tertiary_position_y',
+            model_name="textelement",
+            name="tertiary_position_y",
         ),
     ]

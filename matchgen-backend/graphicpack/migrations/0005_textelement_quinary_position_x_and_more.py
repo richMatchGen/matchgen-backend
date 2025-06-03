@@ -6,38 +6,38 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('graphicpack', '0004_textelement'),
+        ("graphicpack", "0004_textelement"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='textelement',
-            name='quinary_position_x',
+            model_name="textelement",
+            name="quinary_position_x",
             field=models.FloatField(default=0),
         ),
         migrations.AddField(
-            model_name='textelement',
-            name='quinary_position_y',
+            model_name="textelement",
+            name="quinary_position_y",
             field=models.FloatField(default=0),
         ),
         migrations.AddField(
-            model_name='textelement',
-            name='senary_position_x',
+            model_name="textelement",
+            name="senary_position_x",
             field=models.FloatField(default=0),
         ),
         migrations.AddField(
-            model_name='textelement',
-            name='senary_position_y',
+            model_name="textelement",
+            name="senary_position_y",
             field=models.FloatField(default=0),
         ),
         migrations.AddField(
-            model_name='textelement',
-            name='septenary_position_x',
+            model_name="textelement",
+            name="septenary_position_x",
             field=models.FloatField(default=0),
         ),
         migrations.AddField(
-            model_name='textelement',
-            name='septenary_position_y',
+            model_name="textelement",
+            name="septenary_position_y",
             field=models.FloatField(default=0),
         ),
     ]

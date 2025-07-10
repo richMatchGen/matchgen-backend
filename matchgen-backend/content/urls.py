@@ -1,7 +1,14 @@
 from django.urls import path
 
-from .views import (LastMatchView, MatchdayView, MatchListCreateView,
-                    MatchListView, PlayerListCreateView, UpcomingMatchView)
+from .views import (
+    LastMatchView,
+    MatchdayView,
+    MatchListCreateView,
+    MatchListView,
+    PlayerListCreateView,
+    UpcomingMatchView,
+    PlayerDetailView
+)
 
 urlpatterns = [
     path("matches/", MatchListCreateView.as_view(), name="match-list-create"),

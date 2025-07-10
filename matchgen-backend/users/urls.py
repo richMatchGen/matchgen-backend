@@ -2,11 +2,18 @@ from allauth.socialaccount.providers.google.views import GoogleOAuth2Adapter
 from dj_rest_auth.registration.views import SocialLoginView
 from django.urls import path
 from rest_framework.routers import DefaultRouter
-from rest_framework_simplejwt.views import (TokenObtainPairView,
-                                            TokenRefreshView)
+from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 
-from .views import (ClubDetailView, ClubViewSet, CreateClubView, LoginView,
-                    MyClubView, RegisterView, UserDetailView, UserListView)
+from .views import (
+    ClubDetailView,
+    ClubViewSet,
+    CreateClubView,
+    LoginView,
+    MyClubView,
+    RegisterView,
+    UserDetailView,
+    UserListView,
+)
 
 
 class GoogleLogin(SocialLoginView):

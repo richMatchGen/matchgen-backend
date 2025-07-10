@@ -6,8 +6,12 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
 from .models import Club, User
-from .serializers import (ClubSerializer, LoginSerializer, RegisterSerializer,
-                          UserSerializer)
+from .serializers import (
+    ClubSerializer,
+    LoginSerializer,
+    RegisterSerializer,
+    UserSerializer,
+)
 
 User = get_user_model()
 

@@ -19,8 +19,14 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from users.models import Club
 
-from .models import (GraphicPack, ImageElement, StringElement, Template,
-                     TextElement, UserSelection)
+from .models import (
+    GraphicPack,
+    ImageElement,
+    StringElement,
+    Template,
+    TextElement,
+    UserSelection,
+)
 from .serializers import GraphicPackSerializer
 from .utils import get_font
 

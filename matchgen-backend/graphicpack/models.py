@@ -1,5 +1,4 @@
-from django.conf import \
-    settings  # ✅ keeps it clean and safe for custom user models
+from django.conf import settings  # ✅ keeps it clean and safe for custom user models
 from django.db import models
 
 

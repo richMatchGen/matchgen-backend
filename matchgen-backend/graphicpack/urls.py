@@ -1,6 +1,7 @@
 from django.urls import path
 
-from .views import GraphicPackListView, SelectGraphicPackView, generate_matchday
+from .views import (GraphicPackListView, SelectGraphicPackView,
+                    generate_matchday)
 
 urlpatterns = [
     path("graphic-packs/", GraphicPackListView.as_view(), name="graphic-pack-list"),

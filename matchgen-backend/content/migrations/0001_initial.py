@@ -9,18 +9,33 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('users', '0006_club'),
+        ("users", "0006_club"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='Match',
+            name="Match",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('opponent', models.CharField(max_length=255)),
-                ('date', models.DateTimeField()),
-                ('location', models.CharField(max_length=255)),
-                ('club', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='content', to='users.club')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                ("opponent", models.CharField(max_length=255)),
+                ("date", models.DateTimeField()),
+                ("location", models.CharField(max_length=255)),
+                (
+                    "club",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="content",
+                        to="users.club",
+                    ),
+                ),
             ],
         ),
     ]

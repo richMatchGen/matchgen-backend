@@ -7,19 +7,19 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('users', '0002_alter_user_managers_remove_user_profile_picture_and_more'),
+        ("users", "0002_alter_user_managers_remove_user_profile_picture_and_more"),
     ]
 
     operations = [
         migrations.AlterModelManagers(
-            name='user',
+            name="user",
             managers=[
-                ('objects', django.contrib.auth.models.UserManager()),
+                ("objects", django.contrib.auth.models.UserManager()),
             ],
         ),
         migrations.AddField(
-            model_name='user',
-            name='profile_picture',
+            model_name="user",
+            name="profile_picture",
             field=models.URLField(blank=True, null=True),
         ),
     ]

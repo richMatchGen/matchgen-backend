@@ -15,16 +15,18 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path,include
 from django.http import JsonResponse
+from django.urls import include, path
+
 
 # Simple Root View to Show API is Working
 def home_view(request):
     return JsonResponse({"message": "MatchGen API is running!"})
 
+
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path('api/users/', include('users.urls')),
+    path("admin/", admin.site.urls),
+    path("api/users/", include("users.urls")),
     path("api/content/", include("content.urls")),
     path("api/graphicpack/", include("graphicpack.urls")),
     path("", home_view),  # Add this to fix "Not Found" issue

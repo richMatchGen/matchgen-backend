@@ -1,14 +1,20 @@
-from rest_framework import generics, status,viewsets, permissions
+from django.contrib.auth import get_user_model
+from rest_framework import generics, permissions, status, viewsets
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.permissions import AllowAny,IsAuthenticated
 from rest_framework_simplejwt.views import TokenObtainPairView
-from .serializers import RegisterSerializer, LoginSerializer, UserSerializer,ClubSerializer
-from .models import User,Club
-from django.contrib.auth import get_user_model
 
+from .models import Club, User
+from .serializers import (
+    ClubSerializer,
+    LoginSerializer,
+    RegisterSerializer,
+    UserSerializer,
+)
 
 User = get_user_model()
+
 
 class RegisterView(APIView):
     def post(self, request):
@@ -27,6 +33,7 @@ class RegisterView(APIView):
             print("Error:", str(e))  # ✅ Log the error in Railway logs
             return Response({"error": str(e)}, status=500)
 
+
 class LoginView(generics.GenericAPIView):
     serializer_class = LoginSerializer
     permission_classes = [AllowAny]
@@ -36,12 +43,14 @@ class LoginView(generics.GenericAPIView):
         serializer.is_valid(raise_exception=True)
         return Response(serializer.validated_data, status=status.HTTP_200_OK)
 
+
 class UserDetailView(generics.RetrieveAPIView):
     serializer_class = UserSerializer
     permission_classes = [IsAuthenticated]
 
     def get_object(self):
         return self.request.user
+
 
 class UserListView(APIView):
     def get(self, request):
@@ -60,6 +69,7 @@ class ClubViewSet(viewsets.ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(user=self.request.user)
 
+
 class ClubListView(generics.ListAPIView):
     queryset = Club.objects.all()
     serializer_class = ClubSerializer
@@ -70,11 +80,12 @@ class ClubDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Club.objects.all()
     serializer_class = ClubSerializer
     permission_classes = [permissions.IsAuthenticated]
-    lookup_field = 'id'
+    lookup_field = "id"
 
     def get_queryset(self):
         # Optional: limit access to the clubs the user created
         return Club.objects.filter(user=self.request.user)
+
 
 class CreateClubView(APIView):
     permission_classes = [IsAuthenticated]
@@ -85,14 +96,16 @@ class CreateClubView(APIView):
             serializer.save(user=request.user)
             return Response(serializer.data, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-    
-    
+
+
 class MyClubView(APIView):
     permission_classes = [IsAuthenticated]
 
     def get(self, request):
         club = Club.objects.filter(user=request.user).first()
         if not club:
-            return Response({"detail": "No club found"}, status=status.HTTP_404_NOT_FOUND)
+            return Response(
+                {"detail": "No club found"}, status=status.HTTP_404_NOT_FOUND
+            )
         serializer = ClubSerializer(club)
         return Response(serializer.data)

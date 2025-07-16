@@ -6,13 +6,13 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('graphicpack', '0008_remove_textelement_quaternary_position_x_and_more'),
+        ("graphicpack", "0008_remove_textelement_quaternary_position_x_and_more"),
     ]
 
     operations = [
         migrations.AddField(
-            model_name='templateelement',
-            name='content_key',
+            model_name="templateelement",
+            name="content_key",
             field=models.CharField(blank=True, max_length=50, null=True),
         ),
     ]

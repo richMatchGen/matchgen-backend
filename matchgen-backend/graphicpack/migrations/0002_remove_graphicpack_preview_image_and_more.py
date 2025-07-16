@@ -7,36 +7,66 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('graphicpack', '0001_initial'),
+        ("graphicpack", "0001_initial"),
     ]
 
     operations = [
         migrations.RemoveField(
-            model_name='graphicpack',
-            name='preview_image',
+            model_name="graphicpack",
+            name="preview_image",
         ),
         migrations.RemoveField(
-            model_name='graphicpack',
-            name='zip_file',
+            model_name="graphicpack",
+            name="zip_file",
         ),
         migrations.AddField(
-            model_name='graphicpack',
-            name='preview_image_url',
+            model_name="graphicpack",
+            name="preview_image_url",
             field=models.URLField(blank=True, null=True),
         ),
         migrations.AddField(
-            model_name='graphicpack',
-            name='zip_file_url',
+            model_name="graphicpack",
+            name="zip_file_url",
             field=models.URLField(blank=True, null=True),
         ),
         migrations.CreateModel(
-            name='Template',
+            name="Template",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('content_type', models.CharField(choices=[('matchday', 'Matchday'), ('result', 'Result'), ('lineup', 'Lineup'), ('fixture', 'Fixture'), ('upcomingFixtures', 'Upcoming Fixtures'), ('lineup', 'Lineup'), ('alert', 'Alert'), ('player', 'Player')], max_length=100)),
-                ('image_url', models.URLField()),
-                ('sport', models.CharField(blank=True, max_length=50)),
-                ('graphic_pack', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='templates', to='graphicpack.graphicpack')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "content_type",
+                    models.CharField(
+                        choices=[
+                            ("matchday", "Matchday"),
+                            ("result", "Result"),
+                            ("lineup", "Lineup"),
+                            ("fixture", "Fixture"),
+                            ("upcomingFixtures", "Upcoming Fixtures"),
+                            ("lineup", "Lineup"),
+                            ("alert", "Alert"),
+                            ("player", "Player"),
+                        ],
+                        max_length=100,
+                    ),
+                ),
+                ("image_url", models.URLField()),
+                ("sport", models.CharField(blank=True, max_length=50)),
+                (
+                    "graphic_pack",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="templates",
+                        to="graphicpack.graphicpack",
+                    ),
+                ),
             ],
         ),
     ]

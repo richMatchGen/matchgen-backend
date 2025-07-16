@@ -1,26 +1,31 @@
+from django.contrib.auth import authenticate, get_user_model
 from rest_framework import serializers
-from .models import User, Club
-from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
-from django.contrib.auth import authenticate
+
+from .models import Club, User
 
 User = get_user_model()
+
 
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'email', 'profile_picture']
+        fields = ["id", "email", "profile_picture"]
+
 
 class RegisterSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True)
 
     class Meta:
         model = User
-        fields = ['id', 'email', 'password']
+        fields = ["id", "email", "password"]
 
     def create(self, validated_data):
-        user = User.objects.create_user(email=validated_data['email'], password=validated_data['password'])
+        user = User.objects.create_user(
+            email=validated_data["email"], password=validated_data["password"]
+        )
         return user
+
 
 class LoginSerializer(serializers.Serializer):
     email = serializers.EmailField()
@@ -41,4 +46,4 @@ class LoginSerializer(serializers.Serializer):
 class ClubSerializer(serializers.ModelSerializer):
     class Meta:
         model = Club
-        fields = ['id', 'name', 'sport', 'logo']
+        fields = ["id", "name", "sport", "logo"]

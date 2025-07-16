@@ -7,31 +7,59 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('graphicpack', '0006_imageelement_stringelement'),
+        ("graphicpack", "0006_imageelement_stringelement"),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='TemplateElement',
+            name="TemplateElement",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('type', models.CharField(choices=[('text', 'Text'), ('image', 'Image')], max_length=10)),
-                ('x', models.FloatField()),
-                ('y', models.FloatField()),
-                ('width', models.FloatField(blank=True, null=True)),
-                ('height', models.FloatField(blank=True, null=True)),
-                ('rotation', models.FloatField(default=0.0)),
-                ('template', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='elements', to='graphicpack.template')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "type",
+                    models.CharField(
+                        choices=[("text", "Text"), ("image", "Image")], max_length=10
+                    ),
+                ),
+                ("x", models.FloatField()),
+                ("y", models.FloatField()),
+                ("width", models.FloatField(blank=True, null=True)),
+                ("height", models.FloatField(blank=True, null=True)),
+                ("rotation", models.FloatField(default=0.0)),
+                (
+                    "template",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="elements",
+                        to="graphicpack.template",
+                    ),
+                ),
             ],
         ),
         migrations.AlterField(
-            model_name='imageelement',
-            name='template',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='image_elements', to='graphicpack.templateelement'),
+            model_name="imageelement",
+            name="template",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="image_elements",
+                to="graphicpack.templateelement",
+            ),
         ),
         migrations.AlterField(
-            model_name='stringelement',
-            name='template',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='string_elements', to='graphicpack.templateelement'),
+            model_name="stringelement",
+            name="template",
+            field=models.ForeignKey(
+                on_delete=django.db.models.deletion.CASCADE,
+                related_name="string_elements",
+                to="graphicpack.templateelement",
+            ),
         ),
     ]

@@ -9,8 +9,8 @@ import json
 BASE_URL = "https://matchgen-backend-production.up.railway.app"
 HEALTH_URL = f"{BASE_URL}/api/users/health/"
 TOKEN_URL = f"{BASE_URL}/api/users/token/"
-SIMPLE_TOKEN_URL = f"{BASE_URL}/api/users/simple-token/"
-TEST_TOKEN_URL = f"{BASE_URL}/api/users/test-token/"
+LOGIN_URL = f"{BASE_URL}/api/users/login/"
+REGISTER_URL = f"{BASE_URL}/api/users/register/"
 
 def test_health_endpoint():
     """Test the health check endpoint"""
@@ -41,9 +41,9 @@ def test_cors_preflight():
         print(f"CORS preflight error: {e}")
         return False
 
-def test_simple_token_endpoint():
-    """Test the simple token endpoint"""
-    print("\nTesting simple token endpoint...")
+def test_login_endpoint():
+    """Test the login endpoint with sample data"""
+    print("\nTesting login endpoint...")
     try:
         headers = {
             'Content-Type': 'application/json',
@@ -53,14 +53,13 @@ def test_simple_token_endpoint():
             'email': 'test@example.com',
             'password': 'testpassword123'
         }
-        response = requests.post(SIMPLE_TOKEN_URL, headers=headers, json=data)
-        print(f"Simple token endpoint status: {response.status_code}")
+        response = requests.post(LOGIN_URL, headers=headers, json=data)
+        print(f"Login endpoint status: {response.status_code}")
         print(f"Response: {response.text}")
-        return response.status_code == 200  # Should always return 200
+        return response.status_code in [200, 401]  # 401 is expected for invalid credentials
     except Exception as e:
-        print(f"Simple token endpoint error: {e}")
+        print(f"Login endpoint error: {e}")
         return False
-
 
 def test_token_endpoint():
     """Test the token endpoint with sample data"""
@@ -82,10 +81,9 @@ def test_token_endpoint():
         print(f"Token endpoint error: {e}")
         return False
 
-
-def test_test_token_endpoint():
-    """Test the test token endpoint with sample data"""
-    print("\nTesting test-token endpoint...")
+def test_register_endpoint():
+    """Test the register endpoint with sample data"""
+    print("\nTesting register endpoint...")
     try:
         headers = {
             'Content-Type': 'application/json',
@@ -93,14 +91,16 @@ def test_test_token_endpoint():
         }
         data = {
             'email': 'test@example.com',
-            'password': 'testpassword123'
+            'username': 'testuser',
+            'password': 'TestPass123',
+            'password_confirm': 'TestPass123'
         }
-        response = requests.post(TEST_TOKEN_URL, headers=headers, json=data)
-        print(f"Test token endpoint status: {response.status_code}")
+        response = requests.post(REGISTER_URL, headers=headers, json=data)
+        print(f"Register endpoint status: {response.status_code}")
         print(f"Response: {response.text}")
-        return response.status_code in [200, 401]  # 401 is expected for invalid credentials
+        return response.status_code in [201, 400]  # 400 is expected if user already exists
     except Exception as e:
-        print(f"Test token endpoint error: {e}")
+        print(f"Register endpoint error: {e}")
         return False
 
 if __name__ == "__main__":
@@ -109,19 +109,19 @@ if __name__ == "__main__":
     
     health_ok = test_health_endpoint()
     cors_ok = test_cors_preflight()
-    simple_token_ok = test_simple_token_endpoint()
+    login_ok = test_login_endpoint()
     token_ok = test_token_endpoint()
-    test_token_ok = test_test_token_endpoint()
+    register_ok = test_register_endpoint()
     
     print("\n" + "=" * 50)
     print("Test Results:")
     print(f"Health endpoint: {'✅ PASS' if health_ok else '❌ FAIL'}")
     print(f"CORS preflight: {'✅ PASS' if cors_ok else '❌ FAIL'}")
-    print(f"Simple token endpoint: {'✅ PASS' if simple_token_ok else '❌ FAIL'}")
+    print(f"Login endpoint: {'✅ PASS' if login_ok else '❌ FAIL'}")
     print(f"Token endpoint: {'✅ PASS' if token_ok else '❌ FAIL'}")
-    print(f"Test token endpoint: {'✅ PASS' if test_token_ok else '❌ FAIL'}")
+    print(f"Register endpoint: {'✅ PASS' if register_ok else '❌ FAIL'}")
     
-    if all([health_ok, cors_ok, simple_token_ok, token_ok, test_token_ok]):
+    if all([health_ok, cors_ok, login_ok, token_ok, register_ok]):
         print("\n🎉 All tests passed! The API should be working correctly.")
     else:
         print("\n⚠️  Some tests failed. Check the logs above for details.")

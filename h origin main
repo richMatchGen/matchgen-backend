@@ -1,0 +1,33 @@
+[33mcommit 991d8b9f9f1d7c2d664120e03686f100aef1301e[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m
+Author: richMatchGen <rich@matchgen.co.uk>
+Date:   Sun Aug 17 13:19:22 2025 +0100
+
+    cursorAIchanges
+
+matchgen-backend/content/__pycache__/__init__.cpython-313.pyc
+matchgen-backend/content/__pycache__/admin.cpython-313.pyc
+matchgen-backend/content/__pycache__/apps.cpython-313.pyc
+matchgen-backend/content/__pycache__/models.cpython-313.pyc
+matchgen-backend/content/__pycache__/serializers.cpython-313.pyc
+matchgen-backend/content/__pycache__/urls.cpython-313.pyc
+matchgen-backend/content/__pycache__/views.cpython-313.pyc
+matchgen-backend/content/urls.py
+matchgen-backend/graphicpack/__pycache__/__init__.cpython-313.pyc
+matchgen-backend/graphicpack/__pycache__/admin.cpython-313.pyc
+matchgen-backend/graphicpack/__pycache__/apps.cpython-313.pyc
+matchgen-backend/graphicpack/__pycache__/models.cpython-313.pyc
+matchgen-backend/graphicpack/__pycache__/serializers.cpython-313.pyc
+matchgen-backend/graphicpack/__pycache__/urls.cpython-313.pyc
+matchgen-backend/graphicpack/__pycache__/utils.cpython-313.pyc
+matchgen-backend/graphicpack/__pycache__/views.cpython-313.pyc
+matchgen-backend/matchgen/__pycache__/__init__.cpython-313.pyc
+matchgen-backend/matchgen/__pycache__/settings.cpython-313.pyc
+matchgen-backend/matchgen/__pycache__/urls.cpython-313.pyc
+matchgen-backend/matchgen/settings.py
+matchgen-backend/users/__pycache__/__init__.cpython-313.pyc
+matchgen-backend/users/__pycache__/admin.cpython-313.pyc
+matchgen-backend/users/__pycache__/apps.cpython-313.pyc
+matchgen-backend/users/__pycache__/models.cpython-313.pyc
+matchgen-backend/users/__pycache__/serializers.cpython-313.pyc
+matchgen-backend/users/__pycache__/urls.cpython-313.pyc
+matchgen-backend/users/__pycache__/views.cpython-313.pyc

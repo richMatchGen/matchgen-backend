@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 """
 import os
 from pathlib import Path
+from datetime import timedelta
 
 import cloudinary
 import dj_database_url
@@ -18,36 +19,23 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
-
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = (
-    "django-insecure-14k-bd&@uce*9^)(3ysp9ao$(10)-0ckur9%_k@4et&$n0y=j="  # nosec B105
-)
+SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-14k-bd&@uce*9^)(3ysp9ao$(10)-0ckur9%_k@4et&$n0y=j=")
 
 # SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = os.getenv("DEBUG", "False").lower() == "true"
 
-DEBUG = os.getenv("DEBUG", "False") == "True"
+ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "matchgen-backend-production.up.railway.app,localhost,127.0.0.1").split(",")
 
+CSRF_TRUSTED_ORIGINS = os.getenv("CSRF_TRUSTED_ORIGINS", "https://matchgen-backend-production.up.railway.app,https://matchgen-frontend.vercel.app").split(",")
 
-ALLOWED_HOSTS = ["matchgen-backend-production.up.railway.app", "localhost", "127.0.0.1"]
-
-
-CSRF_TRUSTED_ORIGINS = [
-    "https://matchgen-backend-production.up.railway.app",  # Trusted CSRF origin
-    "https://matchgen-frontend.vercel.app",  # Frontend origin
-]
-
-CORS_ALLOWED_ORIGINS = [
-    "https://matchgen-frontend.vercel.app",
-    "http://localhost:3000",
-]
+CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "https://matchgen-frontend.vercel.app,http://localhost:3000").split(",")
 
 # Additional CORS settings for better compatibility
 CORS_ALLOW_CREDENTIALS = True
@@ -87,18 +75,24 @@ CORS_EXPOSE_HEADERS = [
 # Handle preflight requests
 CORS_PREFLIGHT_MAX_AGE = 86400
 
-# Additional CORS settings for production
-# CORS_REPLACE_HTTPS_REFERER = True  # Removed - deprecated setting
-
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
+    "DEFAULT_PERMISSION_CLASSES": (
+        "rest_framework.permissions.IsAuthenticated",
+    ),
+    "DEFAULT_RENDERER_CLASSES": (
+        "rest_framework.renderers.JSONRenderer",
+    ),
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 20,
+    "EXCEPTION_HANDLER": "matchgen.utils.custom_exception_handler",
 }
+
 DATABASES = {"default": dj_database_url.config(default=os.getenv("DATABASE_URL"))}
 
 # Application definition
-
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -106,7 +100,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    "django.contrib.sites",  # 👈 required for django-allauth
+    "django.contrib.sites",  # required for django-allauth
     # Third-party
     "rest_framework",
     "corsheaders",
@@ -117,13 +111,14 @@ INSTALLED_APPS = [
     "allauth.socialaccount.providers.google",
     "rest_framework_simplejwt",
     "rest_framework.authtoken",
-    "users",  # Our custom user app
-    "content",  # Our custom user app
+    # Local apps
+    "users",
+    "content",
     "graphicpack",
 ]
 
 MIDDLEWARE = [
-    "corsheaders.middleware.CorsMiddleware",          # ← FIRST
+    "corsheaders.middleware.CorsMiddleware",          # FIRST
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",     # optional but recommended if using WhiteNoise
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -136,27 +131,88 @@ MIDDLEWARE = [
 ]
 
 # Security settings for production
-SECURE_BROWSER_XSS_FILTER = True
-SECURE_CONTENT_TYPE_NOSNIFF = True
+if not DEBUG:
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
 X_FRAME_OPTIONS = 'DENY'
 
-# settings.py
+# Logging configuration
 LOGGING = {
-  "version": 1,
-  "disable_existing_loggers": False,
-  "handlers": {"console": {"class": "logging.StreamHandler"}},
-  "root": {"handlers": ["console"], "level": "INFO"},
-  "loggers": {
-    "django.request": {"handlers": ["console"], "level": "ERROR", "propagate": False},
-    "django.security": {"handlers": ["console"], "level": "ERROR", "propagate": False},
-    "rest_framework": {"handlers": ["console"], "level": "INFO", "propagate": False},
-  },
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
+            "style": "{",
+        },
+        "simple": {
+            "format": "{levelname} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "verbose",
+        },
+        "file": {
+            "class": "logging.FileHandler",
+            "filename": os.path.join(BASE_DIR, "logs", "django.log"),
+            "formatter": "verbose",
+        },
+    },
+    "root": {
+        "handlers": ["console"],
+        "level": "INFO",
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console", "file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django.request": {
+            "handlers": ["console", "file"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "django.security": {
+            "handlers": ["console", "file"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+        "rest_framework": {
+            "handlers": ["console", "file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "users": {
+            "handlers": ["console", "file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "content": {
+            "handlers": ["console", "file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "graphicpack": {
+            "handlers": ["console", "file"],
+            "level": "INFO",
+            "propagate": False,
+        },
+    },
 }
-
 
 # Ensure WhiteNoise serves static files
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
-
 
 ROOT_URLCONF = "matchgen.urls"
 
@@ -178,20 +234,16 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "matchgen.wsgi.application"
 
-
-# Database
-# https://docs.djangoproject.com/en/5.1/ref/settings/#databases
-
-
 # Password validation
-# https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
-
 AUTH_PASSWORD_VALIDATORS = [
     {
         "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
         "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
+        "OPTIONS": {
+            "min_length": 8,
+        },
     },
     {
         "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
@@ -201,58 +253,70 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
-# https://docs.djangoproject.com/en/5.1/topics/i18n/
-
 LANGUAGE_CODE = "en-us"
-
 TIME_ZONE = "UTC"
-
 USE_I18N = True
-
 USE_TZ = True
 
-
 # Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/5.1/howto/static-files/
-
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
-
 STATIC_URL = "static/"
-
 STATIC_FONT_DIR = os.path.join(BASE_DIR, "staticfiles", "fonts")
 
 # Default primary key field type
-# https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
-
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-from datetime import timedelta
-
+# Custom user model
 AUTH_USER_MODEL = "users.User"
 
+# JWT Settings
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(days=1),
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=1),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": True,
     "ALGORITHM": "HS256",
     "SIGNING_KEY": SECRET_KEY,
+    "VERIFYING_KEY": None,
+    "AUDIENCE": None,
+    "ISSUER": None,
+    "JWK_URL": None,
+    "LEEWAY": 0,
+    "AUTH_HEADER_TYPES": ("Bearer",),
+    "AUTH_HEADER_NAME": "HTTP_AUTHORIZATION",
+    "USER_ID_FIELD": "id",
+    "USER_ID_CLAIM": "user_id",
+    "USER_AUTHENTICATION_RULE": "rest_framework_simplejwt.authentication.default_user_authentication_rule",
+    "AUTH_TOKEN_CLASSES": ("rest_framework_simplejwt.tokens.AccessToken",),
+    "TOKEN_TYPE_CLAIM": "token_type",
+    "TOKEN_USER_CLASS": "rest_framework_simplejwt.models.TokenUser",
+    "JTI_CLAIM": "jti",
+    "SLIDING_TOKEN_REFRESH_EXP_CLAIM": "refresh_exp",
+    "SLIDING_TOKEN_LIFETIME": timedelta(minutes=5),
+    "SLIDING_TOKEN_REFRESH_LIFETIME": timedelta(days=1),
 }
 
-
+# Allauth settings
 ACCOUNT_USERNAME_REQUIRED = False
 ACCOUNT_EMAIL_REQUIRED = True
 ACCOUNT_AUTHENTICATION_METHOD = "email"
+ACCOUNT_EMAIL_VERIFICATION = "none"  # Set to "mandatory" for email verification
+ACCOUNT_UNIQUE_EMAIL = True
 
 SILENCED_SYSTEM_CHECKS = ["account.W001"]
 
+# Cloudinary configuration
 cloudinary.config(
     cloud_name=os.environ.get("CLOUDINARY_CLOUD_NAME"),
     api_key=os.environ.get("CLOUDINARY_API_KEY"),
     api_secret=os.environ.get("CLOUDINARY_API_SECRET"),
 )
 
-
 SITE_ID = 1
+
+# Create logs directory if it doesn't exist
+LOGS_DIR = os.path.join(BASE_DIR, "logs")
+if not os.path.exists(LOGS_DIR):
+    os.makedirs(LOGS_DIR)

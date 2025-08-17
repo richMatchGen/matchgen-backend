@@ -13,8 +13,6 @@ from .views import (
     LoginView,
     MyClubView,
     RegisterView,
-    SimpleTokenView,
-    TestTokenView,
     UserDetailView,
     UserListView,
 )
@@ -28,19 +26,22 @@ router = DefaultRouter()
 router.register(r"clubs", ClubViewSet, basename="club")
 
 urlpatterns = [
+    # Health check
     path("health/", HealthCheckView.as_view(), name="health-check"),
-    path("simple-token/", SimpleTokenView.as_view(), name="simple-token"),
-    path("test-token/", TestTokenView.as_view(), name="test-token"),
+    
+    # Authentication
     path("register/", RegisterView.as_view(), name="register"),
     path("login/", LoginView.as_view(), name="login"),
-    path("me/", UserDetailView.as_view(), name="user-detail"),
-    path("api/users/google/", GoogleLogin.as_view(), name="google_login"),
-    path("all-users/", UserListView.as_view(), name="all-users"),
-    # ✅ JWT login & refresh
     path("token/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
-    # ✅ Club
-    path("club/", CreateClubView.as_view(), name="club-list-create"),
+    path("google/", GoogleLogin.as_view(), name="google_login"),
+    
+    # User management
+    path("me/", UserDetailView.as_view(), name="user-detail"),
+    path("all-users/", UserListView.as_view(), name="all-users"),
+    
+    # Club management
+    path("club/", CreateClubView.as_view(), name="club-create"),
     path("club/<int:id>/", ClubDetailView.as_view(), name="club-detail"),
     path("my-club/", MyClubView.as_view(), name="my-club"),
-]
+] + router.urls

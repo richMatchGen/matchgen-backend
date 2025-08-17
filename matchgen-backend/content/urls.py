@@ -5,7 +5,6 @@ from .views import (
     MatchdayView,
     MatchListCreateView,
     MatchListView,
-    PlayerDetailView,
     PlayerListCreateView,
     UpcomingMatchView,
 )

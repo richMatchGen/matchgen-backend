@@ -41,12 +41,54 @@ ALLOWED_HOSTS = ["matchgen-backend-production.up.railway.app", "localhost", "127
 
 CSRF_TRUSTED_ORIGINS = [
     "https://matchgen-backend-production.up.railway.app",  # Trusted CSRF origin
+    "https://matchgen-frontend.vercel.app",  # Frontend origin
 ]
 
 CORS_ALLOWED_ORIGINS = [
     "https://matchgen-frontend.vercel.app",
     "http://localhost:3000",
 ]
+
+# Additional CORS settings for better compatibility
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOW_ALL_ORIGINS = False
+
+CORS_ALLOWED_HEADERS = [
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+    "access-control-allow-origin",
+    "access-control-allow-headers",
+    "access-control-allow-methods",
+]
+
+CORS_ALLOW_METHODS = [
+    "DELETE",
+    "GET",
+    "OPTIONS",
+    "PATCH",
+    "POST",
+    "PUT",
+]
+
+# Additional settings for better CORS handling
+CORS_EXPOSE_HEADERS = [
+    "access-control-allow-origin",
+    "access-control-allow-headers",
+    "access-control-allow-methods",
+]
+
+# Handle preflight requests
+CORS_PREFLIGHT_MAX_AGE = 86400
+
+# Additional CORS settings for production
+CORS_REPLACE_HTTPS_REFERER = True
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
@@ -92,6 +134,11 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+# Security settings for production
+SECURE_BROWSER_XSS_FILTER = True
+SECURE_CONTENT_TYPE_NOSNIFF = True
+X_FRAME_OPTIONS = 'DENY'
 
 # settings.py
 LOGGING = {
@@ -177,8 +224,6 @@ STATIC_FONT_DIR = os.path.join(BASE_DIR, "staticfiles", "fonts")
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-AUTH_USER_MODEL = "users.User"
-
 from datetime import timedelta
 
 AUTH_USER_MODEL = "users.User"
@@ -189,7 +234,7 @@ SIMPLE_JWT = {
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "ALGORITHM": "HS256",
-    "SIGNING_KEY": "your-secret-key",
+    "SIGNING_KEY": SECRET_KEY,
 }
 
 

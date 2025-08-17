@@ -4,6 +4,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
 from .models import Club, User
 from .serializers import (
@@ -39,9 +40,17 @@ class LoginView(generics.GenericAPIView):
     permission_classes = [AllowAny]
 
     def post(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        return Response(serializer.validated_data, status=status.HTTP_200_OK)
+        try:
+            print("LoginView - Received data:", request.data)  # Debug log
+            serializer = self.get_serializer(data=request.data)
+            if serializer.is_valid():
+                return Response(serializer.validated_data, status=status.HTTP_200_OK)
+            else:
+                print("LoginView - Validation errors:", serializer.errors)  # Debug log
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            print("LoginView - Exception:", str(e))  # Debug log
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class UserDetailView(generics.RetrieveAPIView):
@@ -109,3 +118,25 @@ class MyClubView(APIView):
             )
         serializer = ClubSerializer(club)
         return Response(serializer.data)
+
+
+class CustomTokenObtainPairView(TokenObtainPairView):
+    def post(self, request, *args, **kwargs):
+        try:
+            print("CustomTokenObtainPairView - Received data:", request.data)  # Debug log
+            response = super().post(request, *args, **kwargs)
+            print("CustomTokenObtainPairView - Response status:", response.status_code)  # Debug log
+            return response
+        except Exception as e:
+            print("CustomTokenObtainPairView - Exception:", str(e))  # Debug log
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class HealthCheckView(APIView):
+    permission_classes = [AllowAny]
+    
+    def get(self, request):
+        return Response({"status": "healthy", "message": "Users API is working"}, status=status.HTTP_200_OK)
+    
+    def post(self, request):
+        return Response({"status": "healthy", "message": "Users API POST is working", "data": request.data}, status=status.HTTP_200_OK)

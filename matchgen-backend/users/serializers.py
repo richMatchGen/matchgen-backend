@@ -1,8 +1,11 @@
+from rest_framework.views import APIView
 from django.contrib.auth import authenticate, get_user_model
 from rest_framework import serializers
+from rest_framework.response import Response
+from rest_framework import status
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from .models import Club, User
+from .models import Club
 
 User = get_user_model()
 
@@ -47,3 +50,5 @@ class ClubSerializer(serializers.ModelSerializer):
     class Meta:
         model = Club
         fields = ["id", "name", "sport", "logo"]
+
+

@@ -18,6 +18,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from users.models import Club
+from users.serializers import LoginSerializer
 
 from .models import (
     GraphicPack,
@@ -161,3 +162,14 @@ def generate_matchday(request, match_id):
     match.save()
 
     return JsonResponse({"url": upload_result["secure_url"]})
+
+
+class ObtainTokenView(APIView):
+    authentication_classes = []  # allow unauthenticated
+    permission_classes = []
+
+    def post(self, request):
+        ser = LoginSerializer(data=request.data)
+        ser.is_valid(raise_exception=True)
+        # ser.validated_data already returns {"refresh","access","user": {...}}
+        return Response(ser.validated_data, status=status.HTTP_200_OK)

@@ -3,6 +3,7 @@ from dj_rest_auth.registration.views import SocialLoginView
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
+from .views import ObtainTokenView   
 
 from .views import (
     ClubDetailView,
@@ -36,4 +37,6 @@ urlpatterns = [
     path("club/", CreateClubView.as_view(), name="club-list-create"),
     path("club/<int:id>/", ClubDetailView.as_view(), name="club-detail"),
     path("my-club/", MyClubView.as_view(), name="my-club"),
+    path("token/", ObtainTokenView.as_view(), name="token_obtain"),
+    path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
 ]

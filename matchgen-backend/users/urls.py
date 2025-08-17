@@ -13,6 +13,7 @@ from .views import (
     LoginView,
     MyClubView,
     RegisterView,
+    SimpleTokenView,
     TestTokenView,
     UserDetailView,
     UserListView,
@@ -28,6 +29,7 @@ router.register(r"clubs", ClubViewSet, basename="club")
 
 urlpatterns = [
     path("health/", HealthCheckView.as_view(), name="health-check"),
+    path("simple-token/", SimpleTokenView.as_view(), name="simple-token"),
     path("test-token/", TestTokenView.as_view(), name="test-token"),
     path("register/", RegisterView.as_view(), name="register"),
     path("login/", LoginView.as_view(), name="login"),

@@ -128,11 +128,23 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
         try:
             print("CustomTokenObtainPairView - Received data:", request.data)  # Debug log
+            print("CustomTokenObtainPairView - Request headers:", dict(request.headers))  # Debug log
+            
+            # Check if the request has the right content type
+            if request.content_type != 'application/json':
+                print("CustomTokenObtainPairView - Wrong content type:", request.content_type)
+                return Response(
+                    {"error": "Content-Type must be application/json"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
             response = super().post(request, *args, **kwargs)
             print("CustomTokenObtainPairView - Response status:", response.status_code)  # Debug log
             return response
         except Exception as e:
             print("CustomTokenObtainPairView - Exception:", str(e))  # Debug log
+            import traceback
+            print("CustomTokenObtainPairView - Traceback:", traceback.format_exc())  # Debug log
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
@@ -146,12 +158,35 @@ class HealthCheckView(APIView):
         return Response({"status": "healthy", "message": "Users API POST is working", "data": request.data}, status=status.HTTP_200_OK)
 
 
+class SimpleTokenView(APIView):
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        try:
+            print("SimpleTokenView - Received data:", request.data)
+            print("SimpleTokenView - Request headers:", dict(request.headers))
+            
+            # Just return a simple response to test if the endpoint is reachable
+            return Response({
+                "message": "Simple token endpoint is working",
+                "received_data": request.data,
+                "content_type": request.content_type
+            }, status=status.HTTP_200_OK)
+                
+        except Exception as e:
+            print("SimpleTokenView - Exception:", str(e))
+            import traceback
+            print("SimpleTokenView - Traceback:", traceback.format_exc())
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 class TestTokenView(APIView):
     permission_classes = [AllowAny]
     
     def post(self, request):
         try:
             print("TestTokenView - Received data:", request.data)
+            print("TestTokenView - Request headers:", dict(request.headers))
             email = request.data.get('email')
             password = request.data.get('password')
             
@@ -164,11 +199,17 @@ class TestTokenView(APIView):
                 return Response({
                     "access": str(refresh.access_token),
                     "refresh": str(refresh),
-                    "user": UserSerializer(user).data
+                    "user": {
+                        'id': user.id,
+                        'email': user.email,
+                        'profile_picture': user.profile_picture
+                    }
                 }, status=status.HTTP_200_OK)
             else:
                 return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
                 
         except Exception as e:
             print("TestTokenView - Exception:", str(e))
+            import traceback
+            print("TestTokenView - Traceback:", traceback.format_exc())
             return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

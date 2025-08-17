@@ -5,10 +5,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from .models import Club, User
 from .serializers import (
     ClubSerializer,
+    CustomTokenObtainPairSerializer,
     LoginSerializer,
     RegisterSerializer,
     UserSerializer,
@@ -121,6 +123,8 @@ class MyClubView(APIView):
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
+    serializer_class = CustomTokenObtainPairSerializer
+    
     def post(self, request, *args, **kwargs):
         try:
             print("CustomTokenObtainPairView - Received data:", request.data)  # Debug log
@@ -140,3 +144,31 @@ class HealthCheckView(APIView):
     
     def post(self, request):
         return Response({"status": "healthy", "message": "Users API POST is working", "data": request.data}, status=status.HTTP_200_OK)
+
+
+class TestTokenView(APIView):
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        try:
+            print("TestTokenView - Received data:", request.data)
+            email = request.data.get('email')
+            password = request.data.get('password')
+            
+            if not email or not password:
+                return Response({"error": "Email and password required"}, status=status.HTTP_400_BAD_REQUEST)
+            
+            user = User.objects.filter(email=email).first()
+            if user and user.check_password(password):
+                refresh = RefreshToken.for_user(user)
+                return Response({
+                    "access": str(refresh.access_token),
+                    "refresh": str(refresh),
+                    "user": UserSerializer(user).data
+                }, status=status.HTTP_200_OK)
+            else:
+                return Response({"error": "Invalid credentials"}, status=status.HTTP_401_UNAUTHORIZED)
+                
+        except Exception as e:
+            print("TestTokenView - Exception:", str(e))
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

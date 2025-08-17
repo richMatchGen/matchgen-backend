@@ -13,6 +13,7 @@ from .views import (
     LoginView,
     MyClubView,
     RegisterView,
+    TestTokenView,
     UserDetailView,
     UserListView,
 )
@@ -27,6 +28,7 @@ router.register(r"clubs", ClubViewSet, basename="club")
 
 urlpatterns = [
     path("health/", HealthCheckView.as_view(), name="health-check"),
+    path("test-token/", TestTokenView.as_view(), name="test-token"),
     path("register/", RegisterView.as_view(), name="register"),
     path("login/", LoginView.as_view(), name="login"),
     path("me/", UserDetailView.as_view(), name="user-detail"),
@@ -39,5 +41,4 @@ urlpatterns = [
     path("club/", CreateClubView.as_view(), name="club-list-create"),
     path("club/<int:id>/", ClubDetailView.as_view(), name="club-detail"),
     path("my-club/", MyClubView.as_view(), name="my-club"),
-]
 ]

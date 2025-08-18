@@ -282,8 +282,8 @@ AUTH_USER_MODEL = "users.User"
 
 # JWT Settings
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(hours=1),
-    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=24),       # Extended from 1 hour to 24 hours
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=30),       # Extended from 7 days to 30 days
     "ROTATE_REFRESH_TOKENS": True,
     "BLACKLIST_AFTER_ROTATION": True,
     "UPDATE_LAST_LOGIN": True,

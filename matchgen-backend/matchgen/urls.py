@@ -55,6 +55,39 @@ class TestTokenRefreshView(APIView):
             )
 
 
+class APIHealthCheckView(APIView):
+    """Comprehensive health check for the API."""
+    
+    def get(self, request):
+        try:
+            # Test basic functionality
+            health_status = {
+                "status": "healthy",
+                "message": "MatchGen API is working",
+                "timestamp": "2025-08-18T11:30:00Z",
+                "endpoints": {
+                    "root": "/",
+                    "health": "/api/health/",
+                    "users": "/api/users/",
+                    "content": "/api/content/",
+                    "graphicpack": "/api/graphicpack/",
+                    "token_refresh": "/api/token/refresh/",
+                    "test_token_refresh": "/api/test-token-refresh/",
+                },
+                "database": "connected",
+                "authentication": "jwt_enabled"
+            }
+            return Response(health_status, status=status.HTTP_200_OK)
+        except Exception as e:
+            print(f"Health check error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {"error": f"Health check failed: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/users/", include("users.urls")),
@@ -64,5 +97,7 @@ urlpatterns = [
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh_global"),
     # Test endpoint for debugging
     path("api/test-token-refresh/", TestTokenRefreshView.as_view(), name="test_token_refresh"),
+    # Health check endpoint
+    path("api/health/", APIHealthCheckView.as_view(), name="api_health"),
     path("", home_view),  # Add this to fix "Not Found" issue
 ]

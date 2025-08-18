@@ -29,7 +29,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = os.getenv("SECRET_KEY", "django-insecure-14k-bd&@uce*9^)(3ysp9ao$(10)-0ckur9%_k@4et&$n0y=j=")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.getenv("DEBUG", "False").lower() == "true"
+DEBUG = os.getenv("DEBUG", "True").lower() == "true"  # Temporarily enabled for debugging
 
 ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "matchgen-backend-production.up.railway.app,localhost,127.0.0.1").split(",")
 
@@ -91,8 +91,7 @@ REST_FRAMEWORK = {
     ),
     "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
     "PAGE_SIZE": 20,
-    # Temporarily disabled to debug token refresh 500 error
-    # "EXCEPTION_HANDLER": "matchgen.utils.custom_exception_handler",
+    "EXCEPTION_HANDLER": "matchgen.utils.custom_exception_handler",  # Re-enabled
 }
 
 DATABASES = {"default": dj_database_url.config(default=os.getenv("DATABASE_URL"))}

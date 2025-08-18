@@ -254,3 +254,31 @@ class HealthCheckView(APIView):
             }, 
             status=status.HTTP_200_OK
         )
+
+
+class TestTokenEndpointView(APIView):
+    """Test endpoint to verify token endpoint is accessible."""
+    permission_classes = [AllowAny]
+    
+    def get(self, request):
+        return Response(
+            {
+                "status": "success",
+                "message": "Token endpoint is accessible via GET",
+                "method": "GET",
+                "headers": dict(request.headers)
+            },
+            status=status.HTTP_200_OK
+        )
+    
+    def post(self, request):
+        return Response(
+            {
+                "status": "success", 
+                "message": "Token endpoint is accessible via POST",
+                "method": "POST",
+                "data": request.data,
+                "content_type": request.content_type
+            },
+            status=status.HTTP_200_OK
+        )

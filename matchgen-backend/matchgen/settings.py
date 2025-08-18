@@ -41,6 +41,7 @@ CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "https://matchgen-front
 CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOW_ALL_ORIGINS = False
 
+# Allow all headers and methods for debugging
 CORS_ALLOWED_HEADERS = [
     "accept",
     "accept-encoding",
@@ -54,6 +55,9 @@ CORS_ALLOWED_HEADERS = [
     "access-control-allow-origin",
     "access-control-allow-headers",
     "access-control-allow-methods",
+    "x-forwarded-for",
+    "x-forwarded-proto",
+    "x-forwarded-host",
 ]
 
 CORS_ALLOW_METHODS = [
@@ -137,9 +141,15 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
-    SECURE_SSL_REDIRECT = True
+    # Disable SSL redirect for Railway deployment to prevent redirect loops
+    # SECURE_SSL_REDIRECT = True  # Commented out to fix redirect loop
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
+
+# Proxy settings for Railway deployment
+USE_X_FORWARDED_HOST = True
+USE_X_FORWARDED_PORT = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 X_FRAME_OPTIONS = 'DENY'
 

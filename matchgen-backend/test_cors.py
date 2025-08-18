@@ -11,6 +11,7 @@ HEALTH_URL = f"{BASE_URL}/api/users/health/"
 TOKEN_URL = f"{BASE_URL}/api/users/token/"
 LOGIN_URL = f"{BASE_URL}/api/users/login/"
 REGISTER_URL = f"{BASE_URL}/api/users/register/"
+TEST_TOKEN_URL = f"{BASE_URL}/api/users/test-token/"
 
 def test_health_endpoint():
     """Test the health check endpoint"""
@@ -103,6 +104,26 @@ def test_register_endpoint():
         print(f"Register endpoint error: {e}")
         return False
 
+
+def test_test_token_endpoint():
+    """Test the test token endpoint to verify accessibility"""
+    print("\nTesting test-token endpoint...")
+    try:
+        headers = {
+            'Content-Type': 'application/json',
+            'Origin': 'https://matchgen-frontend.vercel.app',
+        }
+        data = {
+            'test': 'data'
+        }
+        response = requests.post(TEST_TOKEN_URL, headers=headers, json=data)
+        print(f"Test token endpoint status: {response.status_code}")
+        print(f"Response: {response.text}")
+        return response.status_code == 200
+    except Exception as e:
+        print(f"Test token endpoint error: {e}")
+        return False
+
 if __name__ == "__main__":
     print("Testing MatchGen Backend API...")
     print("=" * 50)
@@ -112,6 +133,7 @@ if __name__ == "__main__":
     login_ok = test_login_endpoint()
     token_ok = test_token_endpoint()
     register_ok = test_register_endpoint()
+    test_token_ok = test_test_token_endpoint()
     
     print("\n" + "=" * 50)
     print("Test Results:")
@@ -120,8 +142,9 @@ if __name__ == "__main__":
     print(f"Login endpoint: {'✅ PASS' if login_ok else '❌ FAIL'}")
     print(f"Token endpoint: {'✅ PASS' if token_ok else '❌ FAIL'}")
     print(f"Register endpoint: {'✅ PASS' if register_ok else '❌ FAIL'}")
+    print(f"Test token endpoint: {'✅ PASS' if test_token_ok else '❌ FAIL'}")
     
-    if all([health_ok, cors_ok, login_ok, token_ok, register_ok]):
+    if all([health_ok, cors_ok, login_ok, token_ok, register_ok, test_token_ok]):
         print("\n🎉 All tests passed! The API should be working correctly.")
     else:
         print("\n⚠️  Some tests failed. Check the logs above for details.")

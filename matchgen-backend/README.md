@@ -70,6 +70,7 @@ matchgen-backend/
 - ✅ Improved image processing error handling
 - ✅ Enhanced database query optimization
 - ✅ Added proper logging configuration
+- ✅ Extended URLField max_length to 500 characters for better URL support
 
 ## 🛠️ Installation
 

@@ -13,14 +13,14 @@ class Match(models.Model):
     club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name="matches")
     match_type = models.CharField(max_length=255, default="League")
     opponent = models.CharField(max_length=255)
-    club_logo = models.URLField(blank=True, null=True)
-    opponent_logo = models.URLField(blank=True, null=True)
-    sponsor = models.URLField(blank=True, null=True)
+    club_logo = models.URLField(max_length=500, blank=True, null=True)
+    opponent_logo = models.URLField(max_length=500, blank=True, null=True)
+    sponsor = models.URLField(max_length=500, blank=True, null=True)
     date = models.DateTimeField()
     time_start = models.CharField(max_length=20, blank=True, null=True)
     venue = models.CharField(max_length=255, blank=True, null=True)
     location = models.CharField(max_length=255, blank=True, null=True)
-    matchday_post_url = models.URLField(blank=True, null=True)
+    matchday_post_url = models.URLField(max_length=500, blank=True, null=True)
 
     def __str__(self):
         return (
@@ -33,9 +33,9 @@ class Player(models.Model):
     club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name="players")
     name = models.CharField(max_length=255)
     squad_no = models.CharField(max_length=4)
-    player_pic = models.URLField(blank=True, null=True)
-    formatted_pic = models.URLField(blank=True, null=True)
-    sponsor = models.URLField(blank=True, null=True)
+    player_pic = models.URLField(max_length=500, blank=True, null=True)
+    formatted_pic = models.URLField(max_length=500, blank=True, null=True)
+    sponsor = models.URLField(max_length=500, blank=True, null=True)
     position = models.CharField(max_length=255)
 
     def __str__(self):

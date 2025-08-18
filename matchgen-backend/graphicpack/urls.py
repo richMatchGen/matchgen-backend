@@ -1,13 +1,17 @@
 from django.urls import path
 
-from .views import GraphicPackListView, SelectGraphicPackView, generate_matchday
+from .views import (
+    GraphicGenerationView,
+    GraphicPackListView,
+    ObtainTokenView,
+    SelectGraphicPackView,
+    generate_matchday,
+)
 
 urlpatterns = [
-    path("graphic-packs/", GraphicPackListView.as_view(), name="graphic-pack-list"),
-    path("select-pack/", SelectGraphicPackView.as_view(), name="select-pack-list"),
-    path(
-        "match/<int:match_id>/generate-matchday/",
-        generate_matchday,
-        name="generate-matchday-post",
-    ),
+    path("packs/", GraphicPackListView.as_view(), name="graphic-pack-list"),
+    path("select/", SelectGraphicPackView.as_view(), name="select-graphic-pack"),
+    path("generate/", GraphicGenerationView.as_view(), name="generate-graphic"),
+    path("generate-matchday/<int:match_id>/", generate_matchday, name="generate-matchday"),
+    path("token/", ObtainTokenView.as_view(), name="obtain-token"),
 ]

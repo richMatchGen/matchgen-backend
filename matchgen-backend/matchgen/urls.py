@@ -18,11 +18,41 @@ from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import include, path
 from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
 
 
 # Simple Root View to Show API is Working
 def home_view(request):
     return JsonResponse({"message": "MatchGen API is running!"})
+
+
+class TestTokenRefreshView(APIView):
+    """Test endpoint to diagnose token refresh issues."""
+    
+    def post(self, request):
+        try:
+            # Log the request data for debugging
+            print(f"Token refresh request data: {request.data}")
+            print(f"Token refresh request headers: {dict(request.headers)}")
+            
+            # Call the original TokenRefreshView
+            from rest_framework_simplejwt.views import TokenRefreshView
+            refresh_view = TokenRefreshView()
+            response = refresh_view.post(request)
+            
+            print(f"Token refresh response: {response.data}")
+            return response
+            
+        except Exception as e:
+            print(f"Token refresh error: {str(e)}")
+            import traceback
+            traceback.print_exc()
+            return Response(
+                {"error": f"Token refresh failed: {str(e)}"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 urlpatterns = [
@@ -32,5 +62,7 @@ urlpatterns = [
     path("api/graphicpack/", include("graphicpack.urls")),
     # Global token refresh endpoint for frontend compatibility
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh_global"),
+    # Test endpoint for debugging
+    path("api/test-token-refresh/", TestTokenRefreshView.as_view(), name="test_token_refresh"),
     path("", home_view),  # Add this to fix "Not Found" issue
 ]

@@ -285,7 +285,7 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(hours=24),       # Extended from 1 hour to 24 hours
     "REFRESH_TOKEN_LIFETIME": timedelta(days=30),       # Extended from 7 days to 30 days
     "ROTATE_REFRESH_TOKENS": True,
-    "BLACKLIST_AFTER_ROTATION": True,
+    "BLACKLIST_AFTER_ROTATION": False,                  # Disabled to fix 500 error (blacklist app not installed)
     "UPDATE_LAST_LOGIN": True,
     "ALGORITHM": "HS256",
     "SIGNING_KEY": SECRET_KEY,

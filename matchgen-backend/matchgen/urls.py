@@ -17,6 +17,7 @@ Including another URLconf
 from django.contrib import admin
 from django.http import JsonResponse
 from django.urls import include, path
+from rest_framework_simplejwt.views import TokenRefreshView
 
 
 # Simple Root View to Show API is Working
@@ -29,5 +30,7 @@ urlpatterns = [
     path("api/users/", include("users.urls")),
     path("api/content/", include("content.urls")),
     path("api/graphicpack/", include("graphicpack.urls")),
+    # Global token refresh endpoint for frontend compatibility
+    path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh_global"),
     path("", home_view),  # Add this to fix "Not Found" issue
 ]

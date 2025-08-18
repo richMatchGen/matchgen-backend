@@ -14,6 +14,7 @@ from .views import (
     MyClubView,
     RegisterView,
     TestTokenEndpointView,
+    UploadLogoView,
     UserDetailView,
     UserListView,
 )
@@ -45,5 +46,6 @@ urlpatterns = [
     # Club management
     path("club/", CreateClubView.as_view(), name="club-create"),
     path("club/<int:id>/", ClubDetailView.as_view(), name="club-detail"),
+    path("club/upload-logo/", UploadLogoView.as_view(), name="upload-logo"),
     path("my-club/", MyClubView.as_view(), name="my-club"),
 ] + router.urls

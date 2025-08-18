@@ -152,6 +152,21 @@ class ClubSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Sport must be at least 2 characters long.")
         return value.strip()
 
+    def validate_logo(self, value):
+        """Validate logo field - accept URLs or base64 data URLs."""
+        if not value:
+            return value
+        
+        # Accept base64 data URLs
+        if value.startswith('data:image/'):
+            return value
+        
+        # Accept regular URLs
+        if value.startswith(('http://', 'https://')):
+            return value
+        
+        raise serializers.ValidationError("Logo must be a valid URL or base64 data URL.")
+
     def validate_website(self, value):
         """Validate website URL."""
         if value and not value.startswith(('http://', 'https://')):

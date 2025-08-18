@@ -1,4 +1,6 @@
 import logging
+import base64
+import requests
 from django.contrib.auth import get_user_model
 from rest_framework import generics, permissions, status, viewsets
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -282,3 +284,62 @@ class TestTokenEndpointView(APIView):
             },
             status=status.HTTP_200_OK
         )
+
+
+class UploadLogoView(APIView):
+    """Upload logo for a club."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            logo_data = request.data.get('logo')
+            if not logo_data:
+                return Response(
+                    {"error": "Logo data is required."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Handle base64 data URL
+            if logo_data.startswith('data:image/'):
+                # Extract the base64 part
+                try:
+                    # Split on ',' and get the base64 part
+                    base64_data = logo_data.split(',')[1]
+                    # Decode base64
+                    image_data = base64.b64decode(base64_data)
+                    
+                    # For now, we'll just return the data URL as the logo URL
+                    # In production, you might want to upload this to Cloudinary or another service
+                    logger.info(f"Logo uploaded for user: {request.user.email}")
+                    
+                    return Response({
+                        "logo_url": logo_data,
+                        "message": "Logo uploaded successfully"
+                    }, status=status.HTTP_200_OK)
+                    
+                except Exception as e:
+                    logger.error(f"Error processing base64 logo: {str(e)}")
+                    return Response(
+                        {"error": "Invalid logo format."}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            # Handle regular URL
+            elif logo_data.startswith(('http://', 'https://')):
+                return Response({
+                    "logo_url": logo_data,
+                    "message": "Logo URL set successfully"
+                }, status=status.HTTP_200_OK)
+            
+            else:
+                return Response(
+                    {"error": "Logo must be a valid URL or base64 data URL."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+                
+        except Exception as e:
+            logger.error(f"Error uploading logo: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while uploading the logo."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

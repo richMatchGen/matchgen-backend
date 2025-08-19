@@ -3,6 +3,7 @@ import io
 import logging
 
 from django.utils import timezone
+from django.core.cache import cache
 from rest_framework import generics, status
 from rest_framework.generics import ListAPIView
 from rest_framework.parsers import JSONParser, MultiPartParser
@@ -16,8 +17,25 @@ from .serializers import FixturesSerializer, MatchSerializer, PlayerSerializer
 
 logger = logging.getLogger(__name__)
 
+# Simple rate limiting for debugging
+class RateLimitMixin:
+    def check_rate_limit(self, user_id, endpoint, limit_seconds=5):
+        """Simple rate limiting to prevent excessive calls."""
+        cache_key = f"rate_limit_{endpoint}_{user_id}"
+        last_call = cache.get(cache_key)
+        current_time = timezone.now()
+        
+        if last_call:
+            time_diff = (current_time - last_call).total_seconds()
+            if time_diff < limit_seconds:
+                logger.warning(f"Rate limit exceeded for user {user_id} on {endpoint}. Time since last call: {time_diff}s")
+                return False
+        
+        cache.set(cache_key, current_time, 60)  # Cache for 1 minute
+        return True
 
-class MatchListView(ListAPIView):
+
+class MatchListView(ListAPIView, RateLimitMixin):
     """List all matches for the authenticated user."""
     serializer_class = FixturesSerializer
     permission_classes = [IsAuthenticated]
@@ -27,6 +45,12 @@ class MatchListView(ListAPIView):
         # Add request tracking
         logger.info(f"MatchListView called by user {user.email} at {timezone.now()}")
         logger.info(f"Request headers: {dict(self.request.headers)}")
+        
+        # Check rate limiting
+        if not self.check_rate_limit(user.id, "matches", limit_seconds=3):
+            logger.warning(f"Rate limit exceeded for matches endpoint - user {user.email}")
+            # Return empty queryset instead of raising error to avoid breaking frontend
+            return Match.objects.none()
         
         matches = Match.objects.filter(club__user=user).order_by("date")
         logger.info(f"Found {matches.count()} matches for user {user.email}")

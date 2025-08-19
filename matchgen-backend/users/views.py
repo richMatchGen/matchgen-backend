@@ -10,6 +10,7 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils import timezone
+from django.core.cache import cache
 
 from .models import Club, User
 from .serializers import (
@@ -22,6 +23,23 @@ from .serializers import (
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
+
+# Simple rate limiting for debugging
+class RateLimitMixin:
+    def check_rate_limit(self, user_id, endpoint, limit_seconds=5):
+        """Simple rate limiting to prevent excessive calls."""
+        cache_key = f"rate_limit_{endpoint}_{user_id}"
+        last_call = cache.get(cache_key)
+        current_time = timezone.now()
+        
+        if last_call:
+            time_diff = (current_time - last_call).total_seconds()
+            if time_diff < limit_seconds:
+                logger.warning(f"Rate limit exceeded for user {user_id} on {endpoint}. Time since last call: {time_diff}s")
+                return False
+        
+        cache.set(cache_key, current_time, 60)  # Cache for 1 minute
+        return True
 
 
 class RegisterView(APIView):
@@ -189,7 +207,7 @@ class CreateClubView(APIView):
             )
 
 
-class MyClubView(APIView):
+class MyClubView(APIView, RateLimitMixin):
     """Get the current user's club."""
     permission_classes = [IsAuthenticated]
 
@@ -198,6 +216,16 @@ class MyClubView(APIView):
             # Add request tracking
             logger.info(f"MyClubView called by user {request.user.email} at {timezone.now()}")
             logger.info(f"Request headers: {dict(request.headers)}")
+            
+            # Check rate limiting
+            if not self.check_rate_limit(request.user.id, "my_club", limit_seconds=3):
+                return Response(
+                    {
+                        "error": "Too many requests. Please wait a few seconds.",
+                        "message": "Rate limit exceeded - check frontend for polling issues"
+                    }, 
+                    status=status.HTTP_429_TOO_MANY_REQUESTS
+                )
             
             club = Club.objects.filter(user=request.user).first()
             if not club:

@@ -15,5 +15,6 @@ urlpatterns = [
     path("select-pack/", SelectGraphicPackView.as_view(), name="select-graphic-pack-legacy"),  # Backward compatibility
     path("generate/", GraphicGenerationView.as_view(), name="generate-graphic"),
     path("generate-matchday/<int:match_id>/", generate_matchday, name="generate-matchday"),
+    path("match/<int:match_id>/generate-matchday/", generate_matchday, name="generate-matchday-legacy"),  # Backward compatibility
     path("token/", ObtainTokenView.as_view(), name="obtain-token"),
 ]

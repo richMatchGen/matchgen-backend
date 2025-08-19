@@ -15,7 +15,7 @@ from PIL import Image, ImageDraw, ImageFont
 from rest_framework import generics, status
 from rest_framework.generics import ListAPIView
 from rest_framework.parsers import JSONParser, MultiPartParser
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from users.models import Club
@@ -39,6 +39,7 @@ class GraphicPackListView(ListAPIView):
     """List all available graphic packs."""
     queryset = GraphicPack.objects.all()
     serializer_class = GraphicPackSerializer
+    permission_classes = [AllowAny]  # Allow public access to view available packs
 
 
 class SelectGraphicPackView(APIView):

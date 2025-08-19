@@ -24,7 +24,13 @@ class MatchListView(ListAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        return Match.objects.filter(club__user=user).order_by("date")
+        # Add request tracking
+        logger.info(f"MatchListView called by user {user.email} at {timezone.now()}")
+        logger.info(f"Request headers: {dict(self.request.headers)}")
+        
+        matches = Match.objects.filter(club__user=user).order_by("date")
+        logger.info(f"Found {matches.count()} matches for user {user.email}")
+        return matches
 
 
 class MatchListCreateView(generics.ListCreateAPIView):

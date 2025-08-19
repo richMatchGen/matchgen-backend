@@ -9,6 +9,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.utils import timezone
 
 from .models import Club, User
 from .serializers import (
@@ -194,13 +195,19 @@ class MyClubView(APIView):
 
     def get(self, request):
         try:
+            # Add request tracking
+            logger.info(f"MyClubView called by user {request.user.email} at {timezone.now()}")
+            logger.info(f"Request headers: {dict(request.headers)}")
+            
             club = Club.objects.filter(user=request.user).first()
             if not club:
+                logger.warning(f"No club found for user {request.user.email}")
                 return Response(
                     {"detail": "No club found for this user."}, 
                     status=status.HTTP_404_NOT_FOUND
                 )
             serializer = ClubSerializer(club)
+            logger.info(f"Club data returned for user {request.user.email}: {club.name}")
             return Response(serializer.data)
         except Exception as e:
             logger.error(f"Error fetching user's club: {str(e)}", exc_info=True)

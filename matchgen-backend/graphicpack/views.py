@@ -218,10 +218,21 @@ class GraphicGenerationView(APIView):
 
     def _render_text_elements(self, draw: ImageDraw.Draw, template: Template, content: Dict[str, Any]):
         """Render all text elements on the image."""
-        for element in template.elements.filter(type="text"):
+        logger.info(f"Rendering text elements for template {template.id}")
+        logger.info(f"Available content keys: {list(content.keys())}")
+        
+        elements = template.elements.filter(type="text")
+        logger.info(f"Found {elements.count()} text elements")
+        
+        for element in elements:
+            logger.info(f"Processing text element: {element.content_key} at ({element.x}, {element.y})")
             for string in element.string_elements.all():
+                logger.info(f"Processing string element: {string.content_key}")
                 value = content.get(string.content_key, "")
+                logger.info(f"Value for {string.content_key}: '{value}'")
+                
                 if not value:
+                    logger.warning(f"No value found for content key: {string.content_key}")
                     continue
 
                 try:
@@ -239,17 +250,28 @@ class GraphicGenerationView(APIView):
                     else:  # left alignment
                         x = element.x
 
+                    logger.info(f"Drawing text '{value}' at ({x}, {element.y}) with color {string.color}")
                     draw.text((x, element.y), value, font=font, fill=string.color)
                 except Exception as e:
-                    logger.warning(f"Error rendering text element {string.content_key}: {str(e)}")
+                    logger.error(f"Error rendering text element {string.content_key}: {str(e)}", exc_info=True)
                     continue
 
     def _render_image_elements(self, base_image: Image.Image, template: Template, content: Dict[str, Any]):
         """Render all image elements on the base image."""
-        for element in template.elements.filter(type="image"):
+        logger.info(f"Rendering image elements for template {template.id}")
+        
+        elements = template.elements.filter(type="image")
+        logger.info(f"Found {elements.count()} image elements")
+        
+        for element in elements:
+            logger.info(f"Processing image element: {element.content_key} at ({element.x}, {element.y})")
             for image in element.image_elements.all():
+                logger.info(f"Processing image element: {image.content_key}")
                 image_url = content.get(image.content_key)
+                logger.info(f"Image URL for {image.content_key}: {image_url}")
+                
                 if not image_url:
+                    logger.warning(f"No image URL found for content key: {image.content_key}")
                     continue
                 
                 try:
@@ -262,9 +284,10 @@ class GraphicGenerationView(APIView):
                     else:
                         img = img.resize((int(element.width), int(element.height)))
 
+                    logger.info(f"Pasting image at ({int(element.x)}, {int(element.y)})")
                     base_image.paste(img, (int(element.x), int(element.y)), img)
                 except Exception as e:
-                    logger.warning(f"Error loading image {image.content_key}: {str(e)}")
+                    logger.error(f"Error loading image {image.content_key}: {str(e)}", exc_info=True)
                     continue
 
     def _upload_to_cloudinary(self, image_buffer: BytesIO, club: Club, content_type: str, identifier: str) -> Optional[str]:
@@ -310,9 +333,14 @@ class GraphicGenerationView(APIView):
 
     def _generate_matchday(self, match: Match, club: Club) -> Dict[str, Any]:
         """Generate matchday graphic."""
+        logger.info(f"Generating matchday graphic for match {match.id}, club {club.name}")
+        
         template = self._get_template(club, "matchday")
         if not template:
+            logger.error(f"Matchday template not found for club {club.name}")
             return {"error": "Matchday template not found"}
+
+        logger.info(f"Found template: {template.id} - {template.content_type}")
 
         content = {
             "club_name": club.name,
@@ -326,12 +354,15 @@ class GraphicGenerationView(APIView):
             "opponent_logo": match.opponent_logo,
         }
 
+        logger.info(f"Generated content for matchday: {content}")
+
         result = self._generate_graphic(template, content, club, "matchday", f"match_{match.id}")
         
         # Update match with generated URL
         if result.get("url"):
             match.matchday_post_url = result["url"]
             match.save()
+            logger.info(f"Updated match {match.id} with generated URL: {result['url']}")
         
         return result
 

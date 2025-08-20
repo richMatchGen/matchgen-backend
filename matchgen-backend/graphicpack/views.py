@@ -327,8 +327,14 @@ class MatchdayPostGenerator(APIView):
             date_str = "Date TBC"
         
         # Format the time
-        if match.time:
-            time_str = match.time.strftime("%I:%M %p")
+        if match.time_start:
+            # time_start is a string like "15:00", convert to time object for formatting
+            try:
+                from datetime import datetime
+                time_obj = datetime.strptime(match.time_start, "%H:%M")
+                time_str = time_obj.strftime("%I:%M %p")
+            except:
+                time_str = match.time_start
         else:
             time_str = "Time TBC"
         
@@ -338,8 +344,9 @@ class MatchdayPostGenerator(APIView):
         # Get opponent
         opponent_str = match.opponent or "Opponent TBC"
         
-        # Get home/away indicator
-        home_away = "HOME" if match.is_home else "AWAY"
+        # Since there's no is_home field, we'll use a default or determine from venue
+        # For now, let's assume home games are at the club's venue
+        home_away = "HOME"  # Default to HOME since we can't determine from current model
         
         return {
             "date": date_str,

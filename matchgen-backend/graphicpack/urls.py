@@ -10,6 +10,7 @@ from .views import (
     DebugGraphicPackView,
     TestAPIView,
     CreateTestDataView,
+    DebugTemplatesView,
     generate_matchday,
 )
 
@@ -22,6 +23,7 @@ urlpatterns = [
     path("regenerate/", RegenerateGraphicView.as_view(), name="regenerate-graphic"),
     path("template/<int:template_id>/edit/", TemplateEditorView.as_view(), name="template-editor"),
     path("debug/", DebugGraphicPackView.as_view(), name="debug-graphic-pack"),
+    path("debug-templates/", DebugTemplatesView.as_view(), name="debug-templates"),
     path("test/", TestAPIView.as_view(), name="test-api"),
     path("create-test-data/", CreateTestDataView.as_view(), name="create-test-data"),
     

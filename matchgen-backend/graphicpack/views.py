@@ -1321,3 +1321,47 @@ class CreateTestDataView(APIView):
             return Response({
                 'error': str(e)
             }, status=500)
+
+
+class DebugTemplatesView(APIView):
+    """Debug endpoint to check templates for a specific graphic pack."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            pack_id = request.query_params.get('pack_id', 7)  # Default to pack 7
+            
+            # Get the graphic pack
+            try:
+                pack = GraphicPack.objects.get(id=pack_id)
+            except GraphicPack.DoesNotExist:
+                return Response({
+                    'error': f'Graphic pack with ID {pack_id} not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get all templates for this pack
+            templates = Template.objects.filter(graphic_pack=pack)
+            
+            template_data = []
+            for template in templates:
+                template_data.append({
+                    'id': template.id,
+                    'content_type': template.content_type,
+                    'image_url': template.image_url,
+                    'sport': template.sport,
+                    'elements_count': template.elements.count()
+                })
+            
+            return Response({
+                'pack_id': pack_id,
+                'pack_name': pack.name,
+                'templates_count': templates.count(),
+                'templates': template_data
+            })
+            
+        except Exception as e:
+            logger.error(f"Error in DebugTemplatesView: {str(e)}", exc_info=True)
+            return Response(
+                {'error': f'Failed to debug templates: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

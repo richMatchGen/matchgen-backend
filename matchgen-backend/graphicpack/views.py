@@ -627,6 +627,51 @@ class TestEndpointView(APIView):
                 "timestamp": time.time()
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    def delete(self, request):
+        """Test if the issue is with the view itself."""
+        try:
+            logger.info("Testing view functionality...")
+            
+            # Test 1: Basic Python operations
+            test_list = [1, 2, 3, 4, 5]
+            test_sum = sum(test_list)
+            
+            # Test 2: Import operations
+            from django.conf import settings
+            debug_mode = settings.DEBUG
+            
+            # Test 3: Basic string operations
+            test_string = "Hello World"
+            reversed_string = test_string[::-1]
+            
+            # Test 4: Try to import models without using them
+            try:
+                from .models import GraphicPack, Template
+                models_imported = True
+                logger.info("Models imported successfully")
+            except Exception as model_error:
+                models_imported = False
+                logger.error(f"Model import failed: {str(model_error)}")
+            
+            return Response({
+                "status": "success",
+                "message": "View functionality working!",
+                "timestamp": time.time(),
+                "tests": {
+                    "list_sum": test_sum,
+                    "debug_mode": debug_mode,
+                    "reversed_string": reversed_string,
+                    "models_imported": models_imported
+                }
+            })
+        except Exception as e:
+            logger.error(f"View functionality test failed: {str(e)}", exc_info=True)
+            return Response({
+                "status": "error",
+                "message": f"View functionality test failed: {str(e)}",
+                "timestamp": time.time()
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     def post(self, request):
         """Test database operations."""
         try:

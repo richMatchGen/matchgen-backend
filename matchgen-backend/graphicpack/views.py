@@ -30,7 +30,7 @@ from .models import (
     UserSelection,
 )
 from .serializers import GraphicPackSerializer
-from .utils import get_font
+from .utils import get_font, parse_color, wrap_text, calculate_text_position, render_text_with_shadow
 
 logger = logging.getLogger(__name__)
 
@@ -211,15 +211,19 @@ class GraphicGenerationView(APIView):
             return None
 
     def _render_text_elements(self, draw: ImageDraw.Draw, template: Template, content: Dict[str, Any]):
-        """Render all text elements on the image."""
+        """Render all text elements on the image with enhanced positioning and styling."""
         logger.info(f"Rendering text elements for template {template.id}")
         logger.info(f"Available content keys: {list(content.keys())}")
         
-        elements = template.elements.filter(type="text")
+        # Get image dimensions for percentage calculations
+        image_width, image_height = draw.im.size
+        
+        elements = template.elements.filter(type="text", visible=True).order_by('z_index')
         logger.info(f"Found {elements.count()} text elements")
         
         for element in elements:
             logger.info(f"Processing text element: {element.content_key} at ({element.x}, {element.y})")
+            
             for string in element.string_elements.all():
                 logger.info(f"Processing string element: {string.content_key}")
                 value = content.get(string.content_key, "")
@@ -230,22 +234,54 @@ class GraphicGenerationView(APIView):
                     continue
 
                 try:
-                    font = get_font(string.font_family, string.font_size)
+                    # Get font with enhanced styling
+                    font = get_font(string.font_family, string.font_size, string.font_weight, string.font_style)
                     
-                    # Handle text alignment
-                    if string.alignment == "center":
-                        bbox = draw.textbbox((0, 0), value, font=font)
-                        text_width = bbox[2] - bbox[0]
-                        x = element.x - (text_width / 2)
-                    elif string.alignment == "right":
-                        bbox = draw.textbbox((0, 0), value, font=font)
-                        text_width = bbox[2] - bbox[0]
-                        x = element.x - text_width
-                    else:  # left alignment
-                        x = element.x
-
-                    logger.info(f"Drawing text '{value}' at ({x}, {element.y}) with color {string.color}")
-                    draw.text((x, element.y), value, font=font, fill=string.color)
+                    # Parse and validate color
+                    color = parse_color(string.color)
+                    
+                    # Handle text wrapping if max_width is specified
+                    max_width = element.max_width or string.max_width
+                    if max_width and element.use_percentage:
+                        max_width = (max_width / 100) * image_width
+                    
+                    lines = wrap_text(value, font, max_width, draw)
+                    
+                    # Calculate line height
+                    bbox = draw.textbbox((0, 0), "Ay", font=font)  # Use "Ay" to get proper line height
+                    line_height = (bbox[3] - bbox[1]) * string.line_height
+                    
+                    # Render each line
+                    for i, line in enumerate(lines):
+                        # Calculate position for this line
+                        x, y = calculate_text_position(
+                            element.x, 
+                            element.y + (i * line_height), 
+                            line, 
+                            font, 
+                            string.alignment, 
+                            draw,
+                            element.use_percentage,
+                            image_width,
+                            image_height
+                        )
+                        
+                        # Render text with shadow if enabled
+                        if string.text_shadow:
+                            render_text_with_shadow(
+                                draw,
+                                line,
+                                (x, y),
+                                font,
+                                color,
+                                string.shadow_color,
+                                (string.shadow_offset_x, string.shadow_offset_y)
+                            )
+                        else:
+                            draw.text((x, y), line, font=font, fill=color)
+                        
+                        logger.info(f"Rendered line '{line}' at ({x}, {y}) with color {color}")
+                        
                 except Exception as e:
                     logger.error(f"Error rendering text element {string.content_key}: {str(e)}", exc_info=True)
                     continue

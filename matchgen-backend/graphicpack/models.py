@@ -82,6 +82,15 @@ class TemplateElement(models.Model):
     width = models.FloatField(blank=True, null=True)  # Only used for images
     height = models.FloatField(blank=True, null=True)
     rotation = models.FloatField(default=0.0)
+    
+    # New fields for better positioning
+    use_percentage = models.BooleanField(default=False)  # Use percentage instead of pixels
+    max_width = models.FloatField(blank=True, null=True)  # Maximum width for text wrapping
+    z_index = models.IntegerField(default=0)  # Layer order
+    visible = models.BooleanField(default=True)  # Show/hide element
+    
+    class Meta:
+        ordering = ['z_index', 'id']
 
 
 # Text elements
@@ -99,6 +108,24 @@ class StringElement(models.Model):
         default="left",
     )
     max_width = models.FloatField(null=True, blank=True)
+    
+    # Enhanced text styling
+    font_weight = models.CharField(
+        max_length=20,
+        choices=[("normal", "Normal"), ("bold", "Bold"), ("light", "Light")],
+        default="normal"
+    )
+    font_style = models.CharField(
+        max_length=20,
+        choices=[("normal", "Normal"), ("italic", "Italic")],
+        default="normal"
+    )
+    text_shadow = models.BooleanField(default=False)
+    shadow_color = models.CharField(max_length=7, default="#000000")
+    shadow_offset_x = models.IntegerField(default=2)
+    shadow_offset_y = models.IntegerField(default=2)
+    line_height = models.FloatField(default=1.2)  # Multiplier for line spacing
+    letter_spacing = models.FloatField(default=0.0)  # Space between characters
 
 
 # Image elements

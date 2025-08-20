@@ -43,10 +43,24 @@ class GraphicPackListView(ListAPIView):
     permission_classes = [AllowAny]  # Allow public access to view available packs
 
     def get(self, request, *args, **kwargs):
-        """Override get to add debug logging."""
-        response = super().get(request, *args, **kwargs)
-        logger.info(f"Graphic packs response: {response.data}")
-        return response
+        """Override get to add debug logging and error handling."""
+        try:
+            response = super().get(request, *args, **kwargs)
+            logger.info(f"Graphic packs response: {response.data}")
+            return response
+        except Exception as e:
+            logger.error(f"Error in GraphicPackListView: {str(e)}", exc_info=True)
+            # Fallback to simple serializer
+            try:
+                from .serializers import SimpleGraphicPackSerializer
+                self.serializer_class = SimpleGraphicPackSerializer
+                response = super().get(request, *args, **kwargs)
+                logger.info(f"Fallback graphic packs response: {response.data}")
+                return response
+            except Exception as fallback_error:
+                logger.error(f"Fallback also failed: {str(fallback_error)}", exc_info=True)
+                # Return empty list as last resort
+                return Response([], status=200)
 
 
 class SelectGraphicPackView(APIView):
@@ -1088,35 +1102,79 @@ class DebugGraphicPackView(APIView):
             pack_data = []
             
             for pack in packs:
-                pack_info = {
-                    'id': pack.id,
-                    'name': pack.name,
-                    'description': pack.description,
-                    'templates_count': pack.templates.count(),
-                    'templates': []
-                }
-                
-                for template in pack.templates.all():
-                    template_info = {
-                        'id': template.id,
-                        'content_type': template.content_type,
-                        'elements_count': template.elements.count(),
-                        'elements': []
+                try:
+                    pack_info = {
+                        'id': pack.id,
+                        'name': pack.name,
+                        'description': pack.description,
+                        'templates_count': 0,
+                        'templates': []
                     }
                     
-                    for element in template.elements.all():
-                        element_info = {
-                            'id': element.id,
-                            'type': element.type,
-                            'content_key': element.content_key,
-                            'string_elements_count': element.string_elements.count(),
-                            'image_elements_count': element.image_elements.count()
-                        }
-                        template_info['elements'].append(element_info)
+                    # Try to get templates count safely
+                    try:
+                        pack_info['templates_count'] = pack.templates.count()
+                    except Exception as e:
+                        logger.warning(f"Could not count templates for pack {pack.id}: {str(e)}")
                     
-                    pack_info['templates'].append(template_info)
-                
-                pack_data.append(pack_info)
+                    # Try to get templates safely
+                    try:
+                        for template in pack.templates.all():
+                            try:
+                                template_info = {
+                                    'id': template.id,
+                                    'content_type': template.content_type,
+                                    'elements_count': 0,
+                                    'elements': []
+                                }
+                                
+                                # Try to count elements safely
+                                try:
+                                    template_info['elements_count'] = template.elements.count()
+                                except Exception as e:
+                                    logger.warning(f"Could not count elements for template {template.id}: {str(e)}")
+                                
+                                # Try to get elements safely
+                                try:
+                                    for element in template.elements.all():
+                                        try:
+                                            element_info = {
+                                                'id': element.id,
+                                                'type': element.type,
+                                                'content_key': element.content_key,
+                                                'string_elements_count': 0,
+                                                'image_elements_count': 0
+                                            }
+                                            
+                                            # Try to count string and image elements safely
+                                            try:
+                                                element_info['string_elements_count'] = element.string_elements.count()
+                                            except Exception as e:
+                                                logger.warning(f"Could not count string elements for element {element.id}: {str(e)}")
+                                            
+                                            try:
+                                                element_info['image_elements_count'] = element.image_elements.count()
+                                            except Exception as e:
+                                                logger.warning(f"Could not count image elements for element {element.id}: {str(e)}")
+                                            
+                                            template_info['elements'].append(element_info)
+                                        except Exception as e:
+                                            logger.warning(f"Error processing element: {str(e)}")
+                                            continue
+                                except Exception as e:
+                                    logger.warning(f"Error getting elements for template {template.id}: {str(e)}")
+                                
+                                pack_info['templates'].append(template_info)
+                            except Exception as e:
+                                logger.warning(f"Error processing template: {str(e)}")
+                                continue
+                    except Exception as e:
+                        logger.warning(f"Error getting templates for pack {pack.id}: {str(e)}")
+                    
+                    pack_data.append(pack_info)
+                except Exception as e:
+                    logger.warning(f"Error processing pack {pack.id}: {str(e)}")
+                    continue
             
             return Response({
                 'total_packs': len(pack_data),
@@ -1125,6 +1183,141 @@ class DebugGraphicPackView(APIView):
             
         except Exception as e:
             logger.error(f"Error in debug view: {str(e)}", exc_info=True)
+            return Response({
+                'error': str(e)
+            }, status=500)
+
+
+class TestAPIView(APIView):
+    """Simple test endpoint to check if API is working."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response({
+            'status': 'ok',
+            'message': 'API is working',
+            'timestamp': timezone.now().isoformat()
+        })
+
+
+class CreateTestDataView(APIView):
+    """Create test templates for development."""
+    permission_classes = [AllowAny]
+
+    def post(self, request):
+        try:
+            # Create a test graphic pack
+            pack, created = GraphicPack.objects.get_or_create(
+                name="Test Pack",
+                defaults={
+                    'description': 'Test graphic pack with templates',
+                    'preview_image_url': 'https://via.placeholder.com/400x300',
+                }
+            )
+            
+            if created:
+                logger.info(f'Created graphic pack: {pack.name}')
+            else:
+                logger.info(f'Using existing graphic pack: {pack.name}')
+
+            # Create a matchday template
+            template, created = Template.objects.get_or_create(
+                graphic_pack=pack,
+                content_type='matchday',
+                defaults={
+                    'image_url': 'https://via.placeholder.com/800x600',
+                    'sport': 'football'
+                }
+            )
+            
+            if created:
+                logger.info(f'Created matchday template: {template.id}')
+            else:
+                logger.info(f'Using existing matchday template: {template.id}')
+
+            # Create some template elements
+            elements_data = [
+                {
+                    'type': 'text',
+                    'content_key': 'club_name',
+                    'x': 400,
+                    'y': 100,
+                    'use_percentage': False,
+                    'z_index': 1,
+                    'visible': True
+                },
+                {
+                    'type': 'text',
+                    'content_key': 'opponent',
+                    'x': 400,
+                    'y': 150,
+                    'use_percentage': False,
+                    'z_index': 2,
+                    'visible': True
+                },
+                {
+                    'type': 'text',
+                    'content_key': 'date',
+                    'x': 400,
+                    'y': 200,
+                    'use_percentage': False,
+                    'z_index': 3,
+                    'visible': True
+                },
+                {
+                    'type': 'text',
+                    'content_key': 'venue',
+                    'x': 400,
+                    'y': 250,
+                    'use_percentage': False,
+                    'z_index': 4,
+                    'visible': True
+                }
+            ]
+
+            created_elements = []
+            for element_data in elements_data:
+                element, created = TemplateElement.objects.get_or_create(
+                    template=template,
+                    content_key=element_data['content_key'],
+                    defaults=element_data
+                )
+                
+                if created:
+                    logger.info(f'Created element: {element.content_key}')
+                    
+                    # Create string element for text elements
+                    if element.type == 'text':
+                        string_element, created = StringElement.objects.get_or_create(
+                            template_element=element,
+                            defaults={
+                                'content_key': element_data['content_key'],
+                                'font_family': 'Arial',
+                                'font_size': 24,
+                                'color': '#FFFFFF',
+                                'alignment': 'center'
+                            }
+                        )
+                        
+                        if created:
+                            logger.info(f'Created string element for: {element.content_key}')
+                
+                created_elements.append({
+                    'id': element.id,
+                    'content_key': element.content_key,
+                    'type': element.type
+                })
+
+            return Response({
+                'message': 'Test data created successfully',
+                'pack_id': pack.id,
+                'template_id': template.id,
+                'elements_created': len(created_elements),
+                'elements': created_elements
+            })
+            
+        except Exception as e:
+            logger.error(f"Error creating test data: {str(e)}", exc_info=True)
             return Response({
                 'error': str(e)
             }, status=500)

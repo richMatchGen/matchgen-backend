@@ -10,6 +10,7 @@ from .views import (
     CreateTestDataView,
     ObtainTokenView,
     DiagnosticView,
+    SimpleTestView,
 )
 
 urlpatterns = [
@@ -28,6 +29,7 @@ urlpatterns = [
     path("test/", TestEndpointView.as_view(), name="test"),
     path("create-test-data/", CreateTestDataView.as_view(), name="create-test-data"),
     path("diagnostic/", DiagnosticView.as_view(), name="diagnostic"),
+    path("simple-test/", SimpleTestView.as_view(), name="simple-test"),
     
     # Utility endpoints
     path("obtain-token/", ObtainTokenView.as_view(), name="obtain-token"),

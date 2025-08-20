@@ -911,6 +911,28 @@ class ObtainTokenView(APIView):
         })
 
 
+class SimpleTestView(APIView):
+    """Simple test endpoint that doesn't use any models."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            logger.info("SimpleTestView called")
+            return Response({
+                "status": "success",
+                "message": "Simple test endpoint working!",
+                "user_email": request.user.email,
+                "user_id": request.user.id,
+                "timestamp": time.time()
+            })
+        except Exception as e:
+            logger.error(f"SimpleTestView error: {str(e)}", exc_info=True)
+            return Response({
+                "status": "error",
+                "message": f"Simple test failed: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 class DiagnosticView(APIView):
     """Diagnostic endpoint to check current state for matchday post generation."""
     permission_classes = [IsAuthenticated]
@@ -918,6 +940,12 @@ class DiagnosticView(APIView):
     def get(self, request):
         try:
             logger.info(f"DiagnosticView called for user: {request.user.email}")
+            
+            # Start with basic user info
+            user_info = {
+                "email": request.user.email,
+                "id": request.user.id
+            }
             
             # Check user's club
             try:
@@ -933,6 +961,12 @@ class DiagnosticView(APIView):
                 club_name = None
                 selected_pack_id = None
                 selected_pack_name = None
+            except Exception as club_error:
+                logger.error(f"Error checking club: {str(club_error)}")
+                has_club = False
+                club_name = None
+                selected_pack_id = None
+                selected_pack_name = None
 
             # Check if selected pack exists
             pack_exists = False
@@ -943,6 +977,9 @@ class DiagnosticView(APIView):
                     logger.info(f"Selected pack exists: {pack.name}")
                 except GraphicPack.DoesNotExist:
                     logger.error(f"Selected pack ID {selected_pack_id} does not exist")
+                    pack_exists = False
+                except Exception as pack_error:
+                    logger.error(f"Error checking pack: {str(pack_error)}")
                     pack_exists = False
 
             # Check for matchday template
@@ -957,21 +994,23 @@ class DiagnosticView(APIView):
                     logger.info(f"Matchday template exists: {template.id}")
                 except Template.DoesNotExist:
                     logger.error(f"No matchday template found for pack {selected_pack_id}")
+                except Exception as template_error:
+                    logger.error(f"Error checking template: {str(template_error)}")
+                    template_exists = False
 
             # Check user's matches
-            try:
-                matches = Match.objects.filter(club=club) if has_club else []
-                matches_count = matches.count()
-                logger.info(f"User has {matches_count} matches")
-            except Exception as e:
-                logger.error(f"Error getting matches: {str(e)}")
-                matches_count = 0
+            matches_count = 0
+            if has_club:
+                try:
+                    matches = Match.objects.filter(club=club)
+                    matches_count = matches.count()
+                    logger.info(f"User has {matches_count} matches")
+                except Exception as matches_error:
+                    logger.error(f"Error getting matches: {str(matches_error)}")
+                    matches_count = 0
 
             return Response({
-                "user": {
-                    "email": request.user.email,
-                    "id": request.user.id
-                },
+                "user": user_info,
                 "club": {
                     "has_club": has_club,
                     "name": club_name,

@@ -13,6 +13,7 @@ from .views import (
     CreateTestDataView,
     DebugTemplatesView,
     CreateMissingTemplatesView,
+    TestGraphicPackDetailView,
     generate_matchday,
 )
 
@@ -30,6 +31,7 @@ urlpatterns = [
     path("test/", TestAPIView.as_view(), name="test-api"),
     path("create-test-data/", CreateTestDataView.as_view(), name="create-test-data"),
     path("create-missing-templates/", CreateMissingTemplatesView.as_view(), name="create-missing-templates"),
+    path("test-graphic-pack-detail/", TestGraphicPackDetailView.as_view(), name="test-graphic-pack-detail"),
     
     # Individual post type endpoints
     path("match/<int:match_id>/generate-upcoming/", GraphicGenerationView.as_view(), name="generate-upcoming"),

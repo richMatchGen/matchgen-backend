@@ -73,6 +73,25 @@ class GraphicPackDetailView(RetrieveAPIView):
     def get(self, request, *args, **kwargs):
         """Override get to add debug logging and error handling."""
         try:
+            pack_id = kwargs.get('id')
+            logger.info(f"Fetching graphic pack detail for ID: {pack_id}")
+            
+            # Get the graphic pack with prefetched templates
+            try:
+                pack = GraphicPack.objects.prefetch_related('templates__elements__string_elements', 'templates__elements__image_elements').get(id=pack_id)
+                logger.info(f"Found graphic pack: {pack.name} with {pack.templates.count()} templates")
+                
+                # Log template details
+                for template in pack.templates.all():
+                    logger.info(f"Template {template.id}: {template.content_type} with {template.elements.count()} elements")
+                
+            except GraphicPack.DoesNotExist:
+                logger.error(f"Graphic pack with ID {pack_id} not found")
+                return Response(
+                    {"error": f"Graphic pack with ID {pack_id} not found"},
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
             response = super().get(request, *args, **kwargs)
             logger.info(f"Graphic pack detail response: {response.data}")
             return response
@@ -1553,5 +1572,62 @@ class CreateMissingTemplatesView(APIView):
             logger.error(f"Error in CreateMissingTemplatesView: {str(e)}", exc_info=True)
             return Response(
                 {'error': f'Failed to create missing templates: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class TestGraphicPackDetailView(APIView):
+    """Test endpoint to debug graphic pack detail issues."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            pack_id = request.query_params.get('pack_id', 8)
+            logger.info(f"Testing graphic pack detail for ID: {pack_id}")
+            
+            # Get the graphic pack
+            try:
+                pack = GraphicPack.objects.get(id=pack_id)
+                logger.info(f"Found graphic pack: {pack.name}")
+                
+                # Get templates directly
+                templates = Template.objects.filter(graphic_pack=pack)
+                logger.info(f"Found {templates.count()} templates for pack {pack_id}")
+                
+                template_data = []
+                for template in templates:
+                    elements = TemplateElement.objects.filter(template=template)
+                    template_data.append({
+                        'id': template.id,
+                        'content_type': template.content_type,
+                        'elements_count': elements.count(),
+                        'elements': [
+                            {
+                                'id': el.id,
+                                'type': el.type,
+                                'content_key': el.content_key,
+                                'x': el.x,
+                                'y': el.y
+                            } for el in elements
+                        ]
+                    })
+                
+                return Response({
+                    'pack_id': pack_id,
+                    'pack_name': pack.name,
+                    'templates_count': templates.count(),
+                    'templates': template_data,
+                    'raw_templates': list(templates.values('id', 'content_type', 'graphic_pack_id'))
+                })
+                
+            except GraphicPack.DoesNotExist:
+                return Response({
+                    'error': f'Graphic pack with ID {pack_id} not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+        except Exception as e:
+            logger.error(f"Error in TestGraphicPackDetailView: {str(e)}", exc_info=True)
+            return Response(
+                {'error': f'Failed to test graphic pack detail: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

@@ -279,80 +279,99 @@ class GraphicGenerationView(APIView):
             return None
 
     def _render_text_elements(self, draw: ImageDraw.Draw, template: Template, content: Dict[str, Any]):
-        """Render all text elements on the image with enhanced positioning and styling."""
+        """Render all text elements on the image using JSON-based configuration."""
         logger.info(f"Rendering text elements for template {template.id}")
         logger.info(f"Available content keys: {list(content.keys())}")
         
         # Get image dimensions for percentage calculations
         image_width, image_height = draw.im.size
         
-        elements = template.elements.filter(type="text", visible=True).order_by('z_index')
-        logger.info(f"Found {elements.count()} text elements")
+        # Get template configuration
+        template_config = template.template_config or {}
+        elements = template_config.get('elements', {})
+        logger.info(f"Found {len(elements)} elements in template configuration")
         
-        for element in elements:
-            logger.info(f"Processing text element: {element.content_key} at ({element.x}, {element.y})")
-            
-            for string in element.string_elements.all():
-                logger.info(f"Processing string element: {string.content_key}")
-                value = content.get(string.content_key, "")
-                logger.info(f"Value for {string.content_key}: '{value}'")
+        for element_key, element_config in elements.items():
+            if element_config.get('type') != 'text':
+                continue
                 
-                if not value:
-                    logger.warning(f"No value found for content key: {string.content_key}")
-                    continue
+            logger.info(f"Processing text element: {element_key}")
+            value = content.get(element_key, "")
+            logger.info(f"Value for {element_key}: '{value}'")
+            
+            if not value:
+                logger.warning(f"No value found for content key: {element_key}")
+                continue
 
-                try:
-                    # Get font with enhanced styling
-                    font = get_font(string.font_family, string.font_size, string.font_weight, string.font_style)
-                    
-                    # Parse and validate color
-                    color = parse_color(string.color)
-                    
-                    # Handle text wrapping if max_width is specified
-                    max_width = element.max_width or string.max_width
-                    if max_width and element.use_percentage:
-                        max_width = (max_width / 100) * image_width
-                    
+            try:
+                # Get element style configuration
+                style = element_config.get('style', {})
+                position = element_config.get('position', {})
+                
+                # Get font with enhanced styling
+                font_family = style.get('fontFamily', 'Arial')
+                font_size = style.get('fontSize', 24)
+                font_weight = style.get('fontWeight', 'normal')
+                font_style = style.get('fontStyle', 'normal')
+                
+                font = get_font(font_family, font_size, font_weight, font_style)
+                
+                # Parse and validate color
+                color = parse_color(style.get('color', '#FFFFFF'))
+                
+                # Handle text wrapping if max_width is specified
+                max_width = style.get('maxWidth')
+                if max_width:
                     lines = wrap_text(value, font, max_width, draw)
+                else:
+                    lines = [value]
+                
+                # Calculate line height
+                bbox = draw.textbbox((0, 0), "Ay", font=font)  # Use "Ay" to get proper line height
+                line_height = (bbox[3] - bbox[1]) * style.get('lineHeight', 1.2)
+                
+                # Get position
+                x_pos = position.get('x', 0)
+                y_pos = position.get('y', 0)
+                alignment = style.get('alignment', 'left')
+                
+                # Render each line
+                for i, line in enumerate(lines):
+                    # Calculate position for this line
+                    x, y = calculate_text_position(
+                        x_pos, 
+                        y_pos + (i * line_height), 
+                        line, 
+                        font, 
+                        alignment, 
+                        draw,
+                        False,  # Not using percentage for now
+                        image_width,
+                        image_height
+                    )
                     
-                    # Calculate line height
-                    bbox = draw.textbbox((0, 0), "Ay", font=font)  # Use "Ay" to get proper line height
-                    line_height = (bbox[3] - bbox[1]) * string.line_height
-                    
-                    # Render each line
-                    for i, line in enumerate(lines):
-                        # Calculate position for this line
-                        x, y = calculate_text_position(
-                            element.x, 
-                            element.y + (i * line_height), 
-                            line, 
-                            font, 
-                            string.alignment, 
+                    # Render text with shadow if enabled
+                    if style.get('textShadow'):
+                        shadow_color = style.get('shadowColor', '#000000')
+                        shadow_offset_x = style.get('shadowOffsetX', 2)
+                        shadow_offset_y = style.get('shadowOffsetY', 2)
+                        render_text_with_shadow(
                             draw,
-                            element.use_percentage,
-                            image_width,
-                            image_height
+                            line,
+                            (x, y),
+                            font,
+                            color,
+                            shadow_color,
+                            (shadow_offset_x, shadow_offset_y)
                         )
-                        
-                        # Render text with shadow if enabled
-                        if string.text_shadow:
-                            render_text_with_shadow(
-                                draw,
-                                line,
-                                (x, y),
-                                font,
-                                color,
-                                string.shadow_color,
-                                (string.shadow_offset_x, string.shadow_offset_y)
-                            )
-                        else:
-                            draw.text((x, y), line, font=font, fill=color)
-                        
-                        logger.info(f"Rendered line '{line}' at ({x}, {y}) with color {color}")
-                        
-                except Exception as e:
-                    logger.error(f"Error rendering text element {string.content_key}: {str(e)}", exc_info=True)
-                    continue
+                    else:
+                        draw.text((x, y), line, font=font, fill=color)
+                    
+                    logger.info(f"Rendered line '{line}' at ({x}, {y}) with color {color}")
+                    
+            except Exception as e:
+                logger.error(f"Error rendering text element {element_key}: {str(e)}", exc_info=True)
+                continue
 
     def _render_image_elements(self, base_image: Image.Image, template: Template, content: Dict[str, Any]):
         """Render all image elements on the base image."""
@@ -1125,7 +1144,7 @@ class TestAPIView(APIView):
 
 
 class CreateTestDataView(APIView):
-    """Create test templates for development."""
+    """Create test templates for development with JSON-based configuration."""
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -1144,100 +1163,77 @@ class CreateTestDataView(APIView):
             else:
                 logger.info(f'Using existing graphic pack: {pack.name}')
 
-            # Create a matchday template
+            # Create template configuration
+            template_config = {
+                "elements": {
+                    "club_name": {
+                        "type": "text",
+                        "position": {"x": 400, "y": 100},
+                        "style": {
+                            "fontSize": 24,
+                            "fontFamily": "Arial",
+                            "color": "#FFFFFF",
+                            "alignment": "center"
+                        }
+                    },
+                    "opponent": {
+                        "type": "text",
+                        "position": {"x": 400, "y": 150},
+                        "style": {
+                            "fontSize": 24,
+                            "fontFamily": "Arial",
+                            "color": "#FFFFFF",
+                            "alignment": "center"
+                        }
+                    },
+                    "date": {
+                        "type": "text",
+                        "position": {"x": 400, "y": 200},
+                        "style": {
+                            "fontSize": 20,
+                            "fontFamily": "Arial",
+                            "color": "#FFFFFF",
+                            "alignment": "center"
+                        }
+                    },
+                    "venue": {
+                        "type": "text",
+                        "position": {"x": 400, "y": 250},
+                        "style": {
+                            "fontSize": 20,
+                            "fontFamily": "Arial",
+                            "color": "#FFFFFF",
+                            "alignment": "center"
+                        }
+                    }
+                }
+            }
+
+            # Create a matchday template with JSON configuration
             template, created = Template.objects.get_or_create(
                 graphic_pack=pack,
                 content_type='matchday',
                 defaults={
                     'image_url': 'https://via.placeholder.com/800x600',
-                    'sport': 'football'
+                    'sport': 'football',
+                    'template_config': template_config
                 }
             )
             
             if created:
                 logger.info(f'Created matchday template: {template.id}')
             else:
-                logger.info(f'Using existing matchday template: {template.id}')
-
-            # Create some template elements
-            elements_data = [
-                {
-                    'type': 'text',
-                    'content_key': 'club_name',
-                    'x': 400,
-                    'y': 100,
-                    'use_percentage': False,
-                    'z_index': 1,
-                    'visible': True
-                },
-                {
-                    'type': 'text',
-                    'content_key': 'opponent',
-                    'x': 400,
-                    'y': 150,
-                    'use_percentage': False,
-                    'z_index': 2,
-                    'visible': True
-                },
-                {
-                    'type': 'text',
-                    'content_key': 'date',
-                    'x': 400,
-                    'y': 200,
-                    'use_percentage': False,
-                    'z_index': 3,
-                    'visible': True
-                },
-                {
-                    'type': 'text',
-                    'content_key': 'venue',
-                    'x': 400,
-                    'y': 250,
-                    'use_percentage': False,
-                    'z_index': 4,
-                    'visible': True
-                }
-            ]
-
-            created_elements = []
-            for element_data in elements_data:
-                element, created = TemplateElement.objects.get_or_create(
-                    template=template,
-                    content_key=element_data['content_key'],
-                    defaults=element_data
-                )
-                
-                if created:
-                    logger.info(f'Created element: {element.content_key}')
-                    
-                    # Create string element for text elements
-                    if element.type == 'text':
-                        string_element, created = StringElement.objects.get_or_create(
-                            template_element=element,
-                            defaults={
-                                'content_key': element_data['content_key'],
-                                'font_family': 'Arial',
-                                'font_size': 24,
-                                'color': '#FFFFFF',
-                                'alignment': 'center'
-                            }
-                        )
-                        
-                        if created:
-                            logger.info(f'Created string element for: {element.content_key}')
-                
-                created_elements.append({
-                    'id': element.id,
-                    'content_key': element.content_key,
-                    'type': element.type
-                })
+                # Update existing template with new configuration
+                template.template_config = template_config
+                template.save()
+                logger.info(f'Updated existing matchday template: {template.id}')
 
             return Response({
                 'message': 'Test data created successfully',
                 'pack_id': pack.id,
                 'template_id': template.id,
-                'elements_created': len(created_elements),
-                'elements': created_elements
+                'elements_created': len(template_config['elements']),
+                'template_config': template_config
             })
             
         except Exception as e:
@@ -1268,24 +1264,29 @@ class DebugTemplatesView(APIView):
             
             template_data = []
             for template in templates:
+                template_config = template.template_config or {}
+                elements = template_config.get('elements', {})
                 template_data.append({
                     'id': template.id,
                     'content_type': template.content_type,
                     'image_url': template.image_url,
                     'sport': template.sport,
-                    'elements_count': template.elements.count()
+                    'elements_count': len(elements),
+                    'template_config': template_config
                 })
             
             # Also check all templates in the database
             all_templates = Template.objects.all()
             all_template_data = []
             for template in all_templates:
+                template_config = template.template_config or {}
+                elements = template_config.get('elements', {})
                 all_template_data.append({
                     'id': template.id,
                     'graphic_pack_id': template.graphic_pack.id,
                     'graphic_pack_name': template.graphic_pack.name,
                     'content_type': template.content_type,
-                    'elements_count': template.elements.count()
+                    'elements_count': len(elements)
                 })
             
             return Response({
@@ -1297,9 +1298,7 @@ class DebugTemplatesView(APIView):
                 'all_templates': all_template_data,
                 'database_info': {
                     'total_graphic_packs': GraphicPack.objects.count(),
-                    'total_templates': Template.objects.count(),
-                    'total_template_elements': TemplateElement.objects.count(),
-                    'total_string_elements': StringElement.objects.count()
+                    'total_templates': Template.objects.count()
                 }
             })
             

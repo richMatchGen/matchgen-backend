@@ -261,6 +261,31 @@ class CustomTokenObtainPairView(TokenObtainPairView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
+            # Test database connection before proceeding
+            try:
+                from django.db import connection
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT 1")
+                    result = cursor.fetchone()
+                    logger.info(f"Database connection test in token endpoint: {result}")
+            except Exception as db_error:
+                logger.error(f"Database connection failed in token endpoint: {str(db_error)}", exc_info=True)
+                return Response(
+                    {"error": "Database connection failed. Please try again later."}, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+            
+            # Test User model access
+            try:
+                user_count = User.objects.count()
+                logger.info(f"User model access test: {user_count} users found")
+            except Exception as user_error:
+                logger.error(f"User model access failed: {str(user_error)}", exc_info=True)
+                return Response(
+                    {"error": "User database access failed. Please try again later."}, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+            
             response = super().post(request, *args, **kwargs)
             logger.info(f"Token generated successfully for email: {request.data.get('email')}")
             return response
@@ -277,20 +302,59 @@ class HealthCheckView(APIView):
     permission_classes = [AllowAny]
     
     def get(self, request):
-        return Response(
-            {"status": "healthy", "message": "Users API is working"}, 
-            status=status.HTTP_200_OK
-        )
+        try:
+            # Test database connection
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+                result = cursor.fetchone()
+            
+            # Test User model access
+            user_count = User.objects.count()
+            
+            return Response({
+                "status": "healthy", 
+                "message": "Users API is working",
+                "database": {
+                    "connection": "ok",
+                    "user_count": user_count
+                }
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(f"Health check failed: {str(e)}", exc_info=True)
+            return Response({
+                "status": "unhealthy", 
+                "message": "Database connection failed",
+                "error": str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
     def post(self, request):
-        return Response(
-            {
+        try:
+            # Test database connection
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+                result = cursor.fetchone()
+            
+            # Test User model access
+            user_count = User.objects.count()
+            
+            return Response({
                 "status": "healthy", 
                 "message": "Users API POST is working", 
-                "data": request.data
-            }, 
-            status=status.HTTP_200_OK
-        )
+                "data": request.data,
+                "database": {
+                    "connection": "ok",
+                    "user_count": user_count
+                }
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(f"Health check POST failed: {str(e)}", exc_info=True)
+            return Response({
+                "status": "unhealthy", 
+                "message": "Database connection failed",
+                "error": str(e)
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class TestTokenEndpointView(APIView):

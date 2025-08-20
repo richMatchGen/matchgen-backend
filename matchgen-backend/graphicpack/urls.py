@@ -6,6 +6,7 @@ from .views import (
     ObtainTokenView,
     RegenerateGraphicView,
     SelectGraphicPackView,
+    TemplateEditorView,
     generate_matchday,
 )
 
@@ -15,17 +16,19 @@ urlpatterns = [
     path("select/", SelectGraphicPackView.as_view(), name="select-graphic-pack"),
     path("select-pack/", SelectGraphicPackView.as_view(), name="select-graphic-pack-legacy"),  # Backward compatibility
     path("generate/", GraphicGenerationView.as_view(), name="generate-graphic"),
-    path("regenerate/", RegenerateGraphicView.as_view(), name="regenerate-graphic"),  # New regenerate endpoint
-    path("generate-matchday/<int:match_id>/", generate_matchday, name="generate-matchday"),
-    path("match/<int:match_id>/generate-matchday/", generate_matchday, name="generate-matchday-legacy"),  # Backward compatibility
+    path("regenerate/", RegenerateGraphicView.as_view(), name="regenerate-graphic"),
+    path("template/<int:template_id>/edit/", TemplateEditorView.as_view(), name="template-editor"),
     
-    # Individual post type endpoints for frontend compatibility
+    # Individual post type endpoints
     path("match/<int:match_id>/generate-upcoming/", GraphicGenerationView.as_view(), name="generate-upcoming"),
     path("match/<int:match_id>/generate-startingxi/", GraphicGenerationView.as_view(), name="generate-startingxi"),
     path("match/<int:match_id>/generate-goal/", GraphicGenerationView.as_view(), name="generate-goal"),
     path("match/<int:match_id>/generate-substitution/", GraphicGenerationView.as_view(), name="generate-substitution"),
     path("match/<int:match_id>/generate-halftime/", GraphicGenerationView.as_view(), name="generate-halftime"),
     path("match/<int:match_id>/generate-fulltime/", GraphicGenerationView.as_view(), name="generate-fulltime"),
+    path("match/<int:match_id>/generate-matchday/", GraphicGenerationView.as_view(), name="generate-matchday"),
     
-    path("token/", ObtainTokenView.as_view(), name="obtain-token"),
+    # Legacy endpoint
+    path("generate-matchday/<int:match_id>/", generate_matchday, name="generate-matchday-legacy"),
+    path("obtain-token/", ObtainTokenView.as_view(), name="obtain-token"),
 ]

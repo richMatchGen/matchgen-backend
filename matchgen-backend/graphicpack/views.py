@@ -23,12 +23,8 @@ from users.serializers import LoginSerializer
 
 from .models import (
     GraphicPack,
-    ImageElement,
-    StringElement,
     Template,
-    TextElement,
     UserSelection,
-    TemplateElement,
 )
 from .serializers import GraphicPackSerializer
 from .utils import get_font, parse_color, wrap_text, calculate_text_position, render_text_with_shadow
@@ -886,11 +882,11 @@ class RegenerateGraphicView(APIView):
 
 
 class TemplateEditorView(APIView):
-    """View for editing template elements and positions."""
+    """Handle template editing operations with JSON-based configuration."""
     permission_classes = [IsAuthenticated]
 
     def get(self, request, template_id):
-        """Get template elements for editing."""
+        """Get template configuration for editing."""
         try:
             template = get_object_or_404(Template, id=template_id)
             
@@ -907,75 +903,23 @@ class TemplateEditorView(APIView):
                     {"error": "Club not found for this user."},
                     status=status.HTTP_404_NOT_FOUND
                 )
-
-            # Get all elements with their properties
-            elements = []
-            for element in template.elements.all().order_by('z_index'):
-                element_data = {
-                    'id': element.id,
-                    'type': element.type,
-                    'content_key': element.content_key,
-                    'x': element.x,
-                    'y': element.y,
-                    'width': element.width,
-                    'height': element.height,
-                    'rotation': element.rotation,
-                    'use_percentage': getattr(element, 'use_percentage', False),  # Handle missing field
-                    'max_width': getattr(element, 'max_width', None),  # Handle missing field
-                    'z_index': getattr(element, 'z_index', 0),  # Handle missing field
-                    'visible': getattr(element, 'visible', True),  # Handle missing field
-                    'string_elements': [],
-                    'image_elements': []
-                }
-
-                # Add string elements for text type
-                if element.type == 'text':
-                    for string in element.string_elements.all():
-                        element_data['string_elements'].append({
-                            'id': string.id,
-                            'content_key': string.content_key,
-                            'font_family': string.font_family,
-                            'font_size': string.font_size,
-                            'color': string.color,
-                            'alignment': string.alignment,
-                            'max_width': string.max_width,
-                            'font_weight': getattr(string, 'font_weight', 'normal'),  # Handle missing field
-                            'font_style': getattr(string, 'font_style', 'normal'),  # Handle missing field
-                            'text_shadow': getattr(string, 'text_shadow', False),  # Handle missing field
-                            'shadow_color': getattr(string, 'shadow_color', '#000000'),  # Handle missing field
-                            'shadow_offset_x': getattr(string, 'shadow_offset_x', 2),  # Handle missing field
-                            'shadow_offset_y': getattr(string, 'shadow_offset_y', 2),  # Handle missing field
-                            'line_height': getattr(string, 'line_height', 1.2),  # Handle missing field
-                            'letter_spacing': getattr(string, 'letter_spacing', 0.0)  # Handle missing field
-                        })
-
-                # Add image elements for image type
-                elif element.type == 'image':
-                    for image in element.image_elements.all():
-                        element_data['image_elements'].append({
-                            'id': image.id,
-                            'content_key': image.content_key,
-                            'maintain_aspect_ratio': image.maintain_aspect_ratio
-                        })
-
-                elements.append(element_data)
 
             return Response({
                 'template_id': template.id,
                 'template_name': f"{template.graphic_pack.name} - {template.content_type}",
-                'image_url': template.image_url,
-                'elements': elements
+                'template_config': template.template_config or {},
+                'image_url': template.image_url
             })
-
+            
         except Exception as e:
-            logger.error(f"Error getting template elements: {str(e)}", exc_info=True)
+            logger.error(f"Error getting template configuration: {str(e)}", exc_info=True)
             return Response(
-                {"error": "An error occurred while getting template elements."},
+                {"error": "An error occurred while getting template configuration."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
     def put(self, request, template_id):
-        """Update template elements."""
+        """Update template configuration."""
         try:
             template = get_object_or_404(Template, id=template_id)
             
@@ -993,92 +937,21 @@ class TemplateEditorView(APIView):
                     status=status.HTTP_404_NOT_FOUND
                 )
 
-            elements_data = request.data.get('elements', [])
-            
-            for element_data in elements_data:
-                element_id = element_data.get('id')
-                if not element_id:
-                    continue
-
-                try:
-                    element = TemplateElement.objects.get(id=element_id, template=template)
-                    
-                    # Update element properties (only update existing fields)
-                    element.x = element_data.get('x', element.x)
-                    element.y = element_data.get('y', element.y)
-                    element.width = element_data.get('width', element.width)
-                    element.height = element_data.get('height', element.height)
-                    element.rotation = element_data.get('rotation', element.rotation)
-                    
-                    # Only update new fields if they exist
-                    if hasattr(element, 'use_percentage'):
-                        element.use_percentage = element_data.get('use_percentage', element.use_percentage)
-                    if hasattr(element, 'max_width'):
-                        element.max_width = element_data.get('max_width', element.max_width)
-                    if hasattr(element, 'z_index'):
-                        element.z_index = element_data.get('z_index', element.z_index)
-                    if hasattr(element, 'visible'):
-                        element.visible = element_data.get('visible', element.visible)
-                    
-                    element.save()
-
-                    # Update string elements
-                    for string_data in element_data.get('string_elements', []):
-                        string_id = string_data.get('id')
-                        if string_id:
-                            try:
-                                string = StringElement.objects.get(id=string_id, template=element)
-                                string.font_family = string_data.get('font_family', string.font_family)
-                                string.font_size = string_data.get('font_size', string.font_size)
-                                string.color = string_data.get('color', string.color)
-                                string.alignment = string_data.get('alignment', string.alignment)
-                                string.max_width = string_data.get('max_width', string.max_width)
-                                
-                                # Only update new fields if they exist
-                                if hasattr(string, 'font_weight'):
-                                    string.font_weight = string_data.get('font_weight', string.font_weight)
-                                if hasattr(string, 'font_style'):
-                                    string.font_style = string_data.get('font_style', string.font_style)
-                                if hasattr(string, 'text_shadow'):
-                                    string.text_shadow = string_data.get('text_shadow', string.text_shadow)
-                                if hasattr(string, 'shadow_color'):
-                                    string.shadow_color = string_data.get('shadow_color', string.shadow_color)
-                                if hasattr(string, 'shadow_offset_x'):
-                                    string.shadow_offset_x = string_data.get('shadow_offset_x', string.shadow_offset_x)
-                                if hasattr(string, 'shadow_offset_y'):
-                                    string.shadow_offset_y = string_data.get('shadow_offset_y', string.shadow_offset_y)
-                                if hasattr(string, 'line_height'):
-                                    string.line_height = string_data.get('line_height', string.line_height)
-                                if hasattr(string, 'letter_spacing'):
-                                    string.letter_spacing = string_data.get('letter_spacing', string.letter_spacing)
-                                
-                                string.save()
-                            except StringElement.DoesNotExist:
-                                continue
-
-                    # Update image elements
-                    for image_data in element_data.get('image_elements', []):
-                        image_id = image_data.get('id')
-                        if image_id:
-                            try:
-                                image = ImageElement.objects.get(id=image_id, template=element)
-                                image.maintain_aspect_ratio = image_data.get('maintain_aspect_ratio', image.maintain_aspect_ratio)
-                                image.save()
-                            except ImageElement.DoesNotExist:
-                                continue
-
-                except TemplateElement.DoesNotExist:
-                    continue
+            # Update the template configuration
+            template_config = request.data.get('template_config', {})
+            template.template_config = template_config
+            template.save()
 
             return Response({
-                'message': 'Template elements updated successfully',
-                'template_id': template.id
+                'message': 'Template configuration updated successfully',
+                'template_id': template.id,
+                'template_config': template.template_config
             })
 
         except Exception as e:
-            logger.error(f"Error updating template elements: {str(e)}", exc_info=True)
+            logger.error(f"Error updating template configuration: {str(e)}", exc_info=True)
             return Response(
-                {"error": "An error occurred while updating template elements."},
+                {"error": "An error occurred while updating template configuration."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
 
@@ -1439,12 +1312,12 @@ class DebugTemplatesView(APIView):
 
 
 class CreateMissingTemplatesView(APIView):
-    """Create missing templates for all graphic packs."""
+    """Create missing templates for all graphic packs with JSON-based configuration."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         try:
-            from .models import GraphicPack, Template, TemplateElement, StringElement
+            from .models import GraphicPack, Template
             from django.db import transaction
             
             # Get all graphic packs
@@ -1473,96 +1346,91 @@ class CreateMissingTemplatesView(APIView):
                     if content_type not in existing_content_types:
                         try:
                             with transaction.atomic():
-                                # Create the template
+                                # Create template configuration based on content type
+                                if content_type == "matchday":
+                                    template_config = {
+                                        "elements": {
+                                            "date": {
+                                                "type": "text",
+                                                "position": {"x": 200, "y": 150},
+                                                "style": {
+                                                    "fontSize": 24,
+                                                    "fontFamily": "Arial",
+                                                    "color": "#FFFFFF",
+                                                    "alignment": "center"
+                                                }
+                                            },
+                                            "time": {
+                                                "type": "text",
+                                                "position": {"x": 400, "y": 150},
+                                                "style": {
+                                                    "fontSize": 24,
+                                                    "fontFamily": "Arial",
+                                                    "color": "#FFFFFF",
+                                                    "alignment": "center"
+                                                }
+                                            },
+                                            "venue": {
+                                                "type": "text",
+                                                "position": {"x": 300, "y": 250},
+                                                "style": {
+                                                    "fontSize": 20,
+                                                    "fontFamily": "Arial",
+                                                    "color": "#FFFFFF",
+                                                    "alignment": "center"
+                                                }
+                                            }
+                                        }
+                                    }
+                                elif content_type == "upcomingFixture":
+                                    template_config = {
+                                        "elements": {
+                                            "opponent": {
+                                                "type": "text",
+                                                "position": {"x": 300, "y": 200},
+                                                "style": {
+                                                    "fontSize": 24,
+                                                    "fontFamily": "Arial",
+                                                    "color": "#FFFFFF",
+                                                    "alignment": "center"
+                                                }
+                                            },
+                                            "date": {
+                                                "type": "text",
+                                                "position": {"x": 300, "y": 250},
+                                                "style": {
+                                                    "fontSize": 20,
+                                                    "fontFamily": "Arial",
+                                                    "color": "#FFFFFF",
+                                                    "alignment": "center"
+                                                }
+                                            }
+                                        }
+                                    }
+                                else:
+                                    template_config = {
+                                        "elements": {
+                                            "title": {
+                                                "type": "text",
+                                                "position": {"x": 300, "y": 200},
+                                                "style": {
+                                                    "fontSize": 24,
+                                                    "fontFamily": "Arial",
+                                                    "color": "#FFFFFF",
+                                                    "alignment": "center"
+                                                }
+                                            }
+                                        }
+                                    }
+                                
+                                # Create the template with JSON configuration
                                 template = Template.objects.create(
                                     graphic_pack=pack,
                                     content_type=content_type,
                                     image_url=f"https://via.placeholder.com/800x600/1976d2/ffffff?text={content_type}+Template",
-                                    sport="football"
+                                    sport="football",
+                                    template_config=template_config
                                 )
-                                
-                                # Create some basic template elements based on content type
-                                if content_type == "matchday":
-                                    elements_data = [
-                                        {
-                                            'type': 'text',
-                                            'content_key': 'date',
-                                            'x': 200,
-                                            'y': 150,
-                                            'use_percentage': False,
-                                            'z_index': 1,
-                                            'visible': True
-                                        },
-                                        {
-                                            'type': 'text',
-                                            'content_key': 'time',
-                                            'x': 400,
-                                            'y': 150,
-                                            'use_percentage': False,
-                                            'z_index': 2,
-                                            'visible': True
-                                        },
-                                        {
-                                            'type': 'text',
-                                            'content_key': 'venue',
-                                            'x': 300,
-                                            'y': 250,
-                                            'use_percentage': False,
-                                            'z_index': 3,
-                                            'visible': True
-                                        }
-                                    ]
-                                elif content_type == "upcomingFixture":
-                                    elements_data = [
-                                        {
-                                            'type': 'text',
-                                            'content_key': 'opponent',
-                                            'x': 300,
-                                            'y': 200,
-                                            'use_percentage': False,
-                                            'z_index': 1,
-                                            'visible': True
-                                        },
-                                        {
-                                            'type': 'text',
-                                            'content_key': 'date',
-                                            'x': 300,
-                                            'y': 250,
-                                            'use_percentage': False,
-                                            'z_index': 2,
-                                            'visible': True
-                                        }
-                                    ]
-                                else:
-                                    elements_data = [
-                                        {
-                                            'type': 'text',
-                                            'content_key': 'title',
-                                            'x': 300,
-                                            'y': 200,
-                                            'use_percentage': False,
-                                            'z_index': 1,
-                                            'visible': True
-                                        }
-                                    ]
-                                
-                                # Create template elements
-                                for element_data in elements_data:
-                                    element = TemplateElement.objects.create(
-                                        template=template,
-                                        **element_data
-                                    )
-                                    
-                                    # Create string element for text elements
-                                    if element.type == 'text':
-                                        StringElement.objects.create(
-                                            template_element=element,
-                                            content_key=element_data['content_key'],
-                                            font_family='Arial',
-                                            font_size=24,
-                                            color='#FFFFFF',
-                                            alignment='center'
-                                        )
                                 
                                 created_templates.append({
                                     'pack_name': pack.name,
@@ -1607,19 +1475,20 @@ class TestGraphicPackDetailView(APIView):
                 
                 template_data = []
                 for template in templates:
-                    elements = TemplateElement.objects.filter(template=template)
+                    template_config = template.template_config or {}
+                    elements = template_config.get('elements', {})
                     template_data.append({
                         'id': template.id,
                         'content_type': template.content_type,
-                        'elements_count': elements.count(),
+                        'elements_count': len(elements),
+                        'template_config': template_config,
                         'elements': [
                             {
-                                'id': el.id,
-                                'type': el.type,
-                                'content_key': el.content_key,
-                                'x': el.x,
-                                'y': el.y
-                            } for el in elements
+                                'key': key,
+                                'type': element.get('type', 'text'),
+                                'position': element.get('position', {}),
+                                'style': element.get('style', {})
+                            } for key, element in elements.items()
                         ]
                     })
                 

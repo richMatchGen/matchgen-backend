@@ -331,13 +331,8 @@ class MatchdayPostGenerator(APIView):
                 font_weight = style.get('fontWeight', 'normal')
                 font_style = style.get('fontStyle', 'normal')
                 
-                # Get font (fallback to default if custom font fails)
-                try:
-                    # Try to load a custom font if available
-                    font = ImageFont.truetype(f"{font_family}.ttf", font_size)
-                except:
-                    # Fallback to default font
-                    font = ImageFont.load_default()
+                # Use default font for simplicity
+                font = ImageFont.load_default()
                 
                 # Get color
                 color = style.get('color', '#FFFFFF')
@@ -448,55 +443,69 @@ class DebugTemplatesView(APIView):
 
     def get(self, request):
         try:
+            logger.info("DebugTemplatesView called")
+            
             # Get user's club
             try:
                 club = Club.objects.get(user=request.user)
+                logger.info(f"Found club: {club.name}")
             except Club.DoesNotExist:
+                logger.error(f"No club found for user: {request.user.email}")
                 return Response({
                     "error": "Club not found for this user."
                 }, status=status.HTTP_404_NOT_FOUND)
 
             # Get all graphic packs
-            packs = GraphicPack.objects.all()
-            packs_data = []
-            
-            for pack in packs:
-                templates = Template.objects.filter(graphic_pack=pack)
-                templates_data = []
+            try:
+                packs = GraphicPack.objects.all()
+                logger.info(f"Found {packs.count()} graphic packs")
+                packs_data = []
                 
-                for template in templates:
-                    templates_data.append({
-                        "id": template.id,
-                        "content_type": template.content_type,
-                        "image_url": template.image_url,
-                        "sport": template.sport,
-                        "template_config": template.template_config,
-                        "has_config": bool(template.template_config)
+                for pack in packs:
+                    templates = Template.objects.filter(graphic_pack=pack)
+                    templates_data = []
+                    
+                    for template in templates:
+                        templates_data.append({
+                            "id": template.id,
+                            "content_type": template.content_type,
+                            "image_url": template.image_url,
+                            "sport": template.sport,
+                            "template_config": template.template_config,
+                            "has_config": bool(template.template_config)
+                        })
+                    
+                    packs_data.append({
+                        "id": pack.id,
+                        "name": pack.name,
+                        "description": pack.description,
+                        "is_selected": club.selected_pack == pack if club.selected_pack else False,
+                        "templates": templates_data,
+                        "templates_count": templates.count()
                     })
-                
-                packs_data.append({
-                    "id": pack.id,
-                    "name": pack.name,
-                    "description": pack.description,
-                    "is_selected": club.selected_pack == pack if club.selected_pack else False,
-                    "templates": templates_data,
-                    "templates_count": templates.count()
-                })
+            except Exception as e:
+                logger.error(f"Error getting graphic packs: {str(e)}")
+                packs_data = []
 
             # Get user's matches
-            matches = Match.objects.filter(club=club)
-            matches_data = []
-            
-            for match in matches:
-                matches_data.append({
-                    "id": match.id,
-                    "opponent": match.opponent,
-                    "date": match.date.isoformat() if match.date else None,
-                    "time_start": match.time_start,
-                    "venue": match.venue
-                })
+            try:
+                matches = Match.objects.filter(club=club)
+                logger.info(f"Found {matches.count()} matches for club")
+                matches_data = []
+                
+                for match in matches:
+                    matches_data.append({
+                        "id": match.id,
+                        "opponent": match.opponent,
+                        "date": match.date.isoformat() if match.date else None,
+                        "time_start": match.time_start,
+                        "venue": match.venue
+                    })
+            except Exception as e:
+                logger.error(f"Error getting matches: {str(e)}")
+                matches_data = []
 
-            return Response({
+            response_data = {
                 "user": {
                     "id": request.user.id,
                     "email": request.user.email
@@ -509,14 +518,29 @@ class DebugTemplatesView(APIView):
                 },
                 "graphic_packs": packs_data,
                 "matches": matches_data,
-                "matches_count": matches.count()
-            })
+                "matches_count": len(matches_data)
+            }
+            
+            logger.info("DebugTemplatesView completed successfully")
+            return Response(response_data)
 
         except Exception as e:
             logger.error(f"Error in DebugTemplatesView: {str(e)}", exc_info=True)
             return Response({
                 "error": f"Failed to debug templates: {str(e)}"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class TestEndpointView(APIView):
+    """Simple test endpoint to check if the backend is working."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        return Response({
+            "status": "success",
+            "message": "Backend is working!",
+            "timestamp": time.time()
+        })
 
 
 class ObtainTokenView(APIView):

@@ -6,6 +6,7 @@ from .views import (
     SelectGraphicPackView,
     MatchdayPostGenerator,
     DebugTemplatesView,
+    TestEndpointView,
     ObtainTokenView,
 )
 
@@ -22,6 +23,7 @@ urlpatterns = [
     
     # Debug endpoints
     path("debug-templates/", DebugTemplatesView.as_view(), name="debug-templates"),
+    path("test/", TestEndpointView.as_view(), name="test"),
     
     # Utility endpoints
     path("obtain-token/", ObtainTokenView.as_view(), name="obtain-token"),

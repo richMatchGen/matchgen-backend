@@ -551,35 +551,104 @@ class TestEndpointView(APIView):
             "timestamp": time.time()
         })
 
+    def put(self, request):
+        """Test basic Django functionality without database."""
+        try:
+            logger.info("Testing basic Django functionality...")
+            
+            # Test 1: Basic Python operations
+            test_list = [1, 2, 3, 4, 5]
+            test_sum = sum(test_list)
+            
+            # Test 2: Import operations
+            from django.conf import settings
+            debug_mode = settings.DEBUG
+            
+            # Test 3: Basic string operations
+            test_string = "Hello World"
+            reversed_string = test_string[::-1]
+            
+            return Response({
+                "status": "success",
+                "message": "Basic Django functionality working!",
+                "timestamp": time.time(),
+                "tests": {
+                    "list_sum": test_sum,
+                    "debug_mode": debug_mode,
+                    "reversed_string": reversed_string
+                }
+            })
+        except Exception as e:
+            logger.error(f"Basic functionality test failed: {str(e)}", exc_info=True)
+            return Response({
+                "status": "error",
+                "message": f"Basic functionality test failed: {str(e)}",
+                "timestamp": time.time()
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     def post(self, request):
         """Test database operations."""
         try:
-            # Test creating a simple graphic pack
-            pack = GraphicPack.objects.create(
-                name='Test Pack',
-                description='Test Description',
-                preview_image_url='https://example.com/test.jpg'
-            )
+            logger.info("Testing database operations...")
             
-            # Test creating a simple template
-            template = Template.objects.create(
-                graphic_pack=pack,
-                content_type='matchday',
-                sport='football',
-                image_url='https://example.com/test.jpg',
-                template_config={}
-            )
+            # Test 1: Check if we can query existing data
+            pack_count = GraphicPack.objects.count()
+            template_count = Template.objects.count()
+            logger.info(f"Current counts - Packs: {pack_count}, Templates: {template_count}")
             
-            # Clean up - delete the test data
-            template.delete()
-            pack.delete()
+            # Test 2: Try to create a simple graphic pack
+            try:
+                pack = GraphicPack.objects.create(
+                    name='Test Pack',
+                    description='Test Description',
+                    preview_image_url='https://example.com/test.jpg'
+                )
+                logger.info(f"Created test pack: {pack.id}")
+                
+                # Test 3: Try to create a simple template
+                try:
+                    template = Template.objects.create(
+                        graphic_pack=pack,
+                        content_type='matchday',
+                        sport='football',
+                        image_url='https://example.com/test.jpg',
+                        template_config={}
+                    )
+                    logger.info(f"Created test template: {template.id}")
+                    
+                    # Clean up - delete the test data
+                    template.delete()
+                    logger.info("Deleted test template")
+                except Exception as template_error:
+                    logger.error(f"Template creation failed: {str(template_error)}")
+                    return Response({
+                        "status": "error",
+                        "message": f"Template creation failed: {str(template_error)}",
+                        "timestamp": time.time()
+                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+                pack.delete()
+                logger.info("Deleted test pack")
+                
+            except Exception as pack_error:
+                logger.error(f"Pack creation failed: {str(pack_error)}")
+                return Response({
+                    "status": "error",
+                    "message": f"Pack creation failed: {str(pack_error)}",
+                    "timestamp": time.time()
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
             return Response({
                 "status": "success",
                 "message": "Database operations working!",
-                "timestamp": time.time()
+                "timestamp": time.time(),
+                "current_counts": {
+                    "packs": pack_count,
+                    "templates": template_count
+                }
             })
         except Exception as e:
+            logger.error(f"Database test failed: {str(e)}", exc_info=True)
             return Response({
                 "status": "error",
                 "message": f"Database error: {str(e)}",

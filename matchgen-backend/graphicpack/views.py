@@ -13,7 +13,7 @@ from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from PIL import Image, ImageDraw, ImageFont
 from rest_framework import generics, status
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.response import Response
@@ -61,6 +61,27 @@ class GraphicPackListView(ListAPIView):
                 logger.error(f"Fallback also failed: {str(fallback_error)}", exc_info=True)
                 # Return empty list as last resort
                 return Response([], status=200)
+
+
+class GraphicPackDetailView(RetrieveAPIView):
+    """Get a single graphic pack with all its templates and elements."""
+    queryset = GraphicPack.objects.all()
+    serializer_class = GraphicPackSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = 'id'
+
+    def get(self, request, *args, **kwargs):
+        """Override get to add debug logging and error handling."""
+        try:
+            response = super().get(request, *args, **kwargs)
+            logger.info(f"Graphic pack detail response: {response.data}")
+            return response
+        except Exception as e:
+            logger.error(f"Error in GraphicPackDetailView: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "Failed to load graphic pack details."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 
 class SelectGraphicPackView(APIView):

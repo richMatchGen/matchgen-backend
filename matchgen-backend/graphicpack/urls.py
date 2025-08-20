@@ -14,6 +14,7 @@ from .views import (
     DebugTemplatesView,
     CreateMissingTemplatesView,
     TestGraphicPackDetailView,
+    MatchdayPostView,
     generate_matchday,
 )
 
@@ -41,6 +42,9 @@ urlpatterns = [
     path("match/<int:match_id>/generate-halftime/", GraphicGenerationView.as_view(), name="generate-halftime"),
     path("match/<int:match_id>/generate-fulltime/", GraphicGenerationView.as_view(), name="generate-fulltime"),
     path("match/<int:match_id>/generate-matchday/", GraphicGenerationView.as_view(), name="generate-matchday"),
+    
+    # New simplified endpoints
+    path("matchday-post/", MatchdayPostView.as_view(), name="matchday-post"),
     
     # Legacy endpoint
     path("generate-matchday/<int:match_id>/", generate_matchday, name="generate-matchday-legacy"),

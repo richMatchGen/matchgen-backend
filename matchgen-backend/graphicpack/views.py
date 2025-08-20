@@ -861,6 +861,15 @@ class CreateTestDataView(APIView):
                 )
                 logger.info(f"Created test matchday template: {template.id}")
 
+            # Also set this pack as the user's selected pack
+            try:
+                club = Club.objects.get(user=request.user)
+                club.selected_pack = pack
+                club.save()
+                logger.info(f"Set pack {pack.name} as selected for club {club.name}")
+            except Club.DoesNotExist:
+                logger.warning(f"No club found for user {request.user.email}")
+
             return Response({
                 "message": "Test data created successfully",
                 "pack": {
@@ -872,6 +881,10 @@ class CreateTestDataView(APIView):
                     "id": template.id,
                     "content_type": template.content_type,
                     "has_config": bool(template.template_config)
+                },
+                "user_club": {
+                    "has_club": bool(club),
+                    "selected_pack_id": club.selected_pack.id if club and club.selected_pack else None
                 }
             })
 
@@ -896,3 +909,92 @@ class ObtainTokenView(APIView):
                 "password": "your_password"
             }
         })
+
+
+class DiagnosticView(APIView):
+    """Diagnostic endpoint to check current state for matchday post generation."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            logger.info(f"DiagnosticView called for user: {request.user.email}")
+            
+            # Check user's club
+            try:
+                club = Club.objects.get(user=request.user)
+                logger.info(f"Found club: {club.name} (ID: {club.id})")
+                has_club = True
+                club_name = club.name
+                selected_pack_id = club.selected_pack.id if club.selected_pack else None
+                selected_pack_name = club.selected_pack.name if club.selected_pack else None
+            except Club.DoesNotExist:
+                logger.warning(f"No club found for user: {request.user.email}")
+                has_club = False
+                club_name = None
+                selected_pack_id = None
+                selected_pack_name = None
+
+            # Check if selected pack exists
+            pack_exists = False
+            if selected_pack_id:
+                try:
+                    pack = GraphicPack.objects.get(id=selected_pack_id)
+                    pack_exists = True
+                    logger.info(f"Selected pack exists: {pack.name}")
+                except GraphicPack.DoesNotExist:
+                    logger.error(f"Selected pack ID {selected_pack_id} does not exist")
+                    pack_exists = False
+
+            # Check for matchday template
+            template_exists = False
+            if pack_exists:
+                try:
+                    template = Template.objects.get(
+                        graphic_pack_id=selected_pack_id,
+                        content_type='matchday'
+                    )
+                    template_exists = True
+                    logger.info(f"Matchday template exists: {template.id}")
+                except Template.DoesNotExist:
+                    logger.error(f"No matchday template found for pack {selected_pack_id}")
+
+            # Check user's matches
+            try:
+                matches = Match.objects.filter(club=club) if has_club else []
+                matches_count = matches.count()
+                logger.info(f"User has {matches_count} matches")
+            except Exception as e:
+                logger.error(f"Error getting matches: {str(e)}")
+                matches_count = 0
+
+            return Response({
+                "user": {
+                    "email": request.user.email,
+                    "id": request.user.id
+                },
+                "club": {
+                    "has_club": has_club,
+                    "name": club_name,
+                    "selected_pack_id": selected_pack_id,
+                    "selected_pack_name": selected_pack_name
+                },
+                "pack": {
+                    "exists": pack_exists,
+                    "id": selected_pack_id
+                },
+                "template": {
+                    "exists": template_exists,
+                    "content_type": "matchday"
+                },
+                "matches": {
+                    "count": matches_count
+                },
+                "status": "ready" if (has_club and pack_exists and template_exists and matches_count > 0) else "not_ready",
+                "missing": []
+            })
+
+        except Exception as e:
+            logger.error(f"Diagnostic error: {str(e)}", exc_info=True)
+            return Response({
+                "error": f"Diagnostic failed: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

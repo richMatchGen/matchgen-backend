@@ -47,7 +47,7 @@ class MatchListView(ListAPIView, RateLimitMixin):
         logger.info(f"Request headers: {dict(self.request.headers)}")
         
         # Check rate limiting
-        if not self.check_rate_limit(user.id, "matches", limit_seconds=3):
+        if not self.check_rate_limit(user.id, "matches", limit_seconds=30):  # Increased from 3 to 30 seconds
             logger.warning(f"Rate limit exceeded for matches endpoint - user {user.email}")
             # Return empty queryset instead of raising error to avoid breaking frontend
             return Match.objects.none()

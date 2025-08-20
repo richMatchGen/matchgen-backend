@@ -4,6 +4,7 @@ from .views import (
     GraphicPackListView,
     GraphicPackDetailView,
     SelectGraphicPackView,
+    MatchdayPostGenerator,
     ObtainTokenView,
 )
 
@@ -14,6 +15,9 @@ urlpatterns = [
     path("graphic-packs/<int:id>/", GraphicPackDetailView.as_view(), name="graphic-pack-detail"),
     path("select/", SelectGraphicPackView.as_view(), name="select-graphic-pack"),
     path("select-pack/", SelectGraphicPackView.as_view(), name="select-graphic-pack-legacy"),
+    
+    # Social media post generation
+    path("generate-matchday-post/", MatchdayPostGenerator.as_view(), name="generate-matchday-post"),
     
     # Utility endpoints
     path("obtain-token/", ObtainTokenView.as_view(), name="obtain-token"),

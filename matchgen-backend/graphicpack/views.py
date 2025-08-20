@@ -551,6 +551,41 @@ class TestEndpointView(APIView):
             "timestamp": time.time()
         })
 
+    def post(self, request):
+        """Test database operations."""
+        try:
+            # Test creating a simple graphic pack
+            pack = GraphicPack.objects.create(
+                name='Test Pack',
+                description='Test Description',
+                preview_image_url='https://example.com/test.jpg'
+            )
+            
+            # Test creating a simple template
+            template = Template.objects.create(
+                graphic_pack=pack,
+                content_type='matchday',
+                sport='football',
+                image_url='https://example.com/test.jpg',
+                template_config={}
+            )
+            
+            # Clean up - delete the test data
+            template.delete()
+            pack.delete()
+            
+            return Response({
+                "status": "success",
+                "message": "Database operations working!",
+                "timestamp": time.time()
+            })
+        except Exception as e:
+            return Response({
+                "status": "error",
+                "message": f"Database error: {str(e)}",
+                "timestamp": time.time()
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 class CreateTestDataView(APIView):
     """Create test graphic packs and templates for development."""
@@ -558,29 +593,41 @@ class CreateTestDataView(APIView):
 
     def post(self, request):
         try:
-            # Create a test graphic pack
-            pack, created = GraphicPack.objects.get_or_create(
-                id=7,  # Use the ID that the club is expecting
-                defaults={
-                    'name': 'Leafield',
-                    'description': 'Leafield Bespoke',
-                    'preview_image_url': 'https://res.cloudinary.com/dxoxuyz0j/image/upload/v1755598719/Upcoming_Fixture_Home_tvlije.png'
-                }
-            )
+            logger.info("CreateTestDataView called")
             
-            if created:
+            # First, check if pack ID 7 already exists
+            try:
+                existing_pack = GraphicPack.objects.get(id=7)
+                logger.info(f"Pack ID 7 already exists: {existing_pack.name}")
+                pack = existing_pack
+            except GraphicPack.DoesNotExist:
+                logger.info("Pack ID 7 does not exist, creating new pack")
+                # Create a test graphic pack
+                pack = GraphicPack.objects.create(
+                    id=7,
+                    name='Leafield',
+                    description='Leafield Bespoke',
+                    preview_image_url='https://res.cloudinary.com/dxoxuyz0j/image/upload/v1755598719/Upcoming_Fixture_Home_tvlije.png'
+                )
                 logger.info(f"Created test graphic pack: {pack.name}")
-            else:
-                logger.info(f"Test graphic pack already exists: {pack.name}")
 
-            # Create a test matchday template
-            template, created = Template.objects.get_or_create(
-                graphic_pack=pack,
-                content_type='matchday',
-                defaults={
-                    'sport': 'football',
-                    'image_url': 'https://res.cloudinary.com/dxoxuyz0j/image/upload/v1755598719/Upcoming_Fixture_Home_tvlije.png',
-                    'template_config': {
+            # Check if matchday template already exists
+            try:
+                existing_template = Template.objects.get(
+                    graphic_pack=pack,
+                    content_type='matchday'
+                )
+                logger.info(f"Matchday template already exists: {existing_template.id}")
+                template = existing_template
+            except Template.DoesNotExist:
+                logger.info("Matchday template does not exist, creating new template")
+                # Create a test matchday template
+                template = Template.objects.create(
+                    graphic_pack=pack,
+                    content_type='matchday',
+                    sport='football',
+                    image_url='https://res.cloudinary.com/dxoxuyz0j/image/upload/v1755598719/Upcoming_Fixture_Home_tvlije.png',
+                    template_config={
                         "date": {
                             "x": 100,
                             "y": 200,
@@ -617,13 +664,8 @@ class CreateTestDataView(APIView):
                             "fontFamily": "Arial"
                         }
                     }
-                }
-            )
-            
-            if created:
+                )
                 logger.info(f"Created test matchday template: {template.id}")
-            else:
-                logger.info(f"Test matchday template already exists: {template.id}")
 
             return Response({
                 "message": "Test data created successfully",

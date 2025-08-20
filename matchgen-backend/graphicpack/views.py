@@ -174,7 +174,16 @@ class MatchdayPostGenerator(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            logger.info(f"Club selected pack: {club.selected_pack.name} (ID: {club.selected_pack.id})")
+            # Check if the selected pack actually exists
+            try:
+                selected_pack = GraphicPack.objects.get(id=club.selected_pack.id)
+                logger.info(f"Club selected pack: {selected_pack.name} (ID: {selected_pack.id})")
+            except GraphicPack.DoesNotExist:
+                logger.error(f"Selected pack ID {club.selected_pack.id} does not exist in database")
+                return Response(
+                    {"error": f"Selected graphic pack (ID: {club.selected_pack.id}) no longer exists in database."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
             # Get the match
             try:
@@ -190,12 +199,12 @@ class MatchdayPostGenerator(APIView):
             # Get the matchday template
             try:
                 template = Template.objects.get(
-                    graphic_pack=club.selected_pack,
+                    graphic_pack=selected_pack,
                     content_type="matchday"
                 )
                 logger.info(f"Found matchday template: {template.id}")
             except Template.DoesNotExist:
-                logger.error(f"No matchday template found for graphic pack {club.selected_pack.name}")
+                logger.error(f"No matchday template found for graphic pack {selected_pack.name}")
                 return Response(
                     {"error": "Matchday template not found for this club's graphic pack."},
                     status=status.HTTP_404_NOT_FOUND,
@@ -541,6 +550,100 @@ class TestEndpointView(APIView):
             "message": "Backend is working!",
             "timestamp": time.time()
         })
+
+
+class CreateTestDataView(APIView):
+    """Create test graphic packs and templates for development."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            # Create a test graphic pack
+            pack, created = GraphicPack.objects.get_or_create(
+                id=7,  # Use the ID that the club is expecting
+                defaults={
+                    'name': 'Leafield',
+                    'description': 'Leafield Bespoke',
+                    'preview_image_url': 'https://res.cloudinary.com/dxoxuyz0j/image/upload/v1755598719/Upcoming_Fixture_Home_tvlije.png'
+                }
+            )
+            
+            if created:
+                logger.info(f"Created test graphic pack: {pack.name}")
+            else:
+                logger.info(f"Test graphic pack already exists: {pack.name}")
+
+            # Create a test matchday template
+            template, created = Template.objects.get_or_create(
+                graphic_pack=pack,
+                content_type='matchday',
+                defaults={
+                    'sport': 'football',
+                    'image_url': 'https://res.cloudinary.com/dxoxuyz0j/image/upload/v1755598719/Upcoming_Fixture_Home_tvlije.png',
+                    'template_config': {
+                        "date": {
+                            "x": 100,
+                            "y": 200,
+                            "fontSize": 24,
+                            "color": "#FFFFFF",
+                            "fontFamily": "Arial"
+                        },
+                        "time": {
+                            "x": 100,
+                            "y": 250,
+                            "fontSize": 24,
+                            "color": "#FFFFFF",
+                            "fontFamily": "Arial"
+                        },
+                        "venue": {
+                            "x": 100,
+                            "y": 300,
+                            "fontSize": 20,
+                            "color": "#FFFFFF",
+                            "fontFamily": "Arial"
+                        },
+                        "opponent": {
+                            "x": 100,
+                            "y": 350,
+                            "fontSize": 28,
+                            "color": "#FFFFFF",
+                            "fontFamily": "Arial"
+                        },
+                        "home_away": {
+                            "x": 100,
+                            "y": 150,
+                            "fontSize": 32,
+                            "color": "#FFFFFF",
+                            "fontFamily": "Arial"
+                        }
+                    }
+                }
+            )
+            
+            if created:
+                logger.info(f"Created test matchday template: {template.id}")
+            else:
+                logger.info(f"Test matchday template already exists: {template.id}")
+
+            return Response({
+                "message": "Test data created successfully",
+                "pack": {
+                    "id": pack.id,
+                    "name": pack.name,
+                    "description": pack.description
+                },
+                "template": {
+                    "id": template.id,
+                    "content_type": template.content_type,
+                    "has_config": bool(template.template_config)
+                }
+            })
+
+        except Exception as e:
+            logger.error(f"Error creating test data: {str(e)}", exc_info=True)
+            return Response({
+                "error": f"Failed to create test data: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class ObtainTokenView(APIView):

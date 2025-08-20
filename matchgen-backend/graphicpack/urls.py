@@ -7,6 +7,7 @@ from .views import (
     RegenerateGraphicView,
     SelectGraphicPackView,
     TemplateEditorView,
+    DebugGraphicPackView,
     generate_matchday,
 )
 
@@ -18,6 +19,7 @@ urlpatterns = [
     path("generate/", GraphicGenerationView.as_view(), name="generate-graphic"),
     path("regenerate/", RegenerateGraphicView.as_view(), name="regenerate-graphic"),
     path("template/<int:template_id>/edit/", TemplateEditorView.as_view(), name="template-editor"),
+    path("debug/", DebugGraphicPackView.as_view(), name="debug-graphic-pack"),
     
     # Individual post type endpoints
     path("match/<int:match_id>/generate-upcoming/", GraphicGenerationView.as_view(), name="generate-upcoming"),

@@ -42,6 +42,12 @@ class GraphicPackListView(ListAPIView):
     serializer_class = GraphicPackSerializer
     permission_classes = [AllowAny]  # Allow public access to view available packs
 
+    def get(self, request, *args, **kwargs):
+        """Override get to add debug logging."""
+        response = super().get(request, *args, **kwargs)
+        logger.info(f"Graphic packs response: {response.data}")
+        return response
+
 
 class SelectGraphicPackView(APIView):
     """Select a graphic pack for the user's club."""
@@ -1070,3 +1076,55 @@ class ObtainTokenView(APIView):
                 {"error": "An error occurred during authentication."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class DebugGraphicPackView(APIView):
+    """Debug view to check graphic pack data."""
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        try:
+            packs = GraphicPack.objects.all()
+            pack_data = []
+            
+            for pack in packs:
+                pack_info = {
+                    'id': pack.id,
+                    'name': pack.name,
+                    'description': pack.description,
+                    'templates_count': pack.templates.count(),
+                    'templates': []
+                }
+                
+                for template in pack.templates.all():
+                    template_info = {
+                        'id': template.id,
+                        'content_type': template.content_type,
+                        'elements_count': template.elements.count(),
+                        'elements': []
+                    }
+                    
+                    for element in template.elements.all():
+                        element_info = {
+                            'id': element.id,
+                            'type': element.type,
+                            'content_key': element.content_key,
+                            'string_elements_count': element.string_elements.count(),
+                            'image_elements_count': element.image_elements.count()
+                        }
+                        template_info['elements'].append(element_info)
+                    
+                    pack_info['templates'].append(template_info)
+                
+                pack_data.append(pack_info)
+            
+            return Response({
+                'total_packs': len(pack_data),
+                'packs': pack_data
+            })
+            
+        except Exception as e:
+            logger.error(f"Error in debug view: {str(e)}", exc_info=True)
+            return Response({
+                'error': str(e)
+            }, status=500)

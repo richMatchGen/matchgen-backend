@@ -586,17 +586,83 @@ class TestEndpointView(APIView):
                 "timestamp": time.time()
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+    def patch(self, request):
+        """Test basic database connection without models."""
+        try:
+            logger.info("Testing basic database connection...")
+            
+            # Test 1: Basic database connection
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1 as test_value")
+                result = cursor.fetchone()
+                logger.info(f"Database connection test result: {result}")
+            
+            # Test 2: Check database tables
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT table_name 
+                    FROM information_schema.tables 
+                    WHERE table_schema = 'public' 
+                    AND table_name LIKE '%graphic%'
+                """)
+                tables = cursor.fetchall()
+                table_names = [table[0] for table in tables]
+                logger.info(f"Found graphic tables: {table_names}")
+            
+            return Response({
+                "status": "success",
+                "message": "Basic database connection working!",
+                "timestamp": time.time(),
+                "database_info": {
+                    "connection_test": result[0] if result else None,
+                    "graphic_tables": table_names
+                }
+            })
+        except Exception as e:
+            logger.error(f"Database connection test failed: {str(e)}", exc_info=True)
+            return Response({
+                "status": "error",
+                "message": f"Database connection test failed: {str(e)}",
+                "timestamp": time.time()
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
     def post(self, request):
         """Test database operations."""
         try:
             logger.info("Testing database operations...")
             
-            # Test 1: Check if we can query existing data
-            pack_count = GraphicPack.objects.count()
-            template_count = Template.objects.count()
-            logger.info(f"Current counts - Packs: {pack_count}, Templates: {template_count}")
+            # Test 1: Basic Django database connection
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+                result = cursor.fetchone()
+                logger.info(f"Database connection test: {result}")
             
-            # Test 2: Try to create a simple graphic pack
+            # Test 2: Check if we can query existing data
+            try:
+                pack_count = GraphicPack.objects.count()
+                logger.info(f"GraphicPack count: {pack_count}")
+            except Exception as count_error:
+                logger.error(f"GraphicPack count failed: {str(count_error)}")
+                return Response({
+                    "status": "error",
+                    "message": f"GraphicPack count failed: {str(count_error)}",
+                    "timestamp": time.time()
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            try:
+                template_count = Template.objects.count()
+                logger.info(f"Template count: {template_count}")
+            except Exception as count_error:
+                logger.error(f"Template count failed: {str(count_error)}")
+                return Response({
+                    "status": "error",
+                    "message": f"Template count failed: {str(count_error)}",
+                    "timestamp": time.time()
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            # Test 3: Try to create a simple graphic pack
             try:
                 pack = GraphicPack.objects.create(
                     name='Test Pack',
@@ -605,7 +671,7 @@ class TestEndpointView(APIView):
                 )
                 logger.info(f"Created test pack: {pack.id}")
                 
-                # Test 3: Try to create a simple template
+                # Test 4: Try to create a simple template
                 try:
                     template = Template.objects.create(
                         graphic_pack=pack,
@@ -621,6 +687,8 @@ class TestEndpointView(APIView):
                     logger.info("Deleted test template")
                 except Exception as template_error:
                     logger.error(f"Template creation failed: {str(template_error)}")
+                    # Clean up the pack before returning error
+                    pack.delete()
                     return Response({
                         "status": "error",
                         "message": f"Template creation failed: {str(template_error)}",

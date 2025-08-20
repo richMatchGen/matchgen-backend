@@ -143,17 +143,24 @@ class MatchdayPostGenerator(APIView):
     def post(self, request):
         """Generate a matchday post for a specific fixture."""
         try:
+            logger.info(f"MatchdayPostGenerator called with data: {request.data}")
+            
             match_id = request.data.get("match_id")
             if not match_id:
+                logger.error("No match_id provided in request")
                 return Response(
                     {"error": "match_id is required"}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
+            logger.info(f"Processing match_id: {match_id}")
+
             # Get user's club
             try:
                 club = Club.objects.get(user=request.user)
+                logger.info(f"Found club: {club.name} (ID: {club.id})")
             except Club.DoesNotExist:
+                logger.error(f"No club found for user: {request.user.email}")
                 return Response(
                     {"error": "Club not found for this user."},
                     status=status.HTTP_404_NOT_FOUND,
@@ -161,15 +168,20 @@ class MatchdayPostGenerator(APIView):
 
             # Check if club has selected a graphic pack
             if not club.selected_pack:
+                logger.error(f"No graphic pack selected for club: {club.name}")
                 return Response(
                     {"error": "No graphic pack selected for this club."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
+            logger.info(f"Club selected pack: {club.selected_pack.name} (ID: {club.selected_pack.id})")
+
             # Get the match
             try:
                 match = Match.objects.get(id=match_id, club=club)
+                logger.info(f"Found match: {match.opponent} vs {match.club.name}")
             except Match.DoesNotExist:
+                logger.error(f"Match with ID {match_id} not found for club {club.name}")
                 return Response(
                     {"error": "Match not found."},
                     status=status.HTTP_404_NOT_FOUND,
@@ -181,39 +193,52 @@ class MatchdayPostGenerator(APIView):
                     graphic_pack=club.selected_pack,
                     content_type="matchday"
                 )
+                logger.info(f"Found matchday template: {template.id}")
             except Template.DoesNotExist:
+                logger.error(f"No matchday template found for graphic pack {club.selected_pack.name}")
                 return Response(
                     {"error": "Matchday template not found for this club's graphic pack."},
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
             # Generate the matchday post
+            logger.info("Starting matchday post generation...")
             result = self._generate_matchday_post(match, template, club)
             
             if result.get("error"):
+                logger.error(f"Error in _generate_matchday_post: {result.get('error')}")
                 return Response(result, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
+            logger.info("Matchday post generated successfully")
             return Response(result, status=status.HTTP_200_OK)
 
         except Exception as e:
             logger.error(f"Error generating matchday post: {str(e)}", exc_info=True)
             return Response(
-                {"error": "An error occurred while generating the matchday post."},
+                {"error": f"An error occurred while generating the matchday post: {str(e)}"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
     def _generate_matchday_post(self, match: Match, template: Template, club: Club) -> Dict[str, Any]:
         """Generate a matchday post with fixture details overlaid on template."""
         logger.info(f"Generating matchday post for match {match.id}, club {club.name}")
+        logger.info(f"Template image URL: {template.image_url}")
         
         # Load the template image
         try:
+            logger.info("Fetching template image from URL...")
             response = requests.get(template.image_url, timeout=30)
             response.raise_for_status()
+            logger.info(f"Template image fetched successfully, size: {len(response.content)} bytes")
+            
             base_image = Image.open(BytesIO(response.content)).convert("RGBA")
+            logger.info(f"Template image loaded, dimensions: {base_image.size}")
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Error fetching template image: {str(e)}")
+            return {"error": f"Failed to fetch template image: {str(e)}"}
         except Exception as e:
             logger.error(f"Error loading template image: {str(e)}")
-            return {"error": "Failed to load template image"}
+            return {"error": f"Failed to load template image: {str(e)}"}
 
         # Create drawing context
         draw = ImageDraw.Draw(base_image)
@@ -227,6 +252,63 @@ class MatchdayPostGenerator(APIView):
         # Get template configuration
         template_config = template.template_config or {}
         elements = template_config.get('elements', {})
+        
+        # If no template configuration exists, create a default one
+        if not elements:
+            logger.warning(f"No template configuration found for template {template.id}, using default")
+            elements = {
+                "date": {
+                    "type": "text",
+                    "position": {"x": 400, "y": 150},
+                    "style": {
+                        "fontSize": 24,
+                        "fontFamily": "Arial",
+                        "color": "#FFFFFF",
+                        "alignment": "center"
+                    }
+                },
+                "time": {
+                    "type": "text",
+                    "position": {"x": 400, "y": 200},
+                    "style": {
+                        "fontSize": 20,
+                        "fontFamily": "Arial",
+                        "color": "#FFFFFF",
+                        "alignment": "center"
+                    }
+                },
+                "venue": {
+                    "type": "text",
+                    "position": {"x": 400, "y": 250},
+                    "style": {
+                        "fontSize": 18,
+                        "fontFamily": "Arial",
+                        "color": "#FFFFFF",
+                        "alignment": "center"
+                    }
+                },
+                "opponent": {
+                    "type": "text",
+                    "position": {"x": 400, "y": 100},
+                    "style": {
+                        "fontSize": 28,
+                        "fontFamily": "Arial",
+                        "color": "#FFFFFF",
+                        "alignment": "center",
+                        "fontWeight": "bold"
+                    }
+                },
+                "home_away": {
+                    "type": "text",
+                    "position": {"x": 400, "y": 50},
+                    "style": {
+                        "fontSize": 16,
+                        "fontFamily": "Arial",
+                        "color": "#FFD700",
+                        "alignment": "center"
+                    }
+                }
+            }
         
         # Render text elements
         for element_key, element_config in elements.items():
@@ -291,6 +373,7 @@ class MatchdayPostGenerator(APIView):
 
         # Upload to Cloudinary
         try:
+            logger.info("Uploading image to Cloudinary...")
             upload_result = cloudinary.uploader.upload(
                 buffer,
                 folder=f"matchday_posts/club_{club.id}/",
@@ -301,9 +384,10 @@ class MatchdayPostGenerator(APIView):
                 format="png"
             )
             image_url = upload_result["secure_url"]
+            logger.info(f"Image uploaded successfully to Cloudinary: {image_url}")
         except Exception as e:
             logger.error(f"Error uploading to Cloudinary: {str(e)}")
-            return {"error": "Failed to upload image"}
+            return {"error": f"Failed to upload image to Cloudinary: {str(e)}"}
 
         # Update match with the generated image URL
         match.matchday_post_url = image_url
@@ -356,6 +440,83 @@ class MatchdayPostGenerator(APIView):
             "home_away": home_away,
             "club_name": match.club.name if match.club else "Club"
         }
+
+
+class DebugTemplatesView(APIView):
+    """Debug endpoint to check templates and their configuration."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            # Get user's club
+            try:
+                club = Club.objects.get(user=request.user)
+            except Club.DoesNotExist:
+                return Response({
+                    "error": "Club not found for this user."
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            # Get all graphic packs
+            packs = GraphicPack.objects.all()
+            packs_data = []
+            
+            for pack in packs:
+                templates = Template.objects.filter(graphic_pack=pack)
+                templates_data = []
+                
+                for template in templates:
+                    templates_data.append({
+                        "id": template.id,
+                        "content_type": template.content_type,
+                        "image_url": template.image_url,
+                        "sport": template.sport,
+                        "template_config": template.template_config,
+                        "has_config": bool(template.template_config)
+                    })
+                
+                packs_data.append({
+                    "id": pack.id,
+                    "name": pack.name,
+                    "description": pack.description,
+                    "is_selected": club.selected_pack == pack if club.selected_pack else False,
+                    "templates": templates_data,
+                    "templates_count": templates.count()
+                })
+
+            # Get user's matches
+            matches = Match.objects.filter(club=club)
+            matches_data = []
+            
+            for match in matches:
+                matches_data.append({
+                    "id": match.id,
+                    "opponent": match.opponent,
+                    "date": match.date.isoformat() if match.date else None,
+                    "time_start": match.time_start,
+                    "venue": match.venue
+                })
+
+            return Response({
+                "user": {
+                    "id": request.user.id,
+                    "email": request.user.email
+                },
+                "club": {
+                    "id": club.id,
+                    "name": club.name,
+                    "selected_pack_id": club.selected_pack.id if club.selected_pack else None,
+                    "selected_pack_name": club.selected_pack.name if club.selected_pack else None
+                },
+                "graphic_packs": packs_data,
+                "matches": matches_data,
+                "matches_count": matches.count()
+            })
+
+        except Exception as e:
+            logger.error(f"Error in DebugTemplatesView: {str(e)}", exc_info=True)
+            return Response({
+                "error": f"Failed to debug templates: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class ObtainTokenView(APIView):

@@ -5,6 +5,7 @@ from .views import (
     GraphicPackDetailView,
     SelectGraphicPackView,
     MatchdayPostGenerator,
+    DebugTemplatesView,
     ObtainTokenView,
 )
 
@@ -18,6 +19,9 @@ urlpatterns = [
     
     # Social media post generation
     path("generate-matchday-post/", MatchdayPostGenerator.as_view(), name="generate-matchday-post"),
+    
+    # Debug endpoints
+    path("debug-templates/", DebugTemplatesView.as_view(), name="debug-templates"),
     
     # Utility endpoints
     path("obtain-token/", ObtainTokenView.as_view(), name="obtain-token"),

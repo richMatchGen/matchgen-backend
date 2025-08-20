@@ -1,52 +1,20 @@
 from django.urls import path
 
 from .views import (
-    GraphicGenerationView,
     GraphicPackListView,
     GraphicPackDetailView,
-    ObtainTokenView,
-    RegenerateGraphicView,
     SelectGraphicPackView,
-    TemplateEditorView,
-    DebugGraphicPackView,
-    TestAPIView,
-    CreateTestDataView,
-    DebugTemplatesView,
-    CreateMissingTemplatesView,
-    TestGraphicPackDetailView,
-    MatchdayPostView,
-    generate_matchday,
+    ObtainTokenView,
 )
 
 urlpatterns = [
+    # Basic graphic pack management
     path("packs/", GraphicPackListView.as_view(), name="graphic-pack-list"),
-    path("graphic-packs/", GraphicPackListView.as_view(), name="graphic-pack-list-legacy"),  # Backward compatibility
+    path("graphic-packs/", GraphicPackListView.as_view(), name="graphic-pack-list-legacy"),
     path("graphic-packs/<int:id>/", GraphicPackDetailView.as_view(), name="graphic-pack-detail"),
     path("select/", SelectGraphicPackView.as_view(), name="select-graphic-pack"),
-    path("select-pack/", SelectGraphicPackView.as_view(), name="select-graphic-pack-legacy"),  # Backward compatibility
-    path("generate/", GraphicGenerationView.as_view(), name="generate-graphic"),
-    path("regenerate/", RegenerateGraphicView.as_view(), name="regenerate-graphic"),
-    path("template/<int:template_id>/edit/", TemplateEditorView.as_view(), name="template-editor"),
-    path("debug/", DebugGraphicPackView.as_view(), name="debug-graphic-pack"),
-    path("debug-templates/", DebugTemplatesView.as_view(), name="debug-templates"),
-    path("test/", TestAPIView.as_view(), name="test-api"),
-    path("create-test-data/", CreateTestDataView.as_view(), name="create-test-data"),
-    path("create-missing-templates/", CreateMissingTemplatesView.as_view(), name="create-missing-templates"),
-    path("test-graphic-pack-detail/", TestGraphicPackDetailView.as_view(), name="test-graphic-pack-detail"),
+    path("select-pack/", SelectGraphicPackView.as_view(), name="select-graphic-pack-legacy"),
     
-    # Individual post type endpoints
-    path("match/<int:match_id>/generate-upcoming/", GraphicGenerationView.as_view(), name="generate-upcoming"),
-    path("match/<int:match_id>/generate-startingxi/", GraphicGenerationView.as_view(), name="generate-startingxi"),
-    path("match/<int:match_id>/generate-goal/", GraphicGenerationView.as_view(), name="generate-goal"),
-    path("match/<int:match_id>/generate-substitution/", GraphicGenerationView.as_view(), name="generate-substitution"),
-    path("match/<int:match_id>/generate-halftime/", GraphicGenerationView.as_view(), name="generate-halftime"),
-    path("match/<int:match_id>/generate-fulltime/", GraphicGenerationView.as_view(), name="generate-fulltime"),
-    path("match/<int:match_id>/generate-matchday/", GraphicGenerationView.as_view(), name="generate-matchday"),
-    
-    # New simplified endpoints
-    path("matchday-post/", MatchdayPostView.as_view(), name="matchday-post"),
-    
-    # Legacy endpoint
-    path("generate-matchday/<int:match_id>/", generate_matchday, name="generate-matchday-legacy"),
+    # Utility endpoints
     path("obtain-token/", ObtainTokenView.as_view(), name="obtain-token"),
 ]

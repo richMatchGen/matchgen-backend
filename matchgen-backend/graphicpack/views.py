@@ -717,40 +717,40 @@ class TestEndpointView(APIView):
                 )
                 logger.info(f"Created test pack: {pack.id}")
                 
-                            # Test 4: Try to create a simple template
-            try:
-                logger.info("Attempting to create Template...")
-                
-                # Test with empty template_config first
-                template = Template.objects.create(
-                    graphic_pack=pack,
-                    content_type='matchday',
-                    sport='football',
-                    image_url='https://example.com/test.jpg',
-                    template_config={}
-                )
-                logger.info(f"Created test template with empty config: {template.id}")
-                
-                # Test if we can save a template_config
+                # Test 4: Try to create a simple template
                 try:
-                    template.template_config = {"test": "value"}
-                    template.save()
-                    logger.info("Successfully saved template_config")
-                except Exception as config_error:
-                    logger.error(f"Template config save failed: {str(config_error)}", exc_info=True)
-                
-                # Clean up - delete the test data
-                template.delete()
-                logger.info("Deleted test template")
-            except Exception as template_error:
-                logger.error(f"Template creation failed: {str(template_error)}", exc_info=True)
-                # Clean up the pack before returning error
-                pack.delete()
-                return Response({
-                    "status": "error",
-                    "message": f"Template creation failed: {str(template_error)}",
-                    "timestamp": time.time()
-                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    logger.info("Attempting to create Template...")
+                    
+                    # Test with empty template_config first
+                    template = Template.objects.create(
+                        graphic_pack=pack,
+                        content_type='matchday',
+                        sport='football',
+                        image_url='https://example.com/test.jpg',
+                        template_config={}
+                    )
+                    logger.info(f"Created test template with empty config: {template.id}")
+                    
+                    # Test if we can save a template_config
+                    try:
+                        template.template_config = {"test": "value"}
+                        template.save()
+                        logger.info("Successfully saved template_config")
+                    except Exception as config_error:
+                        logger.error(f"Template config save failed: {str(config_error)}", exc_info=True)
+                    
+                    # Clean up - delete the test data
+                    template.delete()
+                    logger.info("Deleted test template")
+                except Exception as template_error:
+                    logger.error(f"Template creation failed: {str(template_error)}", exc_info=True)
+                    # Clean up the pack before returning error
+                    pack.delete()
+                    return Response({
+                        "status": "error",
+                        "message": f"Template creation failed: {str(template_error)}",
+                        "timestamp": time.time()
+                    }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
                 
                 pack.delete()
                 logger.info("Deleted test pack")

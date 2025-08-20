@@ -367,7 +367,8 @@ class TestTokenEndpointView(APIView):
                 "status": "success",
                 "message": "Token endpoint is accessible via GET",
                 "method": "GET",
-                "headers": dict(request.headers)
+                "headers": dict(request.headers),
+                "cors_test": "CORS GET request successful"
             },
             status=status.HTTP_200_OK
         )
@@ -379,10 +380,23 @@ class TestTokenEndpointView(APIView):
                 "message": "Token endpoint is accessible via POST",
                 "method": "POST",
                 "data": request.data,
-                "content_type": request.content_type
+                "content_type": request.content_type,
+                "cors_test": "CORS POST request successful"
             },
             status=status.HTTP_200_OK
         )
+
+    def options(self, request):
+        """Handle preflight OPTIONS requests for CORS."""
+        response = Response(
+            {
+                "status": "success",
+                "message": "CORS preflight request successful",
+                "method": "OPTIONS"
+            },
+            status=status.HTTP_200_OK
+        )
+        return response
 
 
 class UploadLogoView(APIView):

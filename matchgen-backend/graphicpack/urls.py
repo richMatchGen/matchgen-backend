@@ -18,5 +18,14 @@ urlpatterns = [
     path("regenerate/", RegenerateGraphicView.as_view(), name="regenerate-graphic"),  # New regenerate endpoint
     path("generate-matchday/<int:match_id>/", generate_matchday, name="generate-matchday"),
     path("match/<int:match_id>/generate-matchday/", generate_matchday, name="generate-matchday-legacy"),  # Backward compatibility
+    
+    # Individual post type endpoints for frontend compatibility
+    path("match/<int:match_id>/generate-upcoming/", GraphicGenerationView.as_view(), name="generate-upcoming"),
+    path("match/<int:match_id>/generate-startingxi/", GraphicGenerationView.as_view(), name="generate-startingxi"),
+    path("match/<int:match_id>/generate-goal/", GraphicGenerationView.as_view(), name="generate-goal"),
+    path("match/<int:match_id>/generate-substitution/", GraphicGenerationView.as_view(), name="generate-substitution"),
+    path("match/<int:match_id>/generate-halftime/", GraphicGenerationView.as_view(), name="generate-halftime"),
+    path("match/<int:match_id>/generate-fulltime/", GraphicGenerationView.as_view(), name="generate-fulltime"),
+    
     path("token/", ObtainTokenView.as_view(), name="obtain-token"),
 ]

@@ -84,16 +84,44 @@ class GraphicGenerationView(APIView):
     """Main view for generating all types of graphics."""
     permission_classes = [IsAuthenticated]
 
-    def post(self, request):
+    def post(self, request, match_id=None):
         try:
+            # Extract match_id from URL if not provided in request data
+            if match_id is None:
+                match_id = request.data.get("match_id")
+            
+            # Determine content_type from URL path if not provided in request data
             content_type = request.data.get("content_type")
-            match_id = request.data.get("match_id")
+            if content_type is None:
+                # Extract content_type from URL path
+                path = request.path
+                if "generate-upcoming" in path:
+                    content_type = "upcomingFixture"
+                elif "generate-startingxi" in path:
+                    content_type = "startingXI"
+                elif "generate-goal" in path:
+                    content_type = "goal"
+                elif "generate-substitution" in path:
+                    content_type = "sub"
+                elif "generate-halftime" in path:
+                    content_type = "halftime"
+                elif "generate-fulltime" in path:
+                    content_type = "fulltime"
+                elif "generate-matchday" in path:
+                    content_type = "matchday"
+            
             player_id = request.data.get("player_id")
             regenerate = request.data.get("regenerate", False)  # New parameter
             
             if not content_type:
                 return Response(
                     {"error": "content_type is required"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            if not match_id:
+                return Response(
+                    {"error": "match_id is required"}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
@@ -114,69 +142,34 @@ class GraphicGenerationView(APIView):
 
             # Generate based on content type
             if content_type == "matchday":
-                if not match_id:
-                    return Response(
-                        {"error": "match_id is required for matchday graphics"},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
                 match = get_object_or_404(Match, id=match_id, club=club)
                 result = self._generate_matchday(match, club, regenerate=regenerate)
             
             elif content_type == "startingXI":
-                if not match_id:
-                    return Response(
-                        {"error": "match_id is required for startingXI graphics"},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
                 match = get_object_or_404(Match, id=match_id, club=club)
                 result = self._generate_starting_xi(match, club, regenerate=regenerate)
             
             elif content_type == "upcomingFixture":
-                if not match_id:
-                    return Response(
-                        {"error": "match_id is required for upcomingFixture graphics"},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
                 match = get_object_or_404(Match, id=match_id, club=club)
                 result = self._generate_upcoming_fixture(match, club, regenerate=regenerate)
             
             elif content_type == "goal":
-                if not match_id:
-                    return Response(
-                        {"error": "match_id is required for goal graphics"},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
                 match = get_object_or_404(Match, id=match_id, club=club)
                 scorer_name = request.data.get("scorer_name", "Player")
                 result = self._generate_goal(match, club, scorer_name, regenerate=regenerate)
             
             elif content_type == "sub":
-                if not match_id:
-                    return Response(
-                        {"error": "match_id is required for sub graphics"},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
                 match = get_object_or_404(Match, id=match_id, club=club)
                 player_in = request.data.get("player_in", "Player In")
                 player_out = request.data.get("player_out", "Player Out")
                 result = self._generate_sub(match, club, player_in, player_out, regenerate=regenerate)
             
             elif content_type == "halftime":
-                if not match_id:
-                    return Response(
-                        {"error": "match_id is required for halftime graphics"},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
                 match = get_object_or_404(Match, id=match_id, club=club)
                 score = request.data.get("score", "0-0")
                 result = self._generate_halftime(match, club, score, regenerate=regenerate)
             
             elif content_type == "fulltime":
-                if not match_id:
-                    return Response(
-                        {"error": "match_id is required for fulltime graphics"},
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
                 match = get_object_or_404(Match, id=match_id, club=club)
                 score = request.data.get("score", "0-0")
                 result = self._generate_fulltime(match, club, score, regenerate=regenerate)

@@ -27,6 +27,12 @@ class Template(models.Model):
         ("lineup", "Lineup"),
         ("fixture", "Fixture"),
         ("upcomingFixtures", "Upcoming Fixtures"),
+        ("upcomingFixture", "Upcoming Fixture"),
+        ("startingXI", "Starting XI"),
+        ("goal", "Goal"),
+        ("sub", "Substitution"),
+        ("halftime", "Halftime"),
+        ("fulltime", "Full-time"),
         ("alert", "Alert"),
         ("player", "Player"),
     ]

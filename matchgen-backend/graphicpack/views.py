@@ -1373,16 +1373,185 @@ class DebugTemplatesView(APIView):
                     'elements_count': template.elements.count()
                 })
             
+            # Also check all templates in the database
+            all_templates = Template.objects.all()
+            all_template_data = []
+            for template in all_templates:
+                all_template_data.append({
+                    'id': template.id,
+                    'graphic_pack_id': template.graphic_pack.id,
+                    'graphic_pack_name': template.graphic_pack.name,
+                    'content_type': template.content_type,
+                    'elements_count': template.elements.count()
+                })
+            
             return Response({
                 'pack_id': pack_id,
                 'pack_name': pack.name,
                 'templates_count': templates.count(),
-                'templates': template_data
+                'templates': template_data,
+                'all_templates_count': all_templates.count(),
+                'all_templates': all_template_data,
+                'database_info': {
+                    'total_graphic_packs': GraphicPack.objects.count(),
+                    'total_templates': Template.objects.count(),
+                    'total_template_elements': TemplateElement.objects.count(),
+                    'total_string_elements': StringElement.objects.count()
+                }
             })
             
         except Exception as e:
             logger.error(f"Error in DebugTemplatesView: {str(e)}", exc_info=True)
             return Response(
                 {'error': f'Failed to debug templates: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class CreateMissingTemplatesView(APIView):
+    """Create missing templates for all graphic packs."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            from .models import GraphicPack, Template, TemplateElement, StringElement
+            from django.db import transaction
+            
+            # Get all graphic packs
+            graphic_packs = GraphicPack.objects.all()
+            
+            # Define the content types that the backend expects
+            content_types = [
+                "matchday",
+                "upcomingFixture", 
+                "startingXI",
+                "goal",
+                "sub",
+                "halftime",
+                "fulltime"
+            ]
+            
+            created_templates = []
+            
+            for pack in graphic_packs:
+                # Check existing templates
+                existing_templates = Template.objects.filter(graphic_pack=pack)
+                existing_content_types = [t.content_type for t in existing_templates]
+                
+                # Create missing templates
+                for content_type in content_types:
+                    if content_type not in existing_content_types:
+                        try:
+                            with transaction.atomic():
+                                # Create the template
+                                template = Template.objects.create(
+                                    graphic_pack=pack,
+                                    content_type=content_type,
+                                    image_url=f"https://via.placeholder.com/800x600/1976d2/ffffff?text={content_type}+Template",
+                                    sport="football"
+                                )
+                                
+                                # Create some basic template elements based on content type
+                                if content_type == "matchday":
+                                    elements_data = [
+                                        {
+                                            'type': 'text',
+                                            'content_key': 'date',
+                                            'x': 200,
+                                            'y': 150,
+                                            'use_percentage': False,
+                                            'z_index': 1,
+                                            'visible': True
+                                        },
+                                        {
+                                            'type': 'text',
+                                            'content_key': 'time',
+                                            'x': 400,
+                                            'y': 150,
+                                            'use_percentage': False,
+                                            'z_index': 2,
+                                            'visible': True
+                                        },
+                                        {
+                                            'type': 'text',
+                                            'content_key': 'venue',
+                                            'x': 300,
+                                            'y': 250,
+                                            'use_percentage': False,
+                                            'z_index': 3,
+                                            'visible': True
+                                        }
+                                    ]
+                                elif content_type == "upcomingFixture":
+                                    elements_data = [
+                                        {
+                                            'type': 'text',
+                                            'content_key': 'opponent',
+                                            'x': 300,
+                                            'y': 200,
+                                            'use_percentage': False,
+                                            'z_index': 1,
+                                            'visible': True
+                                        },
+                                        {
+                                            'type': 'text',
+                                            'content_key': 'date',
+                                            'x': 300,
+                                            'y': 250,
+                                            'use_percentage': False,
+                                            'z_index': 2,
+                                            'visible': True
+                                        }
+                                    ]
+                                else:
+                                    elements_data = [
+                                        {
+                                            'type': 'text',
+                                            'content_key': 'title',
+                                            'x': 300,
+                                            'y': 200,
+                                            'use_percentage': False,
+                                            'z_index': 1,
+                                            'visible': True
+                                        }
+                                    ]
+                                
+                                # Create template elements
+                                for element_data in elements_data:
+                                    element = TemplateElement.objects.create(
+                                        template=template,
+                                        **element_data
+                                    )
+                                    
+                                    # Create string element for text elements
+                                    if element.type == 'text':
+                                        StringElement.objects.create(
+                                            template_element=element,
+                                            content_key=element_data['content_key'],
+                                            font_family='Arial',
+                                            font_size=24,
+                                            color='#FFFFFF',
+                                            alignment='center'
+                                        )
+                                
+                                created_templates.append({
+                                    'pack_name': pack.name,
+                                    'pack_id': pack.id,
+                                    'template_id': template.id,
+                                    'content_type': content_type
+                                })
+                                
+                        except Exception as e:
+                            logger.error(f"Error creating template for {content_type} in pack {pack.name}: {str(e)}")
+            
+            return Response({
+                'message': f'Successfully created {len(created_templates)} missing templates',
+                'created_templates': created_templates
+            })
+            
+        except Exception as e:
+            logger.error(f"Error in CreateMissingTemplatesView: {str(e)}", exc_info=True)
+            return Response(
+                {'error': f'Failed to create missing templates: {str(e)}'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )

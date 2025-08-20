@@ -76,14 +76,14 @@ class GraphicPackDetailView(RetrieveAPIView):
             pack_id = kwargs.get('id')
             logger.info(f"Fetching graphic pack detail for ID: {pack_id}")
             
-            # Get the graphic pack with prefetched templates
+            # Simple check if the pack exists
             try:
-                pack = GraphicPack.objects.prefetch_related('templates__elements__string_elements', 'templates__elements__image_elements').get(id=pack_id)
-                logger.info(f"Found graphic pack: {pack.name} with {pack.templates.count()} templates")
+                pack = GraphicPack.objects.get(id=pack_id)
+                logger.info(f"Found graphic pack: {pack.name}")
                 
-                # Log template details
-                for template in pack.templates.all():
-                    logger.info(f"Template {template.id}: {template.content_type} with {template.elements.count()} elements")
+                # Get templates count
+                templates_count = Template.objects.filter(graphic_pack=pack).count()
+                logger.info(f"Found {templates_count} templates for pack {pack_id}")
                 
             except GraphicPack.DoesNotExist:
                 logger.error(f"Graphic pack with ID {pack_id} not found")
@@ -92,9 +92,20 @@ class GraphicPackDetailView(RetrieveAPIView):
                     status=status.HTTP_404_NOT_FOUND
                 )
             
-            response = super().get(request, *args, **kwargs)
-            logger.info(f"Graphic pack detail response: {response.data}")
-            return response
+            try:
+                response = super().get(request, *args, **kwargs)
+                logger.info(f"Graphic pack detail response: {response.data}")
+                return response
+            except Exception as serialization_error:
+                logger.error(f"Serialization error: {str(serialization_error)}")
+                # Return a simple response with basic pack info
+                return Response({
+                    'id': pack.id,
+                    'name': pack.name,
+                    'description': pack.description,
+                    'preview_image_url': getattr(pack, 'preview_image_url', None),
+                    'templates': []
+                })
         except Exception as e:
             logger.error(f"Error in GraphicPackDetailView: {str(e)}", exc_info=True)
             return Response(

@@ -982,7 +982,7 @@ class DiagnosticView(APIView):
             if pack_exists:
                 try:
                     template = Template.objects.get(
-                        graphic_pack_id=selected_pack_id,
+                        graphic_pack=pack,
                         content_type='matchday'
                     )
                     template_exists = True

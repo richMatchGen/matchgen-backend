@@ -928,6 +928,74 @@ class SimpleTestView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
+class TemplateDebugView(APIView):
+    """Debug endpoint to directly check template data."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            logger.info("TemplateDebugView called")
+            
+            # Get user's club
+            club = Club.objects.get(user=request.user)
+            pack_id = club.selected_pack.id
+            
+            logger.info(f"Checking templates for pack ID: {pack_id}")
+            
+            # Raw SQL check
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute("""
+                    SELECT id, content_type, sport, graphic_pack_id 
+                    FROM graphicpack_template 
+                    WHERE graphic_pack_id = %s
+                """, [pack_id])
+                raw_templates = cursor.fetchall()
+                logger.info(f"Raw SQL found {len(raw_templates)} templates: {raw_templates}")
+            
+            # ORM check
+            pack = GraphicPack.objects.get(id=pack_id)
+            orm_templates = Template.objects.filter(graphic_pack=pack)
+            logger.info(f"ORM found {orm_templates.count()} templates")
+            
+            template_data = []
+            for t in orm_templates:
+                template_data.append({
+                    "id": t.id,
+                    "content_type": t.content_type,
+                    "sport": t.sport,
+                    "graphic_pack_id": t.graphic_pack.id
+                })
+            
+            # Try to get matchday template specifically
+            try:
+                matchday_template = Template.objects.get(
+                    graphic_pack=pack,
+                    content_type='matchday'
+                )
+                matchday_found = True
+                matchday_id = matchday_template.id
+            except Template.DoesNotExist:
+                matchday_found = False
+                matchday_id = None
+            
+            return Response({
+                "pack_id": pack_id,
+                "raw_sql_results": raw_templates,
+                "orm_templates": template_data,
+                "matchday_template_found": matchday_found,
+                "matchday_template_id": matchday_id,
+                "raw_count": len(raw_templates),
+                "orm_count": orm_templates.count()
+            })
+            
+        except Exception as e:
+            logger.error(f"TemplateDebugView error: {str(e)}", exc_info=True)
+            return Response({
+                "error": f"Template debug failed: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
 class DiagnosticView(APIView):
     """Diagnostic endpoint to check current state for matchday post generation."""
     permission_classes = [IsAuthenticated]

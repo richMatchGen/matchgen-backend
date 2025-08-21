@@ -789,23 +789,27 @@ class CreateTestDataView(APIView):
         try:
             logger.info("CreateTestDataView called")
             
-            # First, check if pack ID 7 already exists
+            # Get user's club and selected pack
             try:
-                existing_pack = GraphicPack.objects.get(id=7)
-                logger.info(f"Pack ID 7 already exists: {existing_pack.name}")
-                pack = existing_pack
-            except GraphicPack.DoesNotExist:
-                logger.info("Pack ID 7 does not exist, creating new pack")
-                # Create a test graphic pack
-                pack = GraphicPack.objects.create(
-                    id=7,
-                    name='Leafield',
-                    description='Leafield Bespoke',
-                    preview_image_url='https://res.cloudinary.com/dxoxuyz0j/image/upload/v1755598719/Upcoming_Fixture_Home_tvlije.png'
-                )
-                logger.info(f"Created test graphic pack: {pack.name}")
+                club = Club.objects.get(user=request.user)
+                logger.info(f"Found club: {club.name}")
+                
+                if not club.selected_pack:
+                    logger.error("Club has no selected pack")
+                    return Response({
+                        "error": "Club has no selected graphic pack"
+                    }, status=status.HTTP_400_BAD_REQUEST)
+                
+                pack = club.selected_pack
+                logger.info(f"Using club's selected pack: {pack.name} (ID: {pack.id})")
+                
+            except Club.DoesNotExist:
+                logger.error(f"No club found for user {request.user.email}")
+                return Response({
+                    "error": "No club found for this user"
+                }, status=status.HTTP_404_NOT_FOUND)
 
-            # Check if matchday template already exists
+            # Check if matchday template already exists for this pack
             try:
                 existing_template = Template.objects.get(
                     graphic_pack=pack,
@@ -815,7 +819,7 @@ class CreateTestDataView(APIView):
                 template = existing_template
             except Template.DoesNotExist:
                 logger.info("Matchday template does not exist, creating new template")
-                # Create a test matchday template
+                # Create a test matchday template for the user's selected pack
                 template = Template.objects.create(
                     graphic_pack=pack,
                     content_type='matchday',
@@ -861,15 +865,6 @@ class CreateTestDataView(APIView):
                 )
                 logger.info(f"Created test matchday template: {template.id}")
 
-            # Also set this pack as the user's selected pack
-            try:
-                club = Club.objects.get(user=request.user)
-                club.selected_pack = pack
-                club.save()
-                logger.info(f"Set pack {pack.name} as selected for club {club.name}")
-            except Club.DoesNotExist:
-                logger.warning(f"No club found for user {request.user.email}")
-
             return Response({
                 "message": "Test data created successfully",
                 "pack": {
@@ -883,8 +878,8 @@ class CreateTestDataView(APIView):
                     "has_config": bool(template.template_config)
                 },
                 "user_club": {
-                    "has_club": bool(club),
-                    "selected_pack_id": club.selected_pack.id if club and club.selected_pack else None
+                    "name": club.name,
+                    "selected_pack_id": pack.id
                 }
             })
 

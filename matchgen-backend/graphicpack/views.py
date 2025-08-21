@@ -257,10 +257,13 @@ class MatchdayPostGenerator(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
+
+
     def _generate_matchday_post(self, match: Match, template: Template, club: Club, text_settings: Dict = None) -> Dict[str, Any]:
         """Generate a matchday post with fixture details overlaid on template."""
         logger.info(f"Generating matchday post for match {match.id}, club {club.name}")
         logger.info(f"Template image URL: {template.image_url}")
+        logger.info(f"Text settings received: {text_settings}")
         
         # Load the template image
         try:
@@ -363,14 +366,35 @@ class MatchdayPostGenerator(APIView):
                 style = element_config.get('style', {})
                 position = element_config.get('position', {})
                 
+                # Apply text settings if provided
+                if text_settings and element_key in text_settings:
+                    custom_settings = text_settings[element_key]
+                    logger.info(f"Applying custom settings for {element_key}: {custom_settings}")
+                    
+                    # Override position if provided
+                    if 'x' in custom_settings:
+                        position['x'] = custom_settings['x']
+                    if 'y' in custom_settings:
+                        position['y'] = custom_settings['y']
+                    
+                    # Override style if provided
+                    if 'fontSize' in custom_settings:
+                        style['fontSize'] = custom_settings['fontSize']
+                    if 'color' in custom_settings:
+                        style['color'] = custom_settings['color']
+                    if 'fontFamily' in custom_settings:
+                        style['fontFamily'] = custom_settings['fontFamily']
+                
                 # Get font settings
                 font_family = style.get('fontFamily', 'Arial')
                 font_size = style.get('fontSize', 24)
                 font_weight = style.get('fontWeight', 'normal')
                 font_style = style.get('fontStyle', 'normal')
                 
-                # Use default font for simplicity
+                # Use default font for now
+                # Note: In a production system, you'd load actual TTF fonts with different sizes
                 font = ImageFont.load_default()
+                logger.info(f"Using font size setting: {font_size} (actual font size may vary)")
                 
                 # Get color
                 color = style.get('color', '#FFFFFF')
@@ -393,7 +417,7 @@ class MatchdayPostGenerator(APIView):
                 
                 # Draw the text
                 draw.text((x, y_pos), value, font=font, fill=color)
-                logger.info(f"Rendered '{value}' at ({x}, {y_pos})")
+                logger.info(f"Rendered '{value}' at ({x}, {y_pos}) with color {color}, font size {font_size}")
                 
             except Exception as e:
                 logger.error(f"Error rendering text element {element_key}: {str(e)}")

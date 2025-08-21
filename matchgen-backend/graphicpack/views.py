@@ -981,6 +981,26 @@ class DiagnosticView(APIView):
             template_exists = False
             if pack_exists:
                 try:
+                    logger.info(f"Looking for matchday template with graphic_pack={pack.id} and content_type='matchday'")
+                    
+                    # Let's also check with raw SQL to see what's actually in the database
+                    from django.db import connection
+                    with connection.cursor() as cursor:
+                        cursor.execute("""
+                            SELECT id, content_type, sport, graphic_pack_id 
+                            FROM graphicpack_template 
+                            WHERE graphic_pack_id = %s
+                        """, [pack.id])
+                        raw_templates = cursor.fetchall()
+                        logger.info(f"Raw SQL found {len(raw_templates)} templates for pack {pack.id}: {raw_templates}")
+                    
+                    # First, let's see what templates exist for this pack
+                    all_templates = Template.objects.filter(graphic_pack=pack)
+                    logger.info(f"ORM found {all_templates.count()} templates for pack {pack.id}")
+                    for t in all_templates:
+                        logger.info(f"  Template {t.id}: content_type='{t.content_type}', sport='{t.sport}'")
+                    
+                    # Now try to get the specific matchday template
                     template = Template.objects.get(
                         graphic_pack=pack,
                         content_type='matchday'
@@ -989,6 +1009,9 @@ class DiagnosticView(APIView):
                     logger.info(f"Matchday template exists: {template.id}")
                 except Template.DoesNotExist:
                     logger.error(f"No matchday template found for pack {selected_pack_id}")
+                    # Let's also check what content_types exist for this pack
+                    content_types = Template.objects.filter(graphic_pack=pack).values_list('content_type', flat=True).distinct()
+                    logger.error(f"Available content_types for pack {selected_pack_id}: {list(content_types)}")
                 except Exception as template_error:
                     logger.error(f"Error checking template: {str(template_error)}")
                     template_exists = False

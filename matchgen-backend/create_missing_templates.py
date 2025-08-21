@@ -160,3 +160,4 @@ def create_missing_templates():
 
 if __name__ == "__main__":
     create_missing_templates()
+

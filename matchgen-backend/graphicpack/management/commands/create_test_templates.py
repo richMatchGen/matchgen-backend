@@ -94,3 +94,4 @@ class Command(BaseCommand):
         self.stdout.write(
             self.style.SUCCESS('Successfully created test templates!')
         )
+

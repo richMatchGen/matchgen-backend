@@ -235,9 +235,13 @@ class MatchdayPostGenerator(APIView):
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
 
+            # Get text settings from request
+            text_settings = request.data.get('text_settings', {})
+            logger.info(f"Text settings received: {text_settings}")
+            
             # Generate the matchday post
             logger.info("Starting matchday post generation...")
-            result = self._generate_matchday_post(match, template, club)
+            result = self._generate_matchday_post(match, template, club, text_settings)
             
             if result.get("error"):
                 logger.error(f"Error in _generate_matchday_post: {result.get('error')}")
@@ -253,7 +257,7 @@ class MatchdayPostGenerator(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    def _generate_matchday_post(self, match: Match, template: Template, club: Club) -> Dict[str, Any]:
+    def _generate_matchday_post(self, match: Match, template: Template, club: Club, text_settings: Dict = None) -> Dict[str, Any]:
         """Generate a matchday post with fixture details overlaid on template."""
         logger.info(f"Generating matchday post for match {match.id}, club {club.name}")
         logger.info(f"Template image URL: {template.image_url}")

@@ -1,7 +1,7 @@
 from rest_framework import serializers
 import logging
 
-from .models import GraphicPack, UserSelection, Template
+from .models import GraphicPack, UserSelection, Template, TextElement
 
 logger = logging.getLogger(__name__)
 
@@ -62,3 +62,23 @@ class SimpleGraphicPackSerializer(serializers.ModelSerializer):
     class Meta:
         model = GraphicPack
         fields = ['id', 'name', 'description', 'preview_image_url']
+
+
+class TextElementSerializer(serializers.ModelSerializer):
+    """Serializer for TextElement model."""
+    graphic_pack_name = serializers.CharField(source='graphic_pack.name', read_only=True)
+    
+    class Meta:
+        model = TextElement
+        fields = [
+            'id', 'graphic_pack', 'graphic_pack_name', 'content_type', 'element_name',
+            'position_x', 'position_y', 'font_size', 'font_family', 'font_color',
+            'alignment', 'font_weight', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
+    
+    def validate_font_color(self, value):
+        """Validate hex color format."""
+        if not value.startswith('#') or len(value) != 7:
+            raise serializers.ValidationError("Color must be a valid hex color (e.g., #FFFFFF)")
+        return value

@@ -14,8 +14,8 @@ from rest_framework.views import APIView
 from users.models import Club
 from content.models import Match
 
-from .models import GraphicPack, Template
-from .serializers import GraphicPackSerializer
+from .models import GraphicPack, Template, TextElement
+from .serializers import GraphicPackSerializer, TextElementSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -235,13 +235,9 @@ class MatchdayPostGenerator(APIView):
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
 
-            # Get text settings from request
-            text_settings = request.data.get('text_settings', {})
-            logger.info(f"Text settings received: {text_settings}")
-            
             # Generate the matchday post
             logger.info("Starting matchday post generation...")
-            result = self._generate_matchday_post(match, template, club, text_settings)
+            result = self._generate_matchday_post(match, template, club)
             
             if result.get("error"):
                 logger.error(f"Error in _generate_matchday_post: {result.get('error')}")
@@ -259,11 +255,10 @@ class MatchdayPostGenerator(APIView):
 
 
 
-    def _generate_matchday_post(self, match: Match, template: Template, club: Club, text_settings: Dict = None) -> Dict[str, Any]:
+    def _generate_matchday_post(self, match: Match, template: Template, club: Club) -> Dict[str, Any]:
         """Generate a matchday post with fixture details overlaid on template."""
         logger.info(f"Generating matchday post for match {match.id}, club {club.name}")
         logger.info(f"Template image URL: {template.image_url}")
-        logger.info(f"Text settings received: {text_settings}")
         
         # Load the template image
         try:
@@ -290,64 +285,76 @@ class MatchdayPostGenerator(APIView):
         # Prepare fixture data
         fixture_data = self._prepare_fixture_data(match)
         
-        # Get template configuration
-        template_config = template.template_config or {}
-        elements = template_config.get('elements', {})
-        
-        # If no template configuration exists, create a default one
-        if not elements:
-            logger.warning(f"No template configuration found for template {template.id}, using default")
+        # Get text elements from database for this graphic pack and content type
+        try:
+            text_elements = TextElement.objects.filter(
+                graphic_pack=selected_pack,
+                content_type='matchday'
+            )
+            logger.info(f"Found {text_elements.count()} text elements for graphic pack {selected_pack.id}")
+            
+            # Convert to the format expected by the rendering code
+            elements = {}
+            for text_element in text_elements:
+                elements[text_element.element_name] = {
+                    "type": "text",
+                    "position": text_element.position,
+                    "style": text_element.style
+                }
+                logger.info(f"Added text element: {text_element.element_name} at {text_element.position}")
+            
+            # If no text elements found, create default ones
+            if not elements:
+                logger.warning(f"No text elements found for graphic pack {selected_pack.id}, creating defaults")
+                default_elements = [
+                    {'element_name': 'date', 'position_x': 400, 'position_y': 150, 'font_size': 24, 'font_color': '#FFFFFF'},
+                    {'element_name': 'time', 'position_x': 400, 'position_y': 200, 'font_size': 24, 'font_color': '#FFFFFF'},
+                    {'element_name': 'venue', 'position_x': 400, 'position_y': 250, 'font_size': 18, 'font_color': '#FFFFFF'},
+                    {'element_name': 'opponent', 'position_x': 400, 'position_y': 100, 'font_size': 28, 'font_color': '#FFFFFF'},
+                    {'element_name': 'home_away', 'position_x': 400, 'position_y': 50, 'font_size': 16, 'font_color': '#FFD700'}
+                ]
+                
+                for default in default_elements:
+                    text_element = TextElement.objects.create(
+                        graphic_pack=selected_pack,
+                        content_type='matchday',
+                        **default
+                    )
+                    elements[text_element.element_name] = {
+                        "type": "text",
+                        "position": text_element.position,
+                        "style": text_element.style
+                    }
+                    logger.info(f"Created default text element: {text_element.element_name}")
+                    
+        except Exception as e:
+            logger.error(f"Error getting text elements: {str(e)}")
+            # Fallback to default configuration
             elements = {
                 "date": {
                     "type": "text",
                     "position": {"x": 400, "y": 150},
-                    "style": {
-                        "fontSize": 24,
-                        "fontFamily": "Arial",
-                        "color": "#FFFFFF",
-                        "alignment": "center"
-                    }
+                    "style": {"fontSize": 24, "fontFamily": "Arial", "color": "#FFFFFF", "alignment": "center"}
                 },
                 "time": {
                     "type": "text",
                     "position": {"x": 400, "y": 200},
-                    "style": {
-                        "fontSize": 20,
-                        "fontFamily": "Arial",
-                        "color": "#FFFFFF",
-                        "alignment": "center"
-                    }
+                    "style": {"fontSize": 24, "fontFamily": "Arial", "color": "#FFFFFF", "alignment": "center"}
                 },
                 "venue": {
                     "type": "text",
                     "position": {"x": 400, "y": 250},
-                    "style": {
-                        "fontSize": 18,
-                        "fontFamily": "Arial",
-                        "color": "#FFFFFF",
-                        "alignment": "center"
-                    }
+                    "style": {"fontSize": 18, "fontFamily": "Arial", "color": "#FFFFFF", "alignment": "center"}
                 },
                 "opponent": {
                     "type": "text",
                     "position": {"x": 400, "y": 100},
-                    "style": {
-                        "fontSize": 28,
-                        "fontFamily": "Arial",
-                        "color": "#FFFFFF",
-                        "alignment": "center",
-                        "fontWeight": "bold"
-                    }
+                    "style": {"fontSize": 28, "fontFamily": "Arial", "color": "#FFFFFF", "alignment": "center", "fontWeight": "bold"}
                 },
                 "home_away": {
                     "type": "text",
                     "position": {"x": 400, "y": 50},
-                    "style": {
-                        "fontSize": 16,
-                        "fontFamily": "Arial",
-                        "color": "#FFD700",
-                        "alignment": "center"
-                    }
+                    "style": {"fontSize": 16, "fontFamily": "Arial", "color": "#FFD700", "alignment": "center"}
                 }
             }
         
@@ -366,24 +373,7 @@ class MatchdayPostGenerator(APIView):
                 style = element_config.get('style', {})
                 position = element_config.get('position', {})
                 
-                # Apply text settings if provided
-                if text_settings and element_key in text_settings:
-                    custom_settings = text_settings[element_key]
-                    logger.info(f"Applying custom settings for {element_key}: {custom_settings}")
-                    
-                    # Override position if provided
-                    if 'x' in custom_settings:
-                        position['x'] = custom_settings['x']
-                    if 'y' in custom_settings:
-                        position['y'] = custom_settings['y']
-                    
-                    # Override style if provided
-                    if 'fontSize' in custom_settings:
-                        style['fontSize'] = custom_settings['fontSize']
-                    if 'color' in custom_settings:
-                        style['color'] = custom_settings['color']
-                    if 'fontFamily' in custom_settings:
-                        style['fontFamily'] = custom_settings['fontFamily']
+
                 
                 # Get font settings
                 font_family = style.get('fontFamily', 'Arial')
@@ -1225,3 +1215,96 @@ class DiagnosticView(APIView):
             return Response({
                 "error": f"Diagnostic failed: {str(e)}"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class TextElementListView(ListAPIView):
+    """List all text elements."""
+    queryset = TextElement.objects.all()
+    serializer_class = TextElementSerializer
+    permission_classes = [IsAuthenticated]
+
+
+class TextElementCreateView(APIView):
+    """Create a new text element."""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        try:
+            serializer = TextElementSerializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_201_CREATED)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(f"Error creating text element: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while creating the text element."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class TextElementUpdateView(APIView):
+    """Update an existing text element."""
+    permission_classes = [IsAuthenticated]
+    
+    def put(self, request, element_id):
+        try:
+            try:
+                text_element = TextElement.objects.get(id=element_id)
+            except TextElement.DoesNotExist:
+                return Response(
+                    {"error": "Text element not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            
+            serializer = TextElementSerializer(text_element, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            logger.error(f"Error updating text element: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while updating the text element."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class TextElementDeleteView(APIView):
+    """Delete a text element."""
+    permission_classes = [IsAuthenticated]
+    
+    def delete(self, request, element_id):
+        try:
+            try:
+                text_element = TextElement.objects.get(id=element_id)
+            except TextElement.DoesNotExist:
+                return Response(
+                    {"error": "Text element not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            
+            text_element.delete()
+            return Response({"message": "Text element deleted successfully."}, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(f"Error deleting text element: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while deleting the text element."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class TextElementByGraphicPackView(ListAPIView):
+    """Get text elements for a specific graphic pack and content type."""
+    serializer_class = TextElementSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        graphic_pack_id = self.kwargs.get('graphic_pack_id')
+        content_type = self.kwargs.get('content_type')
+        
+        queryset = TextElement.objects.filter(graphic_pack_id=graphic_pack_id)
+        if content_type:
+            queryset = queryset.filter(content_type=content_type)
+        
+        return queryset

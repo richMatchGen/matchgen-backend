@@ -12,6 +12,8 @@ from .views import (
     DiagnosticView,
     SimpleTestView,
     TemplateDebugView,
+    TextElementListView, TextElementCreateView, TextElementUpdateView, 
+    TextElementDeleteView, TextElementByGraphicPackView
 )
 
 urlpatterns = [
@@ -35,4 +37,11 @@ urlpatterns = [
     
     # Utility endpoints
     path("obtain-token/", ObtainTokenView.as_view(), name="obtain-token"),
+    
+    # Text Element Management
+    path('text-elements/', TextElementListView.as_view(), name='text-element-list'),
+    path('text-elements/create/', TextElementCreateView.as_view(), name='text-element-create'),
+    path('text-elements/<int:element_id>/update/', TextElementUpdateView.as_view(), name='text-element-update'),
+    path('text-elements/<int:element_id>/delete/', TextElementDeleteView.as_view(), name='text-element-delete'),
+    path('text-elements/<int:graphic_pack_id>/<str:content_type>/', TextElementByGraphicPackView.as_view(), name='text-element-by-pack'),
 ]

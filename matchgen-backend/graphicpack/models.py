@@ -1,5 +1,6 @@
 from django.conf import settings  # ✅ keeps it clean and safe for custom user models
 from django.db import models
+from django.core.validators import MinValueValidator, MaxValueValidator
 
 
 class GraphicPack(models.Model):
@@ -75,3 +76,57 @@ class Template(models.Model):
 
     def __str__(self):
         return f"{self.graphic_pack.name} - {self.content_type}"
+
+
+class TextElement(models.Model):
+    """Text element configuration for graphic packs."""
+    graphic_pack = models.ForeignKey(GraphicPack, on_delete=models.CASCADE, related_name='text_elements')
+    content_type = models.CharField(max_length=50, help_text="e.g., matchday, upcoming, startingxi")
+    element_name = models.CharField(max_length=50, help_text="e.g., date, time, venue, opponent")
+    
+    # Position
+    position_x = models.IntegerField(default=400, validators=[MinValueValidator(0), MaxValueValidator(2000)])
+    position_y = models.IntegerField(default=150, validators=[MinValueValidator(0), MaxValueValidator(2000)])
+    
+    # Font settings
+    font_size = models.IntegerField(default=24, validators=[MinValueValidator(8), MaxValueValidator(100)])
+    font_family = models.CharField(max_length=100, default='Arial')
+    font_color = models.CharField(max_length=7, default='#FFFFFF', help_text="Hex color code")
+    
+    # Text alignment
+    alignment = models.CharField(
+        max_length=10, 
+        choices=[('left', 'Left'), ('center', 'Center'), ('right', 'Right')],
+        default='center'
+    )
+    
+    # Optional settings
+    font_weight = models.CharField(
+        max_length=20,
+        choices=[('normal', 'Normal'), ('bold', 'Bold')],
+        default='normal'
+    )
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ['graphic_pack', 'content_type', 'element_name']
+        ordering = ['graphic_pack', 'content_type', 'element_name']
+    
+    def __str__(self):
+        return f"{self.graphic_pack.name} - {self.content_type} - {self.element_name}"
+    
+    @property
+    def position(self):
+        return {'x': self.position_x, 'y': self.position_y}
+    
+    @property
+    def style(self):
+        return {
+            'fontSize': self.font_size,
+            'fontFamily': self.font_family,
+            'color': self.font_color,
+            'alignment': self.alignment,
+            'fontWeight': self.font_weight
+        }

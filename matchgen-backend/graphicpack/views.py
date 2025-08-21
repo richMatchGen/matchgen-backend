@@ -936,63 +936,87 @@ class TemplateDebugView(APIView):
         try:
             logger.info("TemplateDebugView called")
             
-            # Get user's club
-            club = Club.objects.get(user=request.user)
-            pack_id = club.selected_pack.id
+            # Start with basic info
+            basic_info = {
+                "user_email": request.user.email,
+                "user_id": request.user.id,
+                "timestamp": time.time()
+            }
             
-            logger.info(f"Checking templates for pack ID: {pack_id}")
-            
-            # Raw SQL check
-            from django.db import connection
-            with connection.cursor() as cursor:
-                cursor.execute("""
-                    SELECT id, content_type, sport, graphic_pack_id 
-                    FROM graphicpack_template 
-                    WHERE graphic_pack_id = %s
-                """, [pack_id])
-                raw_templates = cursor.fetchall()
-                logger.info(f"Raw SQL found {len(raw_templates)} templates: {raw_templates}")
-            
-            # ORM check
-            pack = GraphicPack.objects.get(id=pack_id)
-            orm_templates = Template.objects.filter(graphic_pack=pack)
-            logger.info(f"ORM found {orm_templates.count()} templates")
-            
-            template_data = []
-            for t in orm_templates:
-                template_data.append({
-                    "id": t.id,
-                    "content_type": t.content_type,
-                    "sport": t.sport,
-                    "graphic_pack_id": t.graphic_pack.id
-                })
-            
-            # Try to get matchday template specifically
+            # Try to get user's club
             try:
-                matchday_template = Template.objects.get(
-                    graphic_pack=pack,
-                    content_type='matchday'
-                )
-                matchday_found = True
-                matchday_id = matchday_template.id
-            except Template.DoesNotExist:
-                matchday_found = False
-                matchday_id = None
+                club = Club.objects.get(user=request.user)
+                pack_id = club.selected_pack.id if club.selected_pack else None
+                basic_info["club_name"] = club.name
+                basic_info["pack_id"] = pack_id
+                logger.info(f"Found club: {club.name}, pack_id: {pack_id}")
+            except Exception as club_error:
+                logger.error(f"Club error: {str(club_error)}")
+                basic_info["club_error"] = str(club_error)
+                return Response(basic_info)
             
-            return Response({
-                "pack_id": pack_id,
-                "raw_sql_results": raw_templates,
-                "orm_templates": template_data,
-                "matchday_template_found": matchday_found,
-                "matchday_template_id": matchday_id,
-                "raw_count": len(raw_templates),
-                "orm_count": orm_templates.count()
-            })
+            if not pack_id:
+                basic_info["error"] = "No pack selected"
+                return Response(basic_info)
+            
+            # Try raw SQL first
+            try:
+                from django.db import connection
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT id, content_type, sport, graphic_pack_id 
+                        FROM graphicpack_template 
+                        WHERE graphic_pack_id = %s
+                    """, [pack_id])
+                    raw_templates = cursor.fetchall()
+                    logger.info(f"Raw SQL found {len(raw_templates)} templates: {raw_templates}")
+                    basic_info["raw_sql_results"] = raw_templates
+                    basic_info["raw_count"] = len(raw_templates)
+            except Exception as sql_error:
+                logger.error(f"SQL error: {str(sql_error)}")
+                basic_info["sql_error"] = str(sql_error)
+            
+            # Try ORM
+            try:
+                pack = GraphicPack.objects.get(id=pack_id)
+                orm_templates = Template.objects.filter(graphic_pack=pack)
+                logger.info(f"ORM found {orm_templates.count()} templates")
+                
+                template_data = []
+                for t in orm_templates:
+                    template_data.append({
+                        "id": t.id,
+                        "content_type": t.content_type,
+                        "sport": t.sport,
+                        "graphic_pack_id": t.graphic_pack.id
+                    })
+                
+                basic_info["orm_templates"] = template_data
+                basic_info["orm_count"] = orm_templates.count()
+                
+                # Try to get matchday template specifically
+                try:
+                    matchday_template = Template.objects.get(
+                        graphic_pack=pack,
+                        content_type='matchday'
+                    )
+                    basic_info["matchday_template_found"] = True
+                    basic_info["matchday_template_id"] = matchday_template.id
+                except Template.DoesNotExist:
+                    basic_info["matchday_template_found"] = False
+                    basic_info["matchday_template_id"] = None
+                    
+            except Exception as orm_error:
+                logger.error(f"ORM error: {str(orm_error)}")
+                basic_info["orm_error"] = str(orm_error)
+            
+            return Response(basic_info)
             
         except Exception as e:
             logger.error(f"TemplateDebugView error: {str(e)}", exc_info=True)
             return Response({
-                "error": f"Template debug failed: {str(e)}"
+                "error": f"Template debug failed: {str(e)}",
+                "timestamp": time.time()
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

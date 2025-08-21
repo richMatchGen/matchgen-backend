@@ -196,18 +196,43 @@ class MatchdayPostGenerator(APIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            # Get the matchday template
+            # Get the matchday template using raw SQL to avoid column issues
             try:
-                template = Template.objects.get(
-                    graphic_pack=selected_pack,
-                    content_type="matchday"
-                )
-                logger.info(f"Found matchday template: {template.id}")
-            except Template.DoesNotExist:
-                logger.error(f"No matchday template found for graphic pack {selected_pack.name}")
+                from django.db import connection
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT id, content_type, sport, graphic_pack_id, image_url
+                        FROM graphicpack_template 
+                        WHERE graphic_pack_id = %s AND content_type = 'matchday'
+                    """, [selected_pack.id])
+                    template_data = cursor.fetchone()
+                    
+                if template_data:
+                    template_id, content_type, sport, graphic_pack_id, image_url = template_data
+                    logger.info(f"Found matchday template: {template_id}")
+                    
+                    # Create a minimal template object with the data we need
+                    class MinimalTemplate:
+                        def __init__(self, id, content_type, sport, graphic_pack_id, image_url):
+                            self.id = id
+                            self.content_type = content_type
+                            self.sport = sport
+                            self.graphic_pack_id = graphic_pack_id
+                            self.image_url = image_url
+                            self.template_config = {}  # Default empty config
+                    
+                    template = MinimalTemplate(template_id, content_type, sport, graphic_pack_id, image_url)
+                else:
+                    logger.error(f"No matchday template found for graphic pack {selected_pack.name}")
+                    return Response(
+                        {"error": "Matchday template not found for this club's graphic pack."},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
+            except Exception as e:
+                logger.error(f"Error getting matchday template: {str(e)}")
                 return Response(
-                    {"error": "Matchday template not found for this club's graphic pack."},
-                    status=status.HTTP_404_NOT_FOUND,
+                    {"error": "Error retrieving matchday template."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
 
             # Generate the matchday post
@@ -943,6 +968,34 @@ class TemplateDebugView(APIView):
                 "timestamp": time.time()
             }
             
+            # Check migration status
+            try:
+                from django.db import connection
+                with connection.cursor() as cursor:
+                    # Check if template_config column exists
+                    cursor.execute("""
+                        SELECT column_name 
+                        FROM information_schema.columns 
+                        WHERE table_name = 'graphicpack_template' 
+                        AND column_name = 'template_config'
+                    """)
+                    column_exists = cursor.fetchone() is not None
+                    basic_info["template_config_column_exists"] = column_exists
+                    
+                    # Check migration status
+                    cursor.execute("""
+                        SELECT app, name, applied 
+                        FROM django_migrations 
+                        WHERE app = 'graphicpack' 
+                        ORDER BY applied DESC
+                    """)
+                    migrations = cursor.fetchall()
+                    basic_info["recent_migrations"] = migrations[:5]  # Last 5 migrations
+                    
+            except Exception as migration_error:
+                logger.error(f"Migration check error: {str(migration_error)}")
+                basic_info["migration_error"] = str(migration_error)
+            
             # Try to get user's club
             try:
                 club = Club.objects.get(user=request.user)
@@ -1075,35 +1128,32 @@ class DiagnosticView(APIView):
                 try:
                     logger.info(f"Looking for matchday template with graphic_pack={pack.id} and content_type='matchday'")
                     
-                    # Let's also check with raw SQL to see what's actually in the database
+                    # Use raw SQL to check for matchday template since ORM has column issues
                     from django.db import connection
                     with connection.cursor() as cursor:
                         cursor.execute("""
                             SELECT id, content_type, sport, graphic_pack_id 
                             FROM graphicpack_template 
-                            WHERE graphic_pack_id = %s
+                            WHERE graphic_pack_id = %s AND content_type = 'matchday'
                         """, [pack.id])
-                        raw_templates = cursor.fetchall()
-                        logger.info(f"Raw SQL found {len(raw_templates)} templates for pack {pack.id}: {raw_templates}")
-                    
-                    # First, let's see what templates exist for this pack
-                    all_templates = Template.objects.filter(graphic_pack=pack)
-                    logger.info(f"ORM found {all_templates.count()} templates for pack {pack.id}")
-                    for t in all_templates:
-                        logger.info(f"  Template {t.id}: content_type='{t.content_type}', sport='{t.sport}'")
-                    
-                    # Now try to get the specific matchday template
-                    template = Template.objects.get(
-                        graphic_pack=pack,
-                        content_type='matchday'
-                    )
-                    template_exists = True
-                    logger.info(f"Matchday template exists: {template.id}")
-                except Template.DoesNotExist:
-                    logger.error(f"No matchday template found for pack {selected_pack_id}")
-                    # Let's also check what content_types exist for this pack
-                    content_types = Template.objects.filter(graphic_pack=pack).values_list('content_type', flat=True).distinct()
-                    logger.error(f"Available content_types for pack {selected_pack_id}: {list(content_types)}")
+                        matchday_templates = cursor.fetchall()
+                        logger.info(f"Raw SQL found {len(matchday_templates)} matchday templates for pack {pack.id}: {matchday_templates}")
+                        
+                        if matchday_templates:
+                            template_exists = True
+                            logger.info(f"Matchday template exists: {matchday_templates[0][0]}")
+                        else:
+                            logger.error(f"No matchday template found for pack {selected_pack_id}")
+                            
+                            # Check what content_types exist for this pack
+                            cursor.execute("""
+                                SELECT DISTINCT content_type 
+                                FROM graphicpack_template 
+                                WHERE graphic_pack_id = %s
+                            """, [pack.id])
+                            content_types = cursor.fetchall()
+                            logger.error(f"Available content_types for pack {selected_pack_id}: {[ct[0] for ct in content_types]}")
+                            
                 except Exception as template_error:
                     logger.error(f"Error checking template: {str(template_error)}")
                     template_exists = False

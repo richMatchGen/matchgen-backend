@@ -432,6 +432,11 @@ class MatchdayPostGenerator(APIView):
                 logger.info(f"Rendered '{value}' at ({x}, {y_pos}) with color {color}, requested font size {font_size}, actual font: {font}")
                 
                 # If using default font and size is different from default, try to simulate larger text
+                logger.info(f"=== TEXT SCALING CHECK ===")
+                logger.info(f"Font is default: {font == ImageFont.load_default()}")
+                logger.info(f"Font size > 24: {font_size > 24}")
+                logger.info(f"Should apply scaling: {font == ImageFont.load_default() and font_size > 24}")
+                
                 if font == ImageFont.load_default() and font_size > 24:
                     logger.info(f"=== TEXT SCALING DEBUG ===")
                     logger.info(f"Applying text scaling for font size: {font_size}")

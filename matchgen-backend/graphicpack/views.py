@@ -401,6 +401,8 @@ class MatchdayPostGenerator(APIView):
                         "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
                         "/System/Library/Fonts/Arial.ttf",
                         "C:/Windows/Fonts/arial.ttf",
+                        "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf",  # Ubuntu font
+                        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",  # Liberation
                     ]
                     
                     for font_path in font_paths:
@@ -447,8 +449,26 @@ class MatchdayPostGenerator(APIView):
                 
                 # If using default font and size is different from default, try to simulate larger text
                 if font == ImageFont.load_default() and font_size > 24:
-                    # For default font, we can't change size, but we can make text more prominent
-                    # by drawing it multiple times with slight offsets (bold effect)
+                    # Create a larger temporary image to simulate larger text
+                    scale_factor = max(1.5, font_size / 24.0)  # Scale based on font size
+                    temp_width = int(image_width * scale_factor)
+                    temp_height = int(image_height * scale_factor)
+                    
+                    # Create a temporary image with transparent background
+                    temp_image = Image.new("RGBA", (temp_width, temp_height), (0, 0, 0, 0))
+                    temp_draw = ImageDraw.Draw(temp_image)
+                    
+                    # Draw text on temporary image with scaled position
+                    temp_x = int(x * scale_factor)
+                    temp_y = int(y_pos * scale_factor)
+                    temp_draw.text((temp_x, temp_y), value, font=font, fill=color)
+                    
+                    # Scale back down and composite onto original image
+                    scaled_text = temp_image.resize((image_width, image_height), Image.Resampling.LANCZOS)
+                    base_image.paste(scaled_text, (0, 0), scaled_text)
+                    logger.info(f"Applied text scaling for size {font_size} (scale factor: {scale_factor})")
+                elif font == ImageFont.load_default() and font_size > 16:
+                    # For medium sizes, just apply bold effect
                     for offset_x in range(-1, 2):
                         for offset_y in range(-1, 2):
                             if offset_x != 0 or offset_y != 0:

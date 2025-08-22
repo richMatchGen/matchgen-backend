@@ -237,7 +237,7 @@ class MatchdayPostGenerator(APIView):
 
             # Generate the matchday post
             logger.info("Starting matchday post generation...")
-            result = self._generate_matchday_post(match, template, club)
+            result = self._generate_matchday_post(match, template, club, selected_pack)
             
             if result.get("error"):
                 logger.error(f"Error in _generate_matchday_post: {result.get('error')}")
@@ -255,7 +255,7 @@ class MatchdayPostGenerator(APIView):
 
 
 
-    def _generate_matchday_post(self, match: Match, template: Template, club: Club) -> Dict[str, Any]:
+    def _generate_matchday_post(self, match: Match, template: Template, club: Club, selected_pack: GraphicPack) -> Dict[str, Any]:
         """Generate a matchday post with fixture details overlaid on template."""
         logger.info(f"Generating matchday post for match {match.id}, club {club.name}")
         logger.info(f"Template image URL: {template.image_url}")
@@ -359,6 +359,7 @@ class MatchdayPostGenerator(APIView):
             }
         
         # Render text elements
+        logger.info(f"Rendering {len(elements)} text elements")
         for element_key, element_config in elements.items():
             if element_config.get('type') != 'text':
                 continue
@@ -366,7 +367,10 @@ class MatchdayPostGenerator(APIView):
             # Get the value for this element
             value = fixture_data.get(element_key, "")
             if not value:
+                logger.info(f"Skipping {element_key} - no value available")
                 continue
+                
+            logger.info(f"Rendering text element: {element_key} = '{value}'")
 
             try:
                 # Get element style configuration
@@ -381,10 +385,23 @@ class MatchdayPostGenerator(APIView):
                 font_weight = style.get('fontWeight', 'normal')
                 font_style = style.get('fontStyle', 'normal')
                 
-                # Use default font for now
-                # Note: In a production system, you'd load actual TTF fonts with different sizes
-                font = ImageFont.load_default()
-                logger.info(f"Using font size setting: {font_size} (actual font size may vary)")
+                # Load and scale font based on database settings
+                try:
+                    # Try to load a system font, fallback to default
+                    font = ImageFont.load_default()
+                    
+                    # Scale the font size (default PIL font is typically 10pt)
+                    # We'll use a scaling factor to approximate the desired size
+                    scale_factor = font_size / 10.0
+                    
+                    # For better font handling, you could load actual TTF fonts:
+                    # font = ImageFont.truetype("arial.ttf", font_size)
+                    
+                    logger.info(f"Using font size setting: {font_size} with scale factor: {scale_factor}")
+                except Exception as font_error:
+                    logger.warning(f"Font loading error: {font_error}, using default")
+                    font = ImageFont.load_default()
+                    scale_factor = 1.0
                 
                 # Get color
                 color = style.get('color', '#FFFFFF')

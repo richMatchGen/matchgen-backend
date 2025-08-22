@@ -391,29 +391,32 @@ class MatchdayPostGenerator(APIView):
                 
                 # Load font with proper size support
                 try:
-                    # Try system fonts first (more reliable on Railway)
+                    # Try to use a font that supports size changes
+                    font = None
+                    
+                    # Try different font paths that might be available on Railway
                     font_paths = [
-                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",  # Linux
-                        "/usr/share/fonts/TTF/arial.ttf",  # Linux alternative
-                        "/System/Library/Fonts/Arial.ttf",  # macOS
-                        "C:/Windows/Fonts/arial.ttf",  # Windows
-                        "C:/Windows/Fonts/calibri.ttf",  # Windows alternative
+                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                        "/usr/share/fonts/TTF/arial.ttf",
+                        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+                        "/System/Library/Fonts/Arial.ttf",
+                        "C:/Windows/Fonts/arial.ttf",
                     ]
                     
-                    font = None
                     for font_path in font_paths:
                         try:
                             font = ImageFont.truetype(font_path, font_size)
-                            logger.info(f"Loaded system font from {font_path} with size {font_size}")
+                            logger.info(f"Successfully loaded font from {font_path} with size {font_size}")
                             break
                         except Exception as e:
                             logger.debug(f"Failed to load font from {font_path}: {e}")
                             continue
                     
-                    # If no system font found, use default font
+                    # If no font found, use default but try to simulate size
                     if font is None:
                         font = ImageFont.load_default()
                         logger.warning(f"Using default font - size {font_size} may not be applied correctly")
+                        # We'll handle size scaling differently
                     
                 except Exception as font_error:
                     logger.warning(f"Font loading error: {font_error}, using default font")
@@ -441,6 +444,16 @@ class MatchdayPostGenerator(APIView):
                 # Draw the text
                 draw.text((x, y_pos), value, font=font, fill=color)
                 logger.info(f"Rendered '{value}' at ({x}, {y_pos}) with color {color}, requested font size {font_size}, actual font: {font}")
+                
+                # If using default font and size is different from default, try to simulate larger text
+                if font == ImageFont.load_default() and font_size > 24:
+                    # For default font, we can't change size, but we can make text more prominent
+                    # by drawing it multiple times with slight offsets (bold effect)
+                    for offset_x in range(-1, 2):
+                        for offset_y in range(-1, 2):
+                            if offset_x != 0 or offset_y != 0:
+                                draw.text((x + offset_x, y_pos + offset_y), value, font=font, fill=color)
+                    logger.info(f"Applied bold effect for size {font_size} (default font limitation)")
                 
             except Exception as e:
                 logger.error(f"Error rendering text element {element_key}: {str(e)}")

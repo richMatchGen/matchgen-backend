@@ -437,7 +437,12 @@ class MatchdayPostGenerator(APIView):
                 logger.info(f"Font size > 24: {font_size > 24}")
                 logger.info(f"Should apply scaling: {font == ImageFont.load_default() and font_size > 24}")
                 
-                if font == ImageFont.load_default() and font_size > 24:
+                # Check if we're using the default font (since load_default() creates new objects)
+                is_default_font = isinstance(font, type(ImageFont.load_default()))
+                logger.info(f"Font type check - is_default_font: {is_default_font}")
+                logger.info(f"Should apply scaling (corrected): {is_default_font and font_size > 24}")
+                
+                if is_default_font and font_size > 24:
                     logger.info(f"=== TEXT SCALING DEBUG ===")
                     logger.info(f"Applying text scaling for font size: {font_size}")
                     
@@ -463,7 +468,7 @@ class MatchdayPostGenerator(APIView):
                     scaled_text = temp_image.resize((image_width, image_height), Image.Resampling.LANCZOS)
                     base_image.paste(scaled_text, (0, 0), scaled_text)
                     logger.info(f"SUCCESS: Applied text scaling for size {font_size} (scale factor: {scale_factor})")
-                elif font == ImageFont.load_default() and font_size > 16:
+                elif is_default_font and font_size > 16:
                     # For medium sizes, just apply bold effect
                     for offset_x in range(-1, 2):
                         for offset_y in range(-1, 2):

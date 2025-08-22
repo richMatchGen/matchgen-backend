@@ -446,51 +446,26 @@ class MatchdayPostGenerator(APIView):
                     logger.info(f"=== TEXT SCALING DEBUG ===")
                     logger.info(f"Applying text scaling for font size: {font_size}")
                     
-                    # Create a text-only image with larger dimensions
-                    # Calculate text bounding box to determine needed size
-                    bbox = draw.textbbox((0, 0), value, font=font)
-                    text_width = bbox[2] - bbox[0]
-                    text_height = bbox[3] - bbox[1]
+                    # Create a custom scalable font approach
+                    # Instead of trying to scale the default font, create a "larger" text by drawing multiple layers
                     
-                    # Create a temporary image just for the text, much larger
-                    scale_factor = max(3.0, font_size / 8.0)  # Very aggressive scaling
-                    temp_text_width = int(text_width * scale_factor)
-                    temp_text_height = int(text_height * scale_factor)
+                    # Calculate how many layers to draw based on font size
+                    layers = max(3, font_size // 20)  # More layers for larger fonts
+                    logger.info(f"Drawing {layers} layers for font size {font_size}")
                     
-                    logger.info(f"Original text size: {text_width}x{text_height}")
-                    logger.info(f"Scale factor: {scale_factor}")
-                    logger.info(f"Temporary text size: {temp_text_width}x{temp_text_height}")
+                    # Draw the text multiple times with increasing offsets to create a "larger" appearance
+                    for layer in range(layers):
+                        offset = layer * 2  # Increase offset for each layer
+                        
+                        # Draw in a cross pattern to create a "larger" text effect
+                        for dx in [-offset, 0, offset]:
+                            for dy in [-offset, 0, offset]:
+                                if dx != 0 or dy != 0:  # Don't draw at center (will be drawn by normal text)
+                                    draw.text((x + dx, y_pos + dy), value, font=font, fill=color)
                     
-                    # Create a temporary image just for the text
-                    temp_text_image = Image.new("RGBA", (temp_text_width, temp_text_height), (0, 0, 0, 0))
-                    temp_text_draw = ImageDraw.Draw(temp_text_image)
-                    
-                    # Draw text in the center of the temporary text image
-                    temp_text_draw.text((0, 0), value, font=font, fill=color)
-                    
-                    # Scale the text image back down to a larger size (not the original tiny size)
-                    # Calculate a reasonable larger size based on the font size
-                    target_width = int(text_width * (font_size / 12.0))  # Scale based on font size
-                    target_height = int(text_height * (font_size / 12.0))
-                    logger.info(f"Target text size: {target_width}x{target_height} (vs original: {text_width}x{text_height})")
-                    scaled_text_image = temp_text_image.resize((target_width, target_height), Image.Resampling.LANCZOS)
-                    
-                    # Create a mask from the scaled text
-                    text_mask = scaled_text_image.split()[3]  # Alpha channel
-                    
-                    # Convert color to RGB for pasting
-                    if color.startswith('#'):
-                        color_rgb = tuple(int(color[i:i+2], 16) for i in (1, 3, 5))
-                    else:
-                        color_rgb = (255, 255, 255)  # Default to white
-                    
-                    # Create colored text image with the new target size
-                    colored_text = Image.new("RGBA", (target_width, target_height), color_rgb + (255,))
-                    colored_text.putalpha(text_mask)
-                    
-                    # Paste the scaled text onto the base image
-                    base_image.paste(colored_text, (x, y_pos), colored_text)
-                    logger.info(f"SUCCESS: Applied text scaling for size {font_size} (scale factor: {scale_factor})")
+                    # Draw the main text on top
+                    draw.text((x, y_pos), value, font=font, fill=color)
+                    logger.info(f"SUCCESS: Applied multi-layer text scaling for size {font_size} ({layers} layers)")
                 elif is_default_font and font_size > 16:
                     # For medium sizes, just apply bold effect
                     for offset_x in range(-1, 2):

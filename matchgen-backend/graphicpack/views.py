@@ -446,26 +446,23 @@ class MatchdayPostGenerator(APIView):
                     logger.info(f"=== TEXT SCALING DEBUG ===")
                     logger.info(f"Applying text scaling for font size: {font_size}")
                     
-                    # Create a custom scalable font approach
-                    # Instead of trying to scale the default font, create a "larger" text by drawing multiple layers
+                    # Create a simple scalable font by drawing text with multiple passes
+                    # This creates a "thicker" text that appears larger
                     
-                    # Calculate how many layers to draw based on font size
-                    layers = max(3, font_size // 20)  # More layers for larger fonts
-                    logger.info(f"Drawing {layers} layers for font size {font_size}")
+                    # Calculate how many passes to make based on font size
+                    passes = max(2, font_size // 16)  # More passes for larger fonts
+                    logger.info(f"Drawing {passes} passes for font size {font_size}")
                     
-                    # Draw the text multiple times with increasing offsets to create a "larger" appearance
-                    for layer in range(layers):
-                        offset = layer * 2  # Increase offset for each layer
+                    # Draw the text multiple times with slight offsets to create a "larger" appearance
+                    for pass_num in range(passes):
+                        offset = pass_num * 1  # Small offset for each pass
                         
-                        # Draw in a cross pattern to create a "larger" text effect
+                        # Draw in a pattern around the text position
                         for dx in [-offset, 0, offset]:
                             for dy in [-offset, 0, offset]:
-                                if dx != 0 or dy != 0:  # Don't draw at center (will be drawn by normal text)
-                                    draw.text((x + dx, y_pos + dy), value, font=font, fill=color)
+                                draw.text((x + dx, y_pos + dy), value, font=font, fill=color)
                     
-                    # Draw the main text on top
-                    draw.text((x, y_pos), value, font=font, fill=color)
-                    logger.info(f"SUCCESS: Applied multi-layer text scaling for size {font_size} ({layers} layers)")
+                    logger.info(f"SUCCESS: Applied multi-pass text scaling for size {font_size} ({passes} passes)")
                 elif is_default_font and font_size > 16:
                     # For medium sizes, just apply bold effect
                     for offset_x in range(-1, 2):

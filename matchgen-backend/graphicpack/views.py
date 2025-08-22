@@ -308,8 +308,32 @@ class MatchdayPostGenerator(APIView):
                 
                 logger.info(f"Font settings: size={font_size}, family={font_family}, color={font_color}, pos=({position_x},{position_y})")
                 
-                # Load font
-                font = ImageFont.load_default()
+                # Load font with the specified size
+                try:
+                    # Try to load a scalable font with the specified size
+                    font_paths = [
+                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                        "/usr/share/fonts/TTF/arial.ttf",
+                        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+                    ]
+                    
+                    font = None
+                    for font_path in font_paths:
+                        try:
+                            font = ImageFont.truetype(font_path, font_size)
+                            logger.info(f"Loaded font from {font_path} with size {font_size}")
+                            break
+                        except:
+                            continue
+                    
+                    # If no scalable font found, use default
+                    if font is None:
+                        font = ImageFont.load_default()
+                        logger.info(f"Using default font (size {font_size} may not be applied)")
+                        
+                except Exception as e:
+                    font = ImageFont.load_default()
+                    logger.info(f"Font loading error, using default font: {e}")
                 
                 # Get color
                 color = font_color

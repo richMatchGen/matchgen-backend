@@ -257,8 +257,10 @@ class MatchdayPostGenerator(APIView):
 
     def _generate_matchday_post(self, match: Match, template: Template, club: Club, selected_pack: GraphicPack) -> Dict[str, Any]:
         """Generate a matchday post with fixture details overlaid on template."""
+        logger.info("=== MATCHDAY POST GENERATION STARTED ===")
         logger.info(f"Generating matchday post for match {match.id}, club {club.name}")
         logger.info(f"Template image URL: {template.image_url}")
+        logger.info(f"Selected pack: {selected_pack.name} (ID: {selected_pack.id})")
         
         # Load the template image
         try:
@@ -287,7 +289,13 @@ class MatchdayPostGenerator(APIView):
         
         # Get text elements from database for this graphic pack and content type
         try:
+            logger.info("=== TEXT ELEMENT LOOKUP STARTED ===")
             logger.info(f"Looking for text elements for graphic pack {selected_pack.id} with content_type 'matchday'")
+            
+            # First, let's see what text elements exist in the database
+            all_text_elements = TextElement.objects.all()
+            logger.info(f"Total text elements in database: {all_text_elements.count()}")
+            
             text_elements = TextElement.objects.filter(
                 graphic_pack=selected_pack,
                 content_type='matchday'

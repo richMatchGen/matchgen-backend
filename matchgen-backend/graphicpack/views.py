@@ -317,62 +317,17 @@ class MatchdayPostGenerator(APIView):
                 logger.info(f"Added text element: {text_element.element_name} at {text_element.position}")
                 logger.info(f"Text element style: {text_element.style}")
             
-            # If no text elements found, create default ones
+            # If no text elements found, log the issue but don't create defaults
             if not elements:
-                logger.warning(f"No text elements found for graphic pack {selected_pack.id}, creating defaults")
+                logger.warning(f"No text elements found for graphic pack {selected_pack.id}")
                 logger.info(f"Available text elements in database: {TextElement.objects.all().count()}")
                 logger.info(f"All text elements: {list(TextElement.objects.all().values('graphic_pack_id', 'content_type', 'element_name'))}")
-                default_elements = [
-                    {'element_name': 'date', 'position_x': 400, 'position_y': 150, 'font_size': 24, 'font_color': '#FFFFFF'},
-                    {'element_name': 'time', 'position_x': 400, 'position_y': 200, 'font_size': 24, 'font_color': '#FFFFFF'},
-                    {'element_name': 'venue', 'position_x': 400, 'position_y': 250, 'font_size': 18, 'font_color': '#FFFFFF'},
-                    {'element_name': 'opponent', 'position_x': 400, 'position_y': 100, 'font_size': 28, 'font_color': '#FFFFFF'},
-                    {'element_name': 'home_away', 'position_x': 400, 'position_y': 50, 'font_size': 16, 'font_color': '#FFD700'}
-                ]
-                
-                for default in default_elements:
-                    text_element = TextElement.objects.create(
-                        graphic_pack=selected_pack,
-                        content_type='matchday',
-                        **default
-                    )
-                    elements[text_element.element_name] = {
-                        "type": "text",
-                        "position": text_element.position,
-                        "style": text_element.style
-                    }
-                    logger.info(f"Created default text element: {text_element.element_name}")
+                logger.warning("Please create text elements in the Text Element Management page before generating posts")
                     
         except Exception as e:
             logger.error(f"Error getting text elements: {str(e)}")
-            # Fallback to default configuration
-            elements = {
-                "date": {
-                    "type": "text",
-                    "position": {"x": 400, "y": 150},
-                    "style": {"fontSize": 24, "fontFamily": "Arial", "color": "#FFFFFF", "alignment": "center"}
-                },
-                "time": {
-                    "type": "text",
-                    "position": {"x": 400, "y": 200},
-                    "style": {"fontSize": 24, "fontFamily": "Arial", "color": "#FFFFFF", "alignment": "center"}
-                },
-                "venue": {
-                    "type": "text",
-                    "position": {"x": 400, "y": 250},
-                    "style": {"fontSize": 18, "fontFamily": "Arial", "color": "#FFFFFF", "alignment": "center"}
-                },
-                "opponent": {
-                    "type": "text",
-                    "position": {"x": 400, "y": 100},
-                    "style": {"fontSize": 28, "fontFamily": "Arial", "color": "#FFFFFF", "alignment": "center", "fontWeight": "bold"}
-                },
-                "home_away": {
-                    "type": "text",
-                    "position": {"x": 400, "y": 50},
-                    "style": {"fontSize": 16, "fontFamily": "Arial", "color": "#FFD700", "alignment": "center"}
-                }
-            }
+            # No fallback - require text elements to be created manually
+            elements = {}
         
         # Render text elements
         logger.info(f"Rendering {len(elements)} text elements")

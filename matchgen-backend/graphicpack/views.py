@@ -315,25 +315,30 @@ class MatchdayPostGenerator(APIView):
                         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
                         "/usr/share/fonts/TTF/arial.ttf",
                         "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+                        "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf",
+                        "/System/Library/Fonts/Arial.ttf",
+                        "C:/Windows/Fonts/arial.ttf",
                     ]
                     
                     font = None
                     for font_path in font_paths:
                         try:
                             font = ImageFont.truetype(font_path, font_size)
-                            logger.info(f"Loaded font from {font_path} with size {font_size}")
+                            logger.info(f"✅ SUCCESS: Loaded font from {font_path} with size {font_size}")
                             break
-                        except:
+                        except Exception as e:
+                            logger.debug(f"Failed to load font from {font_path}: {e}")
                             continue
                     
-                    # If no scalable font found, use default
+                    # If no scalable font found, use default with warning
                     if font is None:
+                        logger.warning(f"❌ WARNING: No TrueType font could be loaded. Falling back to default font, which ignores font_size={font_size}")
+                        logger.warning(f"❌ Text will appear tiny regardless of font_size setting")
                         font = ImageFont.load_default()
-                        logger.info(f"Using default font (size {font_size} may not be applied)")
                         
                 except Exception as e:
+                    logger.warning(f"❌ Font loading error, using default font: {e}")
                     font = ImageFont.load_default()
-                    logger.info(f"Font loading error, using default font: {e}")
                 
                 # Get color
                 color = font_color
@@ -351,7 +356,13 @@ class MatchdayPostGenerator(APIView):
                 
                 # Draw the text
                 draw.text((x, position_y), value, font=font, fill=color)
+                
+                # Debug: Draw a red rectangle around the text to show its actual size
+                bbox = draw.textbbox((x, position_y), value, font=font)
+                draw.rectangle(bbox, outline="red", width=2)
+                
                 logger.info(f"Rendered '{value}' at ({x}, {position_y}) with size {font_size}")
+                logger.info(f"Text bounding box: {bbox} (width: {bbox[2]-bbox[0]}, height: {bbox[3]-bbox[1]})")
                 
             except Exception as e:
                 logger.error(f"Error rendering text element {text_element.element_name}: {str(e)}")

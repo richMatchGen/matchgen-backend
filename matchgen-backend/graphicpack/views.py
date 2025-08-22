@@ -372,6 +372,7 @@ class MatchdayPostGenerator(APIView):
                 try:
                     logger.info(f"=== FONT LOADING DEBUG ===")
                     logger.info(f"Attempting to load font with size: {font_size}")
+                    logger.info(f"Font family requested: {font_family}")
                     
                     # Try to use a font that supports size changes
                     font = None
@@ -446,23 +447,45 @@ class MatchdayPostGenerator(APIView):
                     logger.info(f"=== TEXT SCALING DEBUG ===")
                     logger.info(f"Applying text scaling for font size: {font_size}")
                     
-                    # Create a simple scalable font by drawing text with multiple passes
-                    # This creates a "thicker" text that appears larger
+                    # Create a scalable font by creating a larger text area and scaling it down
+                    # This approach only affects the current text element, not the entire image
                     
-                    # Calculate how many passes to make based on font size
-                    passes = max(2, font_size // 16)  # More passes for larger fonts
-                    logger.info(f"Drawing {passes} passes for font size {font_size}")
+                    # Calculate the scale factor based on desired font size
+                    base_font_size = 12  # Default font size
+                    scale_factor = font_size / base_font_size
+                    logger.info(f"Scale factor: {scale_factor}")
                     
-                    # Draw the text multiple times with slight offsets to create a "larger" appearance
-                    for pass_num in range(passes):
-                        offset = pass_num * 1  # Small offset for each pass
-                        
-                        # Draw in a pattern around the text position
-                        for dx in [-offset, 0, offset]:
-                            for dy in [-offset, 0, offset]:
-                                draw.text((x + dx, y_pos + dy), value, font=font, fill=color)
+                    # Get the text bounding box to determine the area needed
+                    bbox = draw.textbbox((0, 0), value, font=font)
+                    text_width = bbox[2] - bbox[0]
+                    text_height = bbox[3] - bbox[1]
                     
-                    logger.info(f"SUCCESS: Applied multi-pass text scaling for size {font_size} ({passes} passes)")
+                    # Create a larger temporary image just for this text
+                    temp_text_width = int(text_width * scale_factor)
+                    temp_text_height = int(text_height * scale_factor)
+                    
+                    logger.info(f"Original text size: {text_width}x{text_height}")
+                    logger.info(f"Temporary text size: {temp_text_width}x{temp_text_height}")
+                    
+                    # Create temporary image with transparent background
+                    temp_text_image = Image.new("RGBA", (temp_text_width, temp_text_height), (0, 0, 0, 0))
+                    temp_text_draw = ImageDraw.Draw(temp_text_image)
+                    
+                    # Draw text in the center of the temporary image
+                    temp_text_draw.text((0, 0), value, font=font, fill=color)
+                    
+                    # Scale the text image back down to a reasonable size
+                    final_width = int(temp_text_width / scale_factor)
+                    final_height = int(temp_text_height / scale_factor)
+                    scaled_text = temp_text_image.resize((final_width, final_height), Image.Resampling.LANCZOS)
+                    
+                    # Calculate position to center the text
+                    paste_x = x - (final_width // 2)
+                    paste_y = y_pos - (final_height // 2)
+                    
+                    # Paste the scaled text onto the base image
+                    base_image.paste(scaled_text, (paste_x, paste_y), scaled_text)
+                    logger.info(f"SUCCESS: Applied text scaling for size {font_size} (scale factor: {scale_factor})")
                 elif is_default_font and font_size > 16:
                     # For medium sizes, just apply bold effect
                     for offset_x in range(-1, 2):

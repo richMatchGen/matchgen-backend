@@ -387,42 +387,59 @@ class MatchdayPostGenerator(APIView):
                 
                 # Load font with proper size support
                 try:
-                    # For Railway deployment, we'll use a simple approach
-                    # Try to load a system font that supports size changes
+                    # Try to download and use a free font that supports size changes
+                    import requests
+                    import os
+                    import tempfile
+                    
+                    # Use Google Fonts - Roboto (free and widely available)
+                    font_url = "https://github.com/google/fonts/raw/main/apache/roboto/Roboto-Regular.ttf"
+                    
+                    # Create a temporary directory for fonts if it doesn't exist
+                    font_dir = os.path.join(tempfile.gettempdir(), "matchgen_fonts")
+                    os.makedirs(font_dir, exist_ok=True)
+                    
+                    font_path = os.path.join(font_dir, "Roboto-Regular.ttf")
+                    
+                    # Download font if it doesn't exist
+                    if not os.path.exists(font_path):
+                        logger.info("Downloading Roboto font...")
+                        response = requests.get(font_url, timeout=10)
+                        response.raise_for_status()
+                        with open(font_path, 'wb') as f:
+                            f.write(response.content)
+                        logger.info(f"Font downloaded to {font_path}")
+                    
+                    # Load the font with the specified size
+                    font = ImageFont.truetype(font_path, font_size)
+                    logger.info(f"Loaded Roboto font with size {font_size}")
+                    
+                except Exception as font_error:
+                    logger.warning(f"Font loading error: {font_error}, trying system fonts...")
+                    
+                    # Fallback to system fonts
                     font_paths = [
                         "/System/Library/Fonts/Arial.ttf",  # macOS
                         "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",  # Linux
                         "C:/Windows/Fonts/arial.ttf",  # Windows
                         "C:/Windows/Fonts/calibri.ttf",  # Windows alternative
                         "/usr/share/fonts/TTF/arial.ttf",  # Linux alternative
-                        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",  # Linux Liberation
                     ]
                     
                     font = None
                     for font_path in font_paths:
                         try:
                             font = ImageFont.truetype(font_path, font_size)
-                            logger.info(f"Loaded font from {font_path} with size {font_size}")
+                            logger.info(f"Loaded system font from {font_path} with size {font_size}")
                             break
                         except Exception as e:
                             logger.debug(f"Failed to load font from {font_path}: {e}")
                             continue
                     
-                    # If no system font found, try to use a fallback
+                    # Last resort: use default font
                     if font is None:
-                        # Try to use a built-in font that supports size
-                        try:
-                            # Some PIL installations have a default TTF font
-                            font = ImageFont.truetype("arial.ttf", font_size)
-                            logger.info(f"Loaded arial.ttf with size {font_size}")
-                        except:
-                            # Last resort: use default font but scale the image
-                            font = ImageFont.load_default()
-                            logger.warning(f"Using default font - size {font_size} may not be applied correctly")
-                            
-                except Exception as font_error:
-                    logger.warning(f"Font loading error: {font_error}, using default")
-                    font = ImageFont.load_default()
+                        font = ImageFont.load_default()
+                        logger.warning(f"Using default font - size {font_size} may not be applied correctly")
                 
                 # Get color
                 color = style.get('color', '#FFFFFF')

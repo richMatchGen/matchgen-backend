@@ -468,8 +468,12 @@ class MatchdayPostGenerator(APIView):
                     # Draw text in the center of the temporary text image
                     temp_text_draw.text((0, 0), value, font=font, fill=color)
                     
-                    # Scale the text image back down to original text size
-                    scaled_text_image = temp_text_image.resize((text_width, text_height), Image.Resampling.LANCZOS)
+                    # Scale the text image back down to a larger size (not the original tiny size)
+                    # Calculate a reasonable larger size based on the font size
+                    target_width = int(text_width * (font_size / 12.0))  # Scale based on font size
+                    target_height = int(text_height * (font_size / 12.0))
+                    logger.info(f"Target text size: {target_width}x{target_height} (vs original: {text_width}x{text_height})")
+                    scaled_text_image = temp_text_image.resize((target_width, target_height), Image.Resampling.LANCZOS)
                     
                     # Create a mask from the scaled text
                     text_mask = scaled_text_image.split()[3]  # Alpha channel
@@ -480,8 +484,8 @@ class MatchdayPostGenerator(APIView):
                     else:
                         color_rgb = (255, 255, 255)  # Default to white
                     
-                    # Create colored text image
-                    colored_text = Image.new("RGBA", (text_width, text_height), color_rgb + (255,))
+                    # Create colored text image with the new target size
+                    colored_text = Image.new("RGBA", (target_width, target_height), color_rgb + (255,))
                     colored_text.putalpha(text_mask)
                     
                     # Paste the scaled text onto the base image

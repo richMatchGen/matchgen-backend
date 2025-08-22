@@ -257,23 +257,14 @@ class MatchdayPostGenerator(APIView):
 
     def _generate_matchday_post(self, match: Match, template: Template, club: Club, selected_pack: GraphicPack) -> Dict[str, Any]:
         """Generate a matchday post with fixture details overlaid on template."""
-        logger.info("=== MATCHDAY POST GENERATION STARTED ===")
         logger.info(f"Generating matchday post for match {match.id}, club {club.name}")
-        logger.info(f"Template image URL: {template.image_url}")
-        logger.info(f"Selected pack: {selected_pack.name} (ID: {selected_pack.id})")
         
         # Load the template image
         try:
-            logger.info("Fetching template image from URL...")
             response = requests.get(template.image_url, timeout=30)
             response.raise_for_status()
-            logger.info(f"Template image fetched successfully, size: {len(response.content)} bytes")
-            
             base_image = Image.open(BytesIO(response.content)).convert("RGBA")
             logger.info(f"Template image loaded, dimensions: {base_image.size}")
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Error fetching template image: {str(e)}")
-            return {"error": f"Failed to fetch template image: {str(e)}"}
         except Exception as e:
             logger.error(f"Error loading template image: {str(e)}")
             return {"error": f"Failed to load template image: {str(e)}"}
@@ -281,221 +272,65 @@ class MatchdayPostGenerator(APIView):
         # Create drawing context
         draw = ImageDraw.Draw(base_image)
         
-        # Get image dimensions
-        image_width, image_height = base_image.size
-        
         # Prepare fixture data
         fixture_data = self._prepare_fixture_data(match)
         
-        # Get text elements from database for this graphic pack and content type
+        # Get text elements from database
         try:
-            logger.info("=== TEXT ELEMENT LOOKUP STARTED ===")
-            logger.info(f"Looking for text elements for graphic pack {selected_pack.id} with content_type 'matchday'")
-            
-            # First, let's see what text elements exist in the database
-            all_text_elements = TextElement.objects.all()
-            logger.info(f"Total text elements in database: {all_text_elements.count()}")
-            
             text_elements = TextElement.objects.filter(
                 graphic_pack=selected_pack,
                 content_type='matchday'
             )
             logger.info(f"Found {text_elements.count()} text elements for graphic pack {selected_pack.id}")
             
-            # Log each text element found
-            for element in text_elements:
-                logger.info(f"Text element: {element.element_name} - size: {element.font_size}, position: ({element.position_x}, {element.position_y})")
-            
-            # Convert to the format expected by the rendering code
-            elements = {}
-            for text_element in text_elements:
-                elements[text_element.element_name] = {
-                    "type": "text",
-                    "position": text_element.position,
-                    "style": text_element.style
-                }
-                logger.info(f"Added text element: {text_element.element_name} at {text_element.position}")
-                logger.info(f"Text element style: {text_element.style}")
-            
-            # If no text elements found, log the issue but don't create defaults
-            if not elements:
-                logger.warning(f"No text elements found for graphic pack {selected_pack.id}")
-                logger.info(f"Available text elements in database: {TextElement.objects.all().count()}")
-                logger.info(f"All text elements: {list(TextElement.objects.all().values('graphic_pack_id', 'content_type', 'element_name'))}")
-                logger.warning("Please create text elements in the Text Element Management page before generating posts")
-                    
         except Exception as e:
             logger.error(f"Error getting text elements: {str(e)}")
-            # No fallback - require text elements to be created manually
-            elements = {}
+            return {"error": f"Failed to get text elements: {str(e)}"}
         
-        # Render text elements
-        logger.info(f"Rendering {len(elements)} text elements")
-        logger.info(f"Elements to render: {list(elements.keys())}")
-        for element_key, element_config in elements.items():
-            if element_config.get('type') != 'text':
-                continue
-                
+        # Render each text element
+        for text_element in text_elements:
             # Get the value for this element
-            value = fixture_data.get(element_key, "")
+            value = fixture_data.get(text_element.element_name, "")
             if not value:
-                logger.info(f"Skipping {element_key} - no value available")
+                logger.info(f"Skipping {text_element.element_name} - no value available")
                 continue
                 
-            logger.info(f"Rendering text element: {element_key} = '{value}'")
+            logger.info(f"Rendering: {text_element.element_name} = '{value}'")
 
             try:
-                # Validate element_config structure
-                if not isinstance(element_config, dict):
-                    logger.warning(f"Invalid element_config for {element_key}: {element_config}")
-                    continue
-                # Get element style configuration
-                style = element_config.get('style', {})
-                position = element_config.get('position', {})
+                # Get font settings directly from TextElement
+                font_size = text_element.font_size
+                font_family = text_element.font_family
+                font_color = text_element.font_color
+                position_x = text_element.position_x
+                position_y = text_element.position_y
+                alignment = text_element.alignment
                 
-
+                logger.info(f"Font settings: size={font_size}, family={font_family}, color={font_color}, pos=({position_x},{position_y})")
                 
-                # Get font settings
-                font_family = style.get('fontFamily', 'Arial')
-                font_size = style.get('fontSize', 24)
-                font_weight = style.get('fontWeight', 'normal')
-                font_style = style.get('fontStyle', 'normal')
-                
-                # Debug font size
-                logger.info(f"=== FONT SIZE DEBUG ===")
-                logger.info(f"Style object: {style}")
-                logger.info(f"Extracted font_size: {font_size}")
-                logger.info(f"Font size type: {type(font_size)}")
-                logger.info(f"Font size value: {font_size}")
-                
-                # Load font with proper size support
-                try:
-                    logger.info(f"=== FONT LOADING DEBUG ===")
-                    logger.info(f"Attempting to load font with size: {font_size}")
-                    logger.info(f"Font family requested: {font_family}")
-                    
-                    # Try to use a font that supports size changes
-                    font = None
-                    
-                    # Try different font paths that might be available on Railway
-                    font_paths = [
-                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-                        "/usr/share/fonts/TTF/arial.ttf",
-                        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-                        "/System/Library/Fonts/Arial.ttf",
-                        "C:/Windows/Fonts/arial.ttf",
-                        "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf",  # Ubuntu font
-                        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",  # Liberation
-                    ]
-                    
-                    for font_path in font_paths:
-                        try:
-                            font = ImageFont.truetype(font_path, font_size)
-                            logger.info(f"SUCCESS: Loaded font from {font_path} with size {font_size}")
-                            logger.info(f"Font object: {font}")
-                            break
-                        except Exception as e:
-                            logger.debug(f"Failed to load font from {font_path}: {e}")
-                            continue
-                    
-                    # If no font found, use default but try to simulate size
-                    if font is None:
-                        font = ImageFont.load_default()
-                        logger.warning(f"FAILED: Using default font - size {font_size} may not be applied correctly")
-                        logger.info(f"Default font object: {font}")
-                        # We'll handle size scaling differently
-                    
-                except Exception as font_error:
-                    logger.warning(f"Font loading error: {font_error}, using default font")
-                    font = ImageFont.load_default()
+                # Load font
+                font = ImageFont.load_default()
                 
                 # Get color
-                color = style.get('color', '#FFFFFF')
-                
-                # Get position
-                x_pos = position.get('x', 0)
-                y_pos = position.get('y', 0)
-                alignment = style.get('alignment', 'left')
+                color = font_color
                 
                 # Calculate text position based on alignment
                 bbox = draw.textbbox((0, 0), value, font=font)
                 text_width = bbox[2] - bbox[0]
                 
                 if alignment == 'center':
-                    x = x_pos - (text_width // 2)
+                    x = position_x - (text_width // 2)
                 elif alignment == 'right':
-                    x = x_pos - text_width
+                    x = position_x - text_width
                 else:  # left
-                    x = x_pos
+                    x = position_x
                 
                 # Draw the text
-                draw.text((x, y_pos), value, font=font, fill=color)
-                logger.info(f"Rendered '{value}' at ({x}, {y_pos}) with color {color}, requested font size {font_size}, actual font: {font}")
-                
-                # If using default font and size is different from default, try to simulate larger text
-                logger.info(f"=== TEXT SCALING CHECK ===")
-                logger.info(f"Font is default: {font == ImageFont.load_default()}")
-                logger.info(f"Font size > 24: {font_size > 24}")
-                logger.info(f"Should apply scaling: {font == ImageFont.load_default() and font_size > 24}")
-                
-                # Check if we're using the default font (since load_default() creates new objects)
-                is_default_font = isinstance(font, type(ImageFont.load_default()))
-                logger.info(f"Font type check - is_default_font: {is_default_font}")
-                logger.info(f"Should apply scaling (corrected): {is_default_font and font_size > 24}")
-                
-                if is_default_font and font_size > 24:
-                    logger.info(f"=== TEXT SCALING DEBUG ===")
-                    logger.info(f"Applying text scaling for font size: {font_size}")
-                    
-                    # Create a scalable font by creating a larger text area and scaling it down
-                    # This approach only affects the current text element, not the entire image
-                    
-                    # Calculate the scale factor based on desired font size
-                    base_font_size = 12  # Default font size
-                    scale_factor = font_size / base_font_size
-                    logger.info(f"Scale factor: {scale_factor}")
-                    
-                    # Get the text bounding box to determine the area needed
-                    bbox = draw.textbbox((0, 0), value, font=font)
-                    text_width = bbox[2] - bbox[0]
-                    text_height = bbox[3] - bbox[1]
-                    
-                    # Create a larger temporary image just for this text
-                    temp_text_width = int(text_width * scale_factor)
-                    temp_text_height = int(text_height * scale_factor)
-                    
-                    logger.info(f"Original text size: {text_width}x{text_height}")
-                    logger.info(f"Temporary text size: {temp_text_width}x{temp_text_height}")
-                    
-                    # Create temporary image with transparent background
-                    temp_text_image = Image.new("RGBA", (temp_text_width, temp_text_height), (0, 0, 0, 0))
-                    temp_text_draw = ImageDraw.Draw(temp_text_image)
-                    
-                    # Draw text in the center of the temporary image
-                    temp_text_draw.text((0, 0), value, font=font, fill=color)
-                    
-                    # Scale the text image back down to a reasonable size
-                    final_width = int(temp_text_width / scale_factor)
-                    final_height = int(temp_text_height / scale_factor)
-                    scaled_text = temp_text_image.resize((final_width, final_height), Image.Resampling.LANCZOS)
-                    
-                    # Calculate position to center the text
-                    paste_x = x - (final_width // 2)
-                    paste_y = y_pos - (final_height // 2)
-                    
-                    # Paste the scaled text onto the base image
-                    base_image.paste(scaled_text, (paste_x, paste_y), scaled_text)
-                    logger.info(f"SUCCESS: Applied text scaling for size {font_size} (scale factor: {scale_factor})")
-                elif is_default_font and font_size > 16:
-                    # For medium sizes, just apply bold effect
-                    for offset_x in range(-1, 2):
-                        for offset_y in range(-1, 2):
-                            if offset_x != 0 or offset_y != 0:
-                                draw.text((x + offset_x, y_pos + offset_y), value, font=font, fill=color)
-                    logger.info(f"Applied bold effect for size {font_size} (default font limitation)")
+                draw.text((x, position_y), value, font=font, fill=color)
+                logger.info(f"Rendered '{value}' at ({x}, {position_y}) with size {font_size}")
                 
             except Exception as e:
-                logger.error(f"Error rendering text element {element_key}: {str(e)}")
+                logger.error(f"Error rendering text element {text_element.element_name}: {str(e)}")
                 continue
 
         # Save to buffer with high resolution

@@ -446,27 +446,46 @@ class MatchdayPostGenerator(APIView):
                     logger.info(f"=== TEXT SCALING DEBUG ===")
                     logger.info(f"Applying text scaling for font size: {font_size}")
                     
-                    # Create a larger temporary image to simulate larger text
-                    scale_factor = max(1.5, font_size / 24.0)  # Scale based on font size
-                    temp_width = int(image_width * scale_factor)
-                    temp_height = int(image_height * scale_factor)
+                    # Create a text-only image with larger dimensions
+                    # Calculate text bounding box to determine needed size
+                    bbox = draw.textbbox((0, 0), value, font=font)
+                    text_width = bbox[2] - bbox[0]
+                    text_height = bbox[3] - bbox[1]
                     
+                    # Create a temporary image just for the text, much larger
+                    scale_factor = max(3.0, font_size / 8.0)  # Very aggressive scaling
+                    temp_text_width = int(text_width * scale_factor)
+                    temp_text_height = int(text_height * scale_factor)
+                    
+                    logger.info(f"Original text size: {text_width}x{text_height}")
                     logger.info(f"Scale factor: {scale_factor}")
-                    logger.info(f"Original image size: {image_width}x{image_height}")
-                    logger.info(f"Temporary image size: {temp_width}x{temp_height}")
+                    logger.info(f"Temporary text size: {temp_text_width}x{temp_text_height}")
                     
-                    # Create a temporary image with transparent background
-                    temp_image = Image.new("RGBA", (temp_width, temp_height), (0, 0, 0, 0))
-                    temp_draw = ImageDraw.Draw(temp_image)
+                    # Create a temporary image just for the text
+                    temp_text_image = Image.new("RGBA", (temp_text_width, temp_text_height), (0, 0, 0, 0))
+                    temp_text_draw = ImageDraw.Draw(temp_text_image)
                     
-                    # Draw text on temporary image with scaled position
-                    temp_x = int(x * scale_factor)
-                    temp_y = int(y_pos * scale_factor)
-                    temp_draw.text((temp_x, temp_y), value, font=font, fill=color)
+                    # Draw text in the center of the temporary text image
+                    temp_text_draw.text((0, 0), value, font=font, fill=color)
                     
-                    # Scale back down and composite onto original image
-                    scaled_text = temp_image.resize((image_width, image_height), Image.Resampling.LANCZOS)
-                    base_image.paste(scaled_text, (0, 0), scaled_text)
+                    # Scale the text image back down to original text size
+                    scaled_text_image = temp_text_image.resize((text_width, text_height), Image.Resampling.LANCZOS)
+                    
+                    # Create a mask from the scaled text
+                    text_mask = scaled_text_image.split()[3]  # Alpha channel
+                    
+                    # Convert color to RGB for pasting
+                    if color.startswith('#'):
+                        color_rgb = tuple(int(color[i:i+2], 16) for i in (1, 3, 5))
+                    else:
+                        color_rgb = (255, 255, 255)  # Default to white
+                    
+                    # Create colored text image
+                    colored_text = Image.new("RGBA", (text_width, text_height), color_rgb + (255,))
+                    colored_text.putalpha(text_mask)
+                    
+                    # Paste the scaled text onto the base image
+                    base_image.paste(colored_text, (x, y_pos), colored_text)
                     logger.info(f"SUCCESS: Applied text scaling for size {font_size} (scale factor: {scale_factor})")
                 elif is_default_font and font_size > 16:
                     # For medium sizes, just apply bold effect

@@ -139,13 +139,26 @@ class SelectGraphicPackView(APIView):
 
 
 def get_font(font_family, font_size):
-    """Load a font with the specified family and size."""
+    """
+    Load a TrueType font by name and size.
+    Tries Cloudinary first, then system fonts, then falls back to default.
+    """
     try:
+        # Map font_family to Cloudinary URLs or system paths
+        font_map = {
+            "Arial": "https://res.cloudinary.com/dxoxuyz0j/raw/upload/v1/fonts/arial.ttf",
+            "Roboto": "https://res.cloudinary.com/dxoxuyz0j/raw/upload/v1/fonts/Roboto-Regular.ttf",
+            "Montserrat": "https://res.cloudinary.com/dxoxuyz0j/raw/upload/v1/fonts/Montserrat-Regular.ttf",
+            "DejaVuSans": "https://res.cloudinary.com/dxoxuyz0j/raw/upload/v1/fonts/DejaVuSans.ttf",
+        }
+        
         # Get the static fonts directory
         static_fonts_dir = os.path.join(settings.BASE_DIR, 'static', 'fonts')
         
-        # Define font paths to try
+        # Define font paths to try (Cloudinary first, then system fonts)
         font_paths = [
+            # Cloudinary fonts (if available)
+            font_map.get(font_family, font_map["Roboto"]),
             # System fonts
             "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
             "/usr/share/fonts/TTF/arial.ttf",
@@ -162,9 +175,22 @@ def get_font(font_family, font_size):
         # Try to load the font
         for font_path in font_paths:
             try:
-                font = ImageFont.truetype(font_path, font_size)
-                logger.info(f"✅ SUCCESS: Loaded font from {font_path} with size {font_size}")
-                return font
+                if font_path.startswith('http'):
+                    # Download font from Cloudinary/URL
+                    logger.info(f"🔄 Downloading font from {font_path}")
+                    response = requests.get(font_path, timeout=10)
+                    response.raise_for_status()
+                    
+                    # Create font from bytes
+                    font = ImageFont.truetype(BytesIO(response.content), font_size)
+                    logger.info(f"✅ SUCCESS: Loaded font from Cloudinary with size {font_size}")
+                    return font
+                else:
+                    # Load from local path
+                    font = ImageFont.truetype(font_path, font_size)
+                    logger.info(f"✅ SUCCESS: Loaded font from {font_path} with size {font_size}")
+                    return font
+                    
             except Exception as e:
                 logger.debug(f"Failed to load font from {font_path}: {e}")
                 continue
@@ -366,22 +392,6 @@ class MatchdayPostGenerator(APIView):
                 
                 # Draw the text
                 draw.text((x, position_y), value, font=font, fill=font_color)
-                
-                # If using default font and font size is large, apply scaling effect
-                if isinstance(font, type(ImageFont.load_default())) and font_size > 24:
-                    logger.info(f"🔧 Applying text scaling effect for size {font_size}")
-                    
-                    # Calculate scale factor
-                    scale_factor = max(2, font_size // 12)
-                    
-                    # Draw multiple layers to create a "larger" text effect
-                    for offset in range(1, scale_factor):
-                        for dx in [-offset, 0, offset]:
-                            for dy in [-offset, 0, offset]:
-                                if dx != 0 or dy != 0:  # Don't redraw at center
-                                    draw.text((x + dx, position_y + dy), value, font=font, fill=font_color)
-                    
-                    logger.info(f"✅ Applied text scaling with {scale_factor} layers")
                 
                 # Debug: Draw a red rectangle around the text to show its actual size
                 bbox = draw.textbbox((x, position_y), value, font=font)

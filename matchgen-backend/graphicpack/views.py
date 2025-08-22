@@ -361,8 +361,18 @@ class MatchdayPostGenerator(APIView):
                 font_weight = style.get('fontWeight', 'normal')
                 font_style = style.get('fontStyle', 'normal')
                 
+                # Debug font size
+                logger.info(f"=== FONT SIZE DEBUG ===")
+                logger.info(f"Style object: {style}")
+                logger.info(f"Extracted font_size: {font_size}")
+                logger.info(f"Font size type: {type(font_size)}")
+                logger.info(f"Font size value: {font_size}")
+                
                 # Load font with proper size support
                 try:
+                    logger.info(f"=== FONT LOADING DEBUG ===")
+                    logger.info(f"Attempting to load font with size: {font_size}")
+                    
                     # Try to use a font that supports size changes
                     font = None
                     
@@ -380,7 +390,8 @@ class MatchdayPostGenerator(APIView):
                     for font_path in font_paths:
                         try:
                             font = ImageFont.truetype(font_path, font_size)
-                            logger.info(f"Successfully loaded font from {font_path} with size {font_size}")
+                            logger.info(f"SUCCESS: Loaded font from {font_path} with size {font_size}")
+                            logger.info(f"Font object: {font}")
                             break
                         except Exception as e:
                             logger.debug(f"Failed to load font from {font_path}: {e}")
@@ -389,7 +400,8 @@ class MatchdayPostGenerator(APIView):
                     # If no font found, use default but try to simulate size
                     if font is None:
                         font = ImageFont.load_default()
-                        logger.warning(f"Using default font - size {font_size} may not be applied correctly")
+                        logger.warning(f"FAILED: Using default font - size {font_size} may not be applied correctly")
+                        logger.info(f"Default font object: {font}")
                         # We'll handle size scaling differently
                     
                 except Exception as font_error:
@@ -421,10 +433,17 @@ class MatchdayPostGenerator(APIView):
                 
                 # If using default font and size is different from default, try to simulate larger text
                 if font == ImageFont.load_default() and font_size > 24:
+                    logger.info(f"=== TEXT SCALING DEBUG ===")
+                    logger.info(f"Applying text scaling for font size: {font_size}")
+                    
                     # Create a larger temporary image to simulate larger text
                     scale_factor = max(1.5, font_size / 24.0)  # Scale based on font size
                     temp_width = int(image_width * scale_factor)
                     temp_height = int(image_height * scale_factor)
+                    
+                    logger.info(f"Scale factor: {scale_factor}")
+                    logger.info(f"Original image size: {image_width}x{image_height}")
+                    logger.info(f"Temporary image size: {temp_width}x{temp_height}")
                     
                     # Create a temporary image with transparent background
                     temp_image = Image.new("RGBA", (temp_width, temp_height), (0, 0, 0, 0))
@@ -438,7 +457,7 @@ class MatchdayPostGenerator(APIView):
                     # Scale back down and composite onto original image
                     scaled_text = temp_image.resize((image_width, image_height), Image.Resampling.LANCZOS)
                     base_image.paste(scaled_text, (0, 0), scaled_text)
-                    logger.info(f"Applied text scaling for size {font_size} (scale factor: {scale_factor})")
+                    logger.info(f"SUCCESS: Applied text scaling for size {font_size} (scale factor: {scale_factor})")
                 elif font == ImageFont.load_default() and font_size > 16:
                     # For medium sizes, just apply bold effect
                     for offset_x in range(-1, 2):

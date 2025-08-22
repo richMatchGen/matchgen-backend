@@ -385,23 +385,44 @@ class MatchdayPostGenerator(APIView):
                 font_weight = style.get('fontWeight', 'normal')
                 font_style = style.get('fontStyle', 'normal')
                 
-                # Load and scale font based on database settings
+                # Load font with proper size support
                 try:
-                    # Try to load a system font, fallback to default
-                    font = ImageFont.load_default()
+                    # For Railway deployment, we'll use a simple approach
+                    # Try to load a system font that supports size changes
+                    font_paths = [
+                        "/System/Library/Fonts/Arial.ttf",  # macOS
+                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",  # Linux
+                        "C:/Windows/Fonts/arial.ttf",  # Windows
+                        "C:/Windows/Fonts/calibri.ttf",  # Windows alternative
+                        "/usr/share/fonts/TTF/arial.ttf",  # Linux alternative
+                        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",  # Linux Liberation
+                    ]
                     
-                    # Scale the font size (default PIL font is typically 10pt)
-                    # We'll use a scaling factor to approximate the desired size
-                    scale_factor = font_size / 10.0
+                    font = None
+                    for font_path in font_paths:
+                        try:
+                            font = ImageFont.truetype(font_path, font_size)
+                            logger.info(f"Loaded font from {font_path} with size {font_size}")
+                            break
+                        except Exception as e:
+                            logger.debug(f"Failed to load font from {font_path}: {e}")
+                            continue
                     
-                    # For better font handling, you could load actual TTF fonts:
-                    # font = ImageFont.truetype("arial.ttf", font_size)
-                    
-                    logger.info(f"Using font size setting: {font_size} with scale factor: {scale_factor}")
+                    # If no system font found, try to use a fallback
+                    if font is None:
+                        # Try to use a built-in font that supports size
+                        try:
+                            # Some PIL installations have a default TTF font
+                            font = ImageFont.truetype("arial.ttf", font_size)
+                            logger.info(f"Loaded arial.ttf with size {font_size}")
+                        except:
+                            # Last resort: use default font but scale the image
+                            font = ImageFont.load_default()
+                            logger.warning(f"Using default font - size {font_size} may not be applied correctly")
+                            
                 except Exception as font_error:
                     logger.warning(f"Font loading error: {font_error}, using default")
                     font = ImageFont.load_default()
-                    scale_factor = 1.0
                 
                 # Get color
                 color = style.get('color', '#FFFFFF')
@@ -424,7 +445,7 @@ class MatchdayPostGenerator(APIView):
                 
                 # Draw the text
                 draw.text((x, y_pos), value, font=font, fill=color)
-                logger.info(f"Rendered '{value}' at ({x}, {y_pos}) with color {color}, font size {font_size}")
+                logger.info(f"Rendered '{value}' at ({x}, {y_pos}) with color {color}, requested font size {font_size}, actual font: {font}")
                 
             except Exception as e:
                 logger.error(f"Error rendering text element {element_key}: {str(e)}")

@@ -287,11 +287,16 @@ class MatchdayPostGenerator(APIView):
         
         # Get text elements from database for this graphic pack and content type
         try:
+            logger.info(f"Looking for text elements for graphic pack {selected_pack.id} with content_type 'matchday'")
             text_elements = TextElement.objects.filter(
                 graphic_pack=selected_pack,
                 content_type='matchday'
             )
             logger.info(f"Found {text_elements.count()} text elements for graphic pack {selected_pack.id}")
+            
+            # Log each text element found
+            for element in text_elements:
+                logger.info(f"Text element: {element.element_name} - size: {element.font_size}, position: ({element.position_x}, {element.position_y})")
             
             # Convert to the format expected by the rendering code
             elements = {}
@@ -302,10 +307,13 @@ class MatchdayPostGenerator(APIView):
                     "style": text_element.style
                 }
                 logger.info(f"Added text element: {text_element.element_name} at {text_element.position}")
+                logger.info(f"Text element style: {text_element.style}")
             
             # If no text elements found, create default ones
             if not elements:
                 logger.warning(f"No text elements found for graphic pack {selected_pack.id}, creating defaults")
+                logger.info(f"Available text elements in database: {TextElement.objects.all().count()}")
+                logger.info(f"All text elements: {list(TextElement.objects.all().values('graphic_pack_id', 'content_type', 'element_name'))}")
                 default_elements = [
                     {'element_name': 'date', 'position_x': 400, 'position_y': 150, 'font_size': 24, 'font_color': '#FFFFFF'},
                     {'element_name': 'time', 'position_x': 400, 'position_y': 200, 'font_size': 24, 'font_color': '#FFFFFF'},
@@ -360,6 +368,7 @@ class MatchdayPostGenerator(APIView):
         
         # Render text elements
         logger.info(f"Rendering {len(elements)} text elements")
+        logger.info(f"Elements to render: {list(elements.keys())}")
         for element_key, element_config in elements.items():
             if element_config.get('type') != 'text':
                 continue

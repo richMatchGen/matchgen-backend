@@ -6,6 +6,8 @@ from typing import Dict, Any
 import cloudinary.uploader
 import requests
 from PIL import Image, ImageDraw, ImageFont
+import os
+from django.conf import settings
 from rest_framework import status
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -134,6 +136,46 @@ class SelectGraphicPackView(APIView):
                 {"error": "An error occurred while selecting the graphic pack."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+def get_font(font_family, font_size):
+    """Load a font with the specified family and size."""
+    try:
+        # Get the static fonts directory
+        static_fonts_dir = os.path.join(settings.BASE_DIR, 'static', 'fonts')
+        
+        # Define font paths to try
+        font_paths = [
+            # System fonts
+            "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+            "/usr/share/fonts/TTF/arial.ttf",
+            "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+            "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf",
+            "/System/Library/Fonts/Arial.ttf",
+            "C:/Windows/Fonts/arial.ttf",
+            # Project fonts
+            os.path.join(static_fonts_dir, "Roboto-Regular.ttf"),
+            os.path.join(static_fonts_dir, "DejaVuSans.ttf"),
+            os.path.join(static_fonts_dir, "Arial.ttf"),
+        ]
+        
+        # Try to load the font
+        for font_path in font_paths:
+            try:
+                font = ImageFont.truetype(font_path, font_size)
+                logger.info(f"✅ SUCCESS: Loaded font from {font_path} with size {font_size}")
+                return font
+            except Exception as e:
+                logger.debug(f"Failed to load font from {font_path}: {e}")
+                continue
+        
+        # Fallback to default font
+        logger.warning(f"❌ WARNING: No TrueType font could be loaded. Falling back to default font, which ignores font_size={font_size}")
+        return ImageFont.load_default()
+        
+    except Exception as e:
+        logger.warning(f"❌ Font loading error, using default font: {e}")
+        return ImageFont.load_default()
 
 
 class MatchdayPostGenerator(APIView):
@@ -308,56 +350,8 @@ class MatchdayPostGenerator(APIView):
                 
                 logger.info(f"Font settings: size={font_size}, family={font_family}, color={font_color}, pos=({position_x},{position_y})")
                 
-                # Load font with the specified size
-                try:
-                    # Try to load a scalable font with the specified size
-                    import os
-                    from django.conf import settings
-                    
-                    # Get the static fonts directory
-                    static_fonts_dir = os.path.join(settings.BASE_DIR, 'static', 'fonts')
-                    
-                    font_paths = [
-                        # System fonts
-                        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-                        "/usr/share/fonts/TTF/arial.ttf",
-                        "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-                        "/usr/share/fonts/truetype/ubuntu/Ubuntu-R.ttf",
-                        "/System/Library/Fonts/Arial.ttf",
-                        "C:/Windows/Fonts/arial.ttf",
-                        # Project fonts
-                        os.path.join(static_fonts_dir, "Roboto-Regular.ttf"),
-                        os.path.join(static_fonts_dir, "DejaVuSans.ttf"),
-                        os.path.join(static_fonts_dir, "Arial.ttf"),
-                    ]
-                    
-                    font = None
-                    for font_path in font_paths:
-                        try:
-                            font = ImageFont.truetype(font_path, font_size)
-                            logger.info(f"✅ SUCCESS: Loaded font from {font_path} with size {font_size}")
-                            break
-                        except Exception as e:
-                            logger.debug(f"Failed to load font from {font_path}: {e}")
-                            continue
-                    
-                    # If no scalable font found, use default with warning
-                    if font is None:
-                        logger.warning(f"❌ WARNING: No TrueType font could be loaded. Falling back to default font, which ignores font_size={font_size}")
-                        logger.warning(f"❌ Text will appear tiny regardless of font_size setting")
-                        font = ImageFont.load_default()
-                        
-                        # Apply text scaling to simulate larger font size
-                        if font_size > 24:
-                            logger.info(f"🔧 Applying text scaling to simulate font size {font_size}")
-                            # We'll handle this in the rendering section
-                        
-                except Exception as e:
-                    logger.warning(f"❌ Font loading error, using default font: {e}")
-                    font = ImageFont.load_default()
-                
-                # Get color
-                color = font_color
+                # Load font using the dedicated function
+                font = get_font(font_family, font_size)
                 
                 # Calculate text position based on alignment
                 bbox = draw.textbbox((0, 0), value, font=font)
@@ -371,7 +365,7 @@ class MatchdayPostGenerator(APIView):
                     x = position_x
                 
                 # Draw the text
-                draw.text((x, position_y), value, font=font, fill=color)
+                draw.text((x, position_y), value, font=font, fill=font_color)
                 
                 # If using default font and font size is large, apply scaling effect
                 if isinstance(font, type(ImageFont.load_default())) and font_size > 24:
@@ -385,7 +379,7 @@ class MatchdayPostGenerator(APIView):
                         for dx in [-offset, 0, offset]:
                             for dy in [-offset, 0, offset]:
                                 if dx != 0 or dy != 0:  # Don't redraw at center
-                                    draw.text((x + dx, position_y + dy), value, font=font, fill=color)
+                                    draw.text((x + dx, position_y + dy), value, font=font, fill=font_color)
                     
                     logger.info(f"✅ Applied text scaling with {scale_factor} layers")
                 

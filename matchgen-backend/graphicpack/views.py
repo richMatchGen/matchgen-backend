@@ -399,12 +399,7 @@ class MatchdayPostGenerator(APIView):
                 # Draw the text
                 draw.text((x, position_y), value, font=font, fill=font_color)
                 
-                # Debug: Draw a red rectangle around the text to show its actual size
-                bbox = draw.textbbox((x, position_y), value, font=font)
-                draw.rectangle(bbox, outline="red", width=2)
-                
                 logger.info(f"Rendered '{value}' at ({x}, {position_y}) with size {font_size}")
-                logger.info(f"Text bounding box: {bbox} (width: {bbox[2]-bbox[0]}, height: {bbox[3]-bbox[1]})")
                 
             except Exception as e:
                 logger.error(f"Error rendering text element {text_element.element_name}: {str(e)}")

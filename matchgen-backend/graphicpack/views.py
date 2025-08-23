@@ -385,21 +385,18 @@ class MatchdayPostGenerator(APIView):
                 # Load font using the dedicated function
                 font = get_font(font_family, font_size)
                 
-                # Calculate text position based on alignment
-                bbox = draw.textbbox((0, 0), value, font=font)
-                text_width = bbox[2] - bbox[0]
-                
+                # Calculate anchor point for precise positioning
                 if alignment == 'center':
-                    x = position_x - (text_width // 2)
+                    anchor = 'mm'  # middle-middle (center horizontally and vertically)
                 elif alignment == 'right':
-                    x = position_x - text_width
+                    anchor = 'rm'  # right-middle (right-aligned, middle vertically)
                 else:  # left
-                    x = position_x
+                    anchor = 'lm'  # left-middle (left-aligned, middle vertically)
                 
-                # Draw the text
-                draw.text((x, position_y), value, font=font, fill=font_color)
+                # Draw the text with anchor point for precise positioning
+                draw.text((position_x, position_y), value, font=font, fill=font_color, anchor=anchor)
                 
-                logger.info(f"Rendered '{value}' at ({x}, {position_y}) with size {font_size}")
+                logger.info(f"Rendered '{value}' at ({position_x}, {position_y}) with anchor '{anchor}' and size {font_size}")
                 
             except Exception as e:
                 logger.error(f"Error rendering text element {text_element.element_name}: {str(e)}")

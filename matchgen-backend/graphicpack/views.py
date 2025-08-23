@@ -148,9 +148,12 @@ def get_font(font_family, font_size):
         font_map = {
             "Arial": "https://res.cloudinary.com/dxoxuyz0j/raw/upload/v1/fonts/arial.ttf",
             "Roboto": "https://res.cloudinary.com/dxoxuyz0j/raw/upload/v1/fonts/Roboto-Regular.ttf",
-            "Montserrat": "https://res.cloudinary.com/dxoxuyz0j/raw/upload/v1/fonts/Montserrat-Regular.ttf",
+            "Montserrat": "https://res.cloudinary.com/dxoxuyz0j/raw/upload/v1755936573/Montserrat-BlackItalic_pizq8t.ttf",
             "DejaVuSans": "https://res.cloudinary.com/dxoxuyz0j/raw/upload/v1/fonts/DejaVuSans.ttf",
         }
+        
+        logger.info(f"🎯 Requesting font: {font_family} with size {font_size}")
+        logger.info(f"🎯 Available fonts: {list(font_map.keys())}")
         
         # Get the static fonts directory
         static_fonts_dir = os.path.join(settings.BASE_DIR, 'static', 'fonts')
@@ -170,6 +173,7 @@ def get_font(font_family, font_size):
             os.path.join(static_fonts_dir, "Roboto-Regular.ttf"),
             os.path.join(static_fonts_dir, "DejaVuSans.ttf"),
             os.path.join(static_fonts_dir, "Arial.ttf"),
+            os.path.join(static_fonts_dir, "Montserrat-BlackItalic_pizq8t.ttf"),
         ]
         
         # Try to load the font
@@ -180,6 +184,8 @@ def get_font(font_family, font_size):
                     logger.info(f"🔄 Downloading font from {font_path}")
                     response = requests.get(font_path, timeout=10)
                     response.raise_for_status()
+                    
+                    logger.info(f"📦 Downloaded {len(response.content)} bytes from Cloudinary")
                     
                     # Create font from bytes
                     font = ImageFont.truetype(BytesIO(response.content), font_size)
@@ -192,7 +198,7 @@ def get_font(font_family, font_size):
                     return font
                     
             except Exception as e:
-                logger.debug(f"Failed to load font from {font_path}: {e}")
+                logger.warning(f"❌ Failed to load font from {font_path}: {e}")
                 continue
         
         # Fallback to default font

@@ -762,13 +762,17 @@ class SocialMediaPostGenerator(APIView):
         """Render a text element on the base image."""
         logger.info(f"Rendering text element: {element.element_name} = '{content}'")
         
-        # Get font size and style
-        style = element.style
-        font_size = style.get('fontSize', 24)
+        # Get font settings directly from TextElement fields
+        font_size = element.font_size
+        font_family = element.font_family
+        font_color = element.font_color
+        alignment = element.alignment
         
         logger.info(f"=== FONT SIZE DEBUG ===")
-        logger.info(f"Style object: {style}")
-        logger.info(f"Extracted font_size: {font_size}")
+        logger.info(f"Font size: {font_size}")
+        logger.info(f"Font family: {font_family}")
+        logger.info(f"Font color: {font_color}")
+        logger.info(f"Alignment: {alignment}")
         logger.info(f"Font size type: {type(font_size)}")
         logger.info(f"Font size value: {font_size}")
         
@@ -777,7 +781,7 @@ class SocialMediaPostGenerator(APIView):
         logger.info(f"Attempting to load font with size: {font_size}")
         
         try:
-            font = get_font(font_size, style.get('fontFamily', 'Arial'), style.get('fontWeight', 'normal'))
+            font = get_font(font_family, font_size)
             logger.info(f"Font loaded successfully: {font}")
         except Exception as e:
             logger.warning(f"FAILED: Using default font - size {font_size} may not be applied correctly")
@@ -798,13 +802,10 @@ class SocialMediaPostGenerator(APIView):
         
         # Determine anchor based on alignment
         anchor = 'mm'  # Default center
-        if style.get('alignment') == 'left':
+        if alignment == 'left':
             anchor = 'lm'
-        elif style.get('alignment') == 'right':
+        elif alignment == 'right':
             anchor = 'rm'
-        
-        # Get color
-        color = style.get('color', '#FFFFFF')
         
         # Create drawing object
         draw = ImageDraw.Draw(base_image)
@@ -814,11 +815,11 @@ class SocialMediaPostGenerator(APIView):
             (x, y),
             content,
             font=font,
-            fill=color,
+            fill=font_color,
             anchor=anchor
         )
         
-        logger.info(f"Rendered '{content}' at ({x}, {y}) with color {color}, requested font size {font_size}, actual font: {font}")
+        logger.info(f"Rendered '{content}' at ({x}, {y}) with color {font_color}, requested font size {font_size}, actual font: {font}")
     
     def _render_image_element(self, base_image, element, content, match):
         """Render an image element on the base image."""
@@ -837,8 +838,8 @@ class SocialMediaPostGenerator(APIView):
             logger.info(f"Image downloaded successfully: {img.size}")
             
             # Resize image if needed
-            if element.image_width and element.image_height:
-                if element.maintain_aspect_ratio:
+            if hasattr(element, 'image_width') and hasattr(element, 'image_height') and element.image_width and element.image_height:
+                if hasattr(element, 'maintain_aspect_ratio') and element.maintain_aspect_ratio:
                     # Calculate aspect ratio
                     img_ratio = img.width / img.height
                     target_ratio = element.image_width / element.image_height
@@ -859,8 +860,9 @@ class SocialMediaPostGenerator(APIView):
                 logger.info(f"Image resized to: {img.size}")
             
             # Apply color modifications if specified
-            img = apply_image_color_modifications(img, element)
-            logger.info(f"Image after color modifications: {img.size}")
+            if hasattr(element, 'image_color_filter') and element.image_color_filter != 'none':
+                img = apply_image_color_modifications(img, element)
+                logger.info(f"Image after color modifications: {img.size}")
             
             # Calculate position
             x = element.position_x

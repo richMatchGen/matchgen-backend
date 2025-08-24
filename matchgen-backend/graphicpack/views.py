@@ -2,6 +2,7 @@ import logging
 import time
 from io import BytesIO
 from typing import Dict, Any
+from datetime import datetime
 
 import cloudinary.uploader
 import requests
@@ -543,15 +544,393 @@ class MatchdayPostGenerator(APIView):
         # Get opponent
         opponent_str = match.opponent or "Opponent TBC"
         
-        # Since there's no is_home field, we'll use a default or determine from venue
-        # For now, let's assume home games are at the club's venue
-        home_away = "HOME"  # Default to HOME since we can't determine from current model
+        # Get opponent logo URL from the match model
+        opponent_logo_url = match.opponent_logo or ""
+        
+        # Get club logo URL from the club model
+        club_logo_url = match.club.logo if match.club and match.club.logo else ""
+        
+        # Get home/away status from the match model
+        home_away = match.home_away if hasattr(match, 'home_away') and match.home_away else "HOME"
         
         return {
             "date": date_str,
             "time": time_str,
             "venue": venue_str,
             "opponent": opponent_str,
+            "opponent_logo": opponent_logo_url,  # Add opponent logo URL
+            "club_logo": club_logo_url,  # Add club logo URL
+            "home_away": home_away,
+            "club_name": match.club.name if match.club else "Club"
+        }
+
+
+class SocialMediaPostGenerator(APIView):
+    """Generic social media post generator that handles all post types."""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request, post_type='matchday'):
+        try:
+            logger.info(f"SocialMediaPostGenerator called for post type: {post_type}")
+            
+            # Validate post type
+            valid_post_types = [
+                'matchday', 'upcomingFixture', 'startingXI', 'goal', 
+                'sub', 'player', 'halftime', 'fulltime'
+            ]
+            
+            if post_type not in valid_post_types:
+                return Response({
+                    "error": f"Invalid post type: {post_type}. Valid types: {valid_post_types}"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Get match_id from request
+            match_id = request.data.get('match_id')
+            if not match_id:
+                logger.error("No match_id provided in request")
+                return Response({
+                    "error": "match_id is required"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            logger.info(f"Processing match_id: {match_id}")
+            
+            # Get the match
+            try:
+                match = Match.objects.get(id=match_id)
+            except Match.DoesNotExist:
+                return Response({
+                    "error": f"Match with id {match_id} not found"
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get user's club
+            try:
+                club = Club.objects.get(user=request.user)
+            except Club.DoesNotExist:
+                return Response({
+                    "error": "No club found for this user"
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get the club's selected graphic pack
+            pack = club.selected_pack
+            if not pack:
+                return Response({
+                    "error": "No graphic pack selected for this club"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            logger.info(f"Found club: {club.name} (ID: {club.id})")
+            logger.info(f"Club selected pack: {pack.name} (ID: {pack.id})")
+            logger.info(f"Found match: {match.opponent} vs {match.club.name}")
+            
+            # Get the template for this post type
+            try:
+                template = Template.objects.get(
+                    graphic_pack=pack,
+                    content_type=post_type
+                )
+                logger.info(f"Found {post_type} template: {template.id}")
+            except Template.DoesNotExist:
+                return Response({
+                    "error": f"No {post_type} template found in selected graphic pack"
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            logger.info(f"Starting {post_type} post generation...")
+            logger.info(f"=== {post_type.upper()} POST GENERATION STARTED ===")
+            logger.info(f"Generating {post_type} post for match {match_id}, club {club.name}")
+            logger.info(f"Template image URL: {template.image_url}")
+            logger.info(f"Selected pack: {pack.name} (ID: {pack.id})")
+            
+            # Generate the post
+            try:
+                image_url = self._generate_social_media_post(match, club, pack, template, post_type)
+                
+                logger.info(f"{post_type.capitalize()} post generated successfully")
+                
+                return Response({
+                    "success": True,
+                    "image_url": image_url,
+                    "post_type": post_type,
+                    "match_id": match_id,
+                    "club_name": club.name,
+                    "fixture_details": self._prepare_fixture_data(match)
+                }, status=status.HTTP_200_OK)
+                
+            except Exception as e:
+                logger.error(f"Error generating {post_type} post: {str(e)}", exc_info=True)
+                return Response({
+                    "error": f"Failed to generate {post_type} post: {str(e)}"
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+        except Exception as e:
+            logger.error(f"Error in SocialMediaPostGenerator: {str(e)}", exc_info=True)
+            return Response({
+                "error": f"Internal server error: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def _generate_social_media_post(self, match, club, pack, template, post_type):
+        """Generate a social media post for the specified post type."""
+        logger.info(f"=== {post_type.upper()} POST GENERATION STARTED ===")
+        logger.info(f"Generating {post_type} post for match {match.id}, club {club.name}")
+        logger.info(f"Template image URL: {template.image_url}")
+        logger.info(f"Selected pack: {pack.name} (ID: {pack.id})")
+        
+        # Fetch template image
+        logger.info("Fetching template image from URL...")
+        try:
+            response = requests.get(template.image_url)
+            response.raise_for_status()
+            logger.info(f"Template image fetched successfully, size: {len(response.content)} bytes")
+        except requests.RequestException as e:
+            logger.error(f"Failed to fetch template image: {str(e)}")
+            raise Exception(f"Failed to fetch template image: {str(e)}")
+        
+        # Load template image
+        try:
+            template_image = Image.open(BytesIO(response.content))
+            logger.info(f"Template image loaded, dimensions: {template_image.size}")
+        except Exception as e:
+            logger.error(f"Failed to load template image: {str(e)}")
+            raise Exception(f"Failed to load template image: {str(e)}")
+        
+        # Get text elements for this post type
+        logger.info("=== TEXT ELEMENT LOOKUP STARTED ===")
+        text_elements = TextElement.objects.filter(
+            graphic_pack=pack,
+            content_type=post_type
+        )
+        
+        logger.info(f"Total text elements in database: {TextElement.objects.count()}")
+        logger.info(f"Found {text_elements.count()} text elements for graphic pack {pack.id}")
+        
+        # Prepare fixture data
+        fixture_data = self._prepare_fixture_data(match)
+        
+        # Create a copy of the template image to work with
+        base_image = template_image.copy()
+        
+        # Process text elements
+        elements_to_render = []
+        for element in text_elements:
+            logger.info(f"Text element: {element.element_name} - size: {element.font_size}, position: ({element.position_x}, {element.position_y})")
+            
+            # Get the content for this element
+            content = fixture_data.get(element.element_name, '')
+            
+            if content:
+                elements_to_render.append(element.element_name)
+                
+                if element.element_type == 'text':
+                    # Render text element
+                    self._render_text_element(base_image, element, content, match)
+                elif element.element_type == 'image':
+                    # Render image element
+                    self._render_image_element(base_image, element, content, match)
+        
+        logger.info(f"Rendering {len(elements_to_render)} text elements")
+        logger.info(f"Elements to render: {elements_to_render}")
+        
+        # Save the generated image
+        timestamp = int(time.time())
+        filename = f"{post_type}_posts/club_{club.id}/{post_type}_{match.id}_{timestamp}.png"
+        
+        logger.info(f"Uploading image to Cloudinary...")
+        try:
+            # Convert PIL image to bytes
+            img_buffer = BytesIO()
+            base_image.save(img_buffer, format='PNG', quality=95)
+            img_buffer.seek(0)
+            
+            # Upload to Cloudinary
+            result = cloudinary.uploader.upload(
+                img_buffer,
+                public_id=filename,
+                folder="matchgen",
+                overwrite=True,
+                resource_type="image"
+            )
+            
+            image_url = result['secure_url']
+            logger.info(f"Image uploaded successfully to Cloudinary: {image_url}")
+            
+        except Exception as e:
+            logger.error(f"Failed to upload image to Cloudinary: {str(e)}")
+            raise Exception(f"Failed to upload image: {str(e)}")
+        
+        logger.info(f"{post_type.capitalize()} post generated successfully")
+        return image_url
+    
+    def _render_text_element(self, base_image, element, content, match):
+        """Render a text element on the base image."""
+        logger.info(f"Rendering text element: {element.element_name} = '{content}'")
+        
+        # Get font size and style
+        style = element.style
+        font_size = style.get('fontSize', 24)
+        
+        logger.info(f"=== FONT SIZE DEBUG ===")
+        logger.info(f"Style object: {style}")
+        logger.info(f"Extracted font_size: {font_size}")
+        logger.info(f"Font size type: {type(font_size)}")
+        logger.info(f"Font size value: {font_size}")
+        
+        # Load font
+        logger.info(f"=== FONT LOADING DEBUG ===")
+        logger.info(f"Attempting to load font with size: {font_size}")
+        
+        try:
+            font = get_font(font_size, style.get('fontFamily', 'Arial'), style.get('fontWeight', 'normal'))
+            logger.info(f"Font loaded successfully: {font}")
+        except Exception as e:
+            logger.warning(f"FAILED: Using default font - size {font_size} may not be applied correctly")
+            logger.info(f"Default font object: {font}")
+        
+        # Calculate position
+        x = element.position_x
+        y = element.position_y
+        
+        # Use home/away specific positioning if available
+        if hasattr(match, 'home_away') and match.home_away:
+            if match.home_away == 'HOME' and element.home_position_x is not None:
+                x = element.home_position_x
+                y = element.home_position_y
+            elif match.home_away == 'AWAY' and element.away_position_x is not None:
+                x = element.away_position_x
+                y = element.away_position_y
+        
+        # Determine anchor based on alignment
+        anchor = 'mm'  # Default center
+        if style.get('alignment') == 'left':
+            anchor = 'lm'
+        elif style.get('alignment') == 'right':
+            anchor = 'rm'
+        
+        # Get color
+        color = style.get('color', '#FFFFFF')
+        
+        # Create drawing object
+        draw = ImageDraw.Draw(base_image)
+        
+        # Render text
+        draw.text(
+            (x, y),
+            content,
+            font=font,
+            fill=color,
+            anchor=anchor
+        )
+        
+        logger.info(f"Rendered '{content}' at ({x}, {y}) with color {color}, requested font size {font_size}, actual font: {font}")
+    
+    def _render_image_element(self, base_image, element, content, match):
+        """Render an image element on the base image."""
+        if not content:  # Skip if no image URL
+            return
+            
+        logger.info(f"Rendering image element: {element.element_name} from URL: {content}")
+        
+        try:
+            # Download the image
+            response = requests.get(content)
+            response.raise_for_status()
+            
+            # Load the image
+            img = Image.open(BytesIO(response.content))
+            logger.info(f"Image downloaded successfully: {img.size}")
+            
+            # Resize image if needed
+            if element.image_width and element.image_height:
+                if element.maintain_aspect_ratio:
+                    # Calculate aspect ratio
+                    img_ratio = img.width / img.height
+                    target_ratio = element.image_width / element.image_height
+                    
+                    if img_ratio > target_ratio:
+                        # Image is wider, fit to width
+                        new_width = element.image_width
+                        new_height = int(element.image_width / img_ratio)
+                    else:
+                        # Image is taller, fit to height
+                        new_height = element.image_height
+                        new_width = int(element.image_height * img_ratio)
+                else:
+                    new_width = element.image_width
+                    new_height = element.image_height
+                
+                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                logger.info(f"Image resized to: {img.size}")
+            
+            # Apply color modifications if specified
+            img = apply_image_color_modifications(img, element)
+            logger.info(f"Image after color modifications: {img.size}")
+            
+            # Calculate position
+            x = element.position_x
+            y = element.position_y
+            
+            # Use home/away specific positioning if available
+            if hasattr(match, 'home_away') and match.home_away:
+                if match.home_away == 'HOME' and element.home_position_x is not None:
+                    x = element.home_position_x
+                    y = element.home_position_y
+                elif match.home_away == 'AWAY' and element.away_position_x is not None:
+                    x = element.away_position_x
+                    y = element.away_position_y
+            
+            # Calculate paste position to center the image
+            paste_x = x - img.width // 2
+            paste_y = y - img.height // 2
+            
+            # Convert to RGBA if needed
+            if img.mode != 'RGBA':
+                img = img.convert('RGBA')
+            
+            # Paste the image onto the base image
+            base_image.paste(img, (paste_x, paste_y), img)
+            logger.info(f"Image pasted at ({paste_x}, {paste_y})")
+            
+        except Exception as e:
+            logger.error(f"Failed to render image element {element.element_name}: {str(e)}")
+            # Continue with other elements instead of failing completely
+    
+    def _prepare_fixture_data(self, match):
+        """Prepare fixture data for text rendering."""
+        # Format date
+        if match.date:
+            date_str = match.date.strftime("%A, %d %B %Y")
+        else:
+            date_str = "Date TBC"
+        
+        # Format time
+        if match.time_start:
+            try:
+                time_obj = datetime.strptime(str(match.time_start), '%H:%M:%S').time()
+                time_str = time_obj.strftime("%H:%M")
+            except:
+                time_str = str(match.time_start)
+        else:
+            time_str = "Time TBC"
+        
+        # Format venue
+        venue_str = match.venue or "Venue TBC"
+        
+        # Format opponent
+        opponent_str = match.opponent or "Opponent TBC"
+        
+        # Get opponent logo URL from the match model
+        opponent_logo_url = match.opponent_logo or ""
+        
+        # Get club logo URL from the club model
+        club_logo_url = match.club.logo if match.club and match.club.logo else ""
+        
+        # Get home/away status from the match model
+        home_away = match.home_away if hasattr(match, 'home_away') and match.home_away else "HOME"
+        
+        return {
+            "date": date_str,
+            "time": time_str,
+            "venue": venue_str,
+            "opponent": opponent_str,
+            "opponent_logo": opponent_logo_url,  # Add opponent logo URL
+            "club_logo": club_logo_url,  # Add club logo URL
             "home_away": home_away,
             "club_name": match.club.name if match.club else "Club"
         }

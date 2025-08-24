@@ -1351,3 +1351,63 @@ class TextElementByGraphicPackView(ListAPIView):
             queryset = queryset.filter(content_type=content_type)
         
         return queryset
+
+
+class AddOpponentLogoElementView(APIView):
+    """Add opponent logo image element to user's selected graphic pack."""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        try:
+            # Get user's club and selected pack
+            club = Club.objects.get(user=request.user)
+            if not club.selected_pack:
+                return Response({
+                    "error": "Club has no selected graphic pack"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            pack = club.selected_pack
+            
+            # Check if opponent logo element already exists
+            existing_element = TextElement.objects.filter(
+                graphic_pack=pack,
+                content_type='matchday',
+                element_name='opponent_logo'
+            ).first()
+            
+            if existing_element:
+                return Response({
+                    "message": "Opponent logo element already exists",
+                    "element_id": existing_element.id
+                }, status=status.HTTP_200_OK)
+            
+            # Create the opponent logo image element
+            element = TextElement.objects.create(
+                graphic_pack=pack,
+                content_type='matchday',
+                element_name='opponent_logo',
+                element_type='image',
+                position_x=400,  # Center of image
+                position_y=200,  # Adjust as needed
+                image_width=150,
+                image_height=150,
+                maintain_aspect_ratio=True
+            )
+            
+            logger.info(f"Created opponent logo element: {element.id} for pack {pack.name}")
+            
+            return Response({
+                "message": "Opponent logo element created successfully",
+                "element_id": element.id,
+                "pack_name": pack.name
+            }, status=status.HTTP_201_CREATED)
+            
+        except Club.DoesNotExist:
+            return Response({
+                "error": "No club found for this user"
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Error creating opponent logo element: {str(e)}", exc_info=True)
+            return Response({
+                "error": f"Failed to create opponent logo element: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

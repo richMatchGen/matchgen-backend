@@ -126,6 +126,40 @@ class TextElement(models.Model):
     image_height = models.IntegerField(default=100, validators=[MinValueValidator(10), MaxValueValidator(500)], help_text="Height of image in pixels")
     maintain_aspect_ratio = models.BooleanField(default=True, help_text="Maintain aspect ratio when resizing image")
     
+    # Image color modification settings
+    image_color_filter = models.CharField(
+        max_length=20,
+        choices=[
+            ('none', 'No Filter'),
+            ('grayscale', 'Grayscale'),
+            ('sepia', 'Sepia'),
+            ('invert', 'Invert Colors'),
+            ('custom', 'Custom Color')
+        ],
+        default='none',
+        help_text="Color filter to apply to image"
+    )
+    image_color_tint = models.CharField(
+        max_length=7, 
+        default='#FFFFFF', 
+        help_text="Hex color for tinting (use with custom filter)"
+    )
+    image_brightness = models.FloatField(
+        default=1.0,
+        validators=[MinValueValidator(0.1), MaxValueValidator(3.0)],
+        help_text="Brightness multiplier (0.1 to 3.0)"
+    )
+    image_contrast = models.FloatField(
+        default=1.0,
+        validators=[MinValueValidator(0.1), MaxValueValidator(3.0)],
+        help_text="Contrast multiplier (0.1 to 3.0)"
+    )
+    image_saturation = models.FloatField(
+        default=1.0,
+        validators=[MinValueValidator(0.0), MaxValueValidator(3.0)],
+        help_text="Saturation multiplier (0.0 to 3.0)"
+    )
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -154,5 +188,10 @@ class TextElement(models.Model):
             return {
                 'width': self.image_width,
                 'height': self.image_height,
-                'maintainAspectRatio': self.maintain_aspect_ratio
+                'maintainAspectRatio': self.maintain_aspect_ratio,
+                'colorFilter': self.image_color_filter,
+                'colorTint': self.image_color_tint,
+                'brightness': self.image_brightness,
+                'contrast': self.image_contrast,
+                'saturation': self.image_saturation
             }

@@ -1,13 +1,16 @@
 import logging
 import time
 from io import BytesIO
-from typing import Dict, Any
+from typing import Dict, Any, List
 
 import cloudinary.uploader
 import requests
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageOps
 import os
 from django.conf import settings
+from django.core.cache import cache
+from django.db import connection
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -20,6 +23,60 @@ from .models import GraphicPack, Template, TextElement
 from .serializers import GraphicPackSerializer, TextElementSerializer
 
 logger = logging.getLogger(__name__)
+
+
+def apply_image_color_modifications(img, element):
+    """Apply color modifications to an image based on element settings."""
+    if element.image_color_filter == 'none':
+        return img
+    
+    # Apply brightness, contrast, and saturation adjustments
+    if element.image_brightness != 1.0:
+        enhancer = ImageEnhance.Brightness(img)
+        img = enhancer.enhance(element.image_brightness)
+    
+    if element.image_contrast != 1.0:
+        enhancer = ImageEnhance.Contrast(img)
+        img = enhancer.enhance(element.image_contrast)
+    
+    if element.image_saturation != 1.0:
+        enhancer = ImageEnhance.Color(img)
+        img = enhancer.enhance(element.image_saturation)
+    
+    # Apply color filters
+    if element.image_color_filter == 'grayscale':
+        img = img.convert('L').convert('RGBA')
+    elif element.image_color_filter == 'sepia':
+        # Convert to grayscale first, then apply sepia effect
+        img_gray = img.convert('L')
+        img_sepia = Image.new('RGB', img_gray.size)
+        for x in range(img_gray.width):
+            for y in range(img_gray.height):
+                pixel = img_gray.getpixel((x, y))
+                # Sepia formula
+                r = min(255, int(pixel * 0.393 + pixel * 0.769 + pixel * 0.189))
+                g = min(255, int(pixel * 0.349 + pixel * 0.686 + pixel * 0.168))
+                b = min(255, int(pixel * 0.272 + pixel * 0.534 + pixel * 0.131))
+                img_sepia.putpixel((x, y), (r, g, b))
+        img = img_sepia.convert('RGBA')
+    elif element.image_color_filter == 'invert':
+        img = ImageOps.invert(img.convert('RGB')).convert('RGBA')
+    elif element.image_color_filter == 'custom':
+        # Apply custom color tint
+        try:
+            # Parse hex color
+            tint_color = element.image_color_tint.lstrip('#')
+            r = int(tint_color[0:2], 16)
+            g = int(tint_color[2:4], 16)
+            b = int(tint_color[4:6], 16)
+            
+            # Create a tint overlay
+            tint_overlay = Image.new('RGBA', img.size, (r, g, b, 128))
+            img = Image.alpha_composite(img, tint_overlay)
+        except (ValueError, IndexError):
+            logger.warning(f"Invalid tint color: {element.image_color_tint}")
+    
+    return img
 
 
 class GraphicPackListView(ListAPIView):
@@ -272,7 +329,6 @@ class MatchdayPostGenerator(APIView):
 
             # Get the matchday template using raw SQL to avoid column issues
             try:
-                from django.db import connection
                 with connection.cursor() as cursor:
                     cursor.execute("""
                         SELECT id, content_type, sport, graphic_pack_id, image_url
@@ -419,6 +475,10 @@ class MatchdayPostGenerator(APIView):
                         img = Image.open(BytesIO(img_response.content)).convert("RGBA")
                         logger.info(f"Loaded image: {img.size}")
                         
+                        # Apply color modifications if specified
+                        img = apply_image_color_modifications(img, element)
+                        logger.info(f"Image after color modifications: {img.size}")
+
                         # Get position and size settings based on home/away
                         if fixture_data.get('home_away') == 'HOME':
                             position_x = element.home_position_x
@@ -686,7 +746,6 @@ class TestEndpointView(APIView):
             logger.info("Testing basic database connection...")
             
             # Test 1: Basic database connection
-            from django.db import connection
             with connection.cursor() as cursor:
                 cursor.execute("SELECT 1 as test_value")
                 result = cursor.fetchone()
@@ -772,7 +831,6 @@ class TestEndpointView(APIView):
             logger.info("Testing database operations...")
             
             # Test 1: Basic Django database connection
-            from django.db import connection
             with connection.cursor() as cursor:
                 cursor.execute("SELECT 1")
                 result = cursor.fetchone()
@@ -1039,7 +1097,6 @@ class TemplateDebugView(APIView):
             
             # Check migration status
             try:
-                from django.db import connection
                 with connection.cursor() as cursor:
                     # Check if template_config column exists
                     cursor.execute("""
@@ -1083,7 +1140,6 @@ class TemplateDebugView(APIView):
             
             # Try raw SQL first
             try:
-                from django.db import connection
                 with connection.cursor() as cursor:
                     cursor.execute("""
                         SELECT id, content_type, sport, graphic_pack_id 
@@ -1198,7 +1254,6 @@ class DiagnosticView(APIView):
                     logger.info(f"Looking for matchday template with graphic_pack={pack.id} and content_type='matchday'")
                     
                     # Use raw SQL to check for matchday template since ORM has column issues
-                    from django.db import connection
                     with connection.cursor() as cursor:
                         cursor.execute("""
                             SELECT id, content_type, sport, graphic_pack_id 

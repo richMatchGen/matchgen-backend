@@ -75,12 +75,19 @@ class TextElementSerializer(serializers.ModelSerializer):
             'element_type', 'position_x', 'position_y', 'home_position_x', 'home_position_y',
             'away_position_x', 'away_position_y', 'font_size', 'font_family', 'font_color',
             'alignment', 'font_weight', 'image_width', 'image_height', 'maintain_aspect_ratio',
+            'image_color_filter', 'image_color_tint', 'image_brightness', 'image_contrast', 'image_saturation',
             'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
     
     def validate_font_color(self, value):
         """Validate hex color format."""
+        if not value.startswith('#') or len(value) != 7:
+            raise serializers.ValidationError("Color must be a valid hex color (e.g., #FFFFFF)")
+        return value
+    
+    def validate_image_color_tint(self, value):
+        """Validate hex color format for image tint."""
         if not value.startswith('#') or len(value) != 7:
             raise serializers.ValidationError("Color must be a valid hex color (e.g., #FFFFFF)")
         return value

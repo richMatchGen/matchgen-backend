@@ -72,8 +72,9 @@ class TextElementSerializer(serializers.ModelSerializer):
         model = TextElement
         fields = [
             'id', 'graphic_pack', 'graphic_pack_name', 'content_type', 'element_name',
-            'position_x', 'position_y', 'font_size', 'font_family', 'font_color',
-            'alignment', 'font_weight', 'created_at', 'updated_at'
+            'element_type', 'position_x', 'position_y', 'font_size', 'font_family', 'font_color',
+            'alignment', 'font_weight', 'image_width', 'image_height', 'maintain_aspect_ratio',
+            'created_at', 'updated_at'
         ]
         read_only_fields = ['created_at', 'updated_at']
     

@@ -1378,7 +1378,16 @@ class AddOpponentLogoElementView(APIView):
             if existing_element:
                 return Response({
                     "message": "Opponent logo element already exists",
-                    "element_id": existing_element.id
+                    "element_id": existing_element.id,
+                    "element_details": {
+                        "id": existing_element.id,
+                        "element_type": existing_element.element_type,
+                        "element_name": existing_element.element_name,
+                        "position_x": existing_element.position_x,
+                        "position_y": existing_element.position_y,
+                        "image_width": existing_element.image_width,
+                        "image_height": existing_element.image_height
+                    }
                 }, status=status.HTTP_200_OK)
             
             # Create the opponent logo image element
@@ -1399,7 +1408,16 @@ class AddOpponentLogoElementView(APIView):
             return Response({
                 "message": "Opponent logo element created successfully",
                 "element_id": element.id,
-                "pack_name": pack.name
+                "pack_name": pack.name,
+                "element_details": {
+                    "id": element.id,
+                    "element_type": element.element_type,
+                    "element_name": element.element_name,
+                    "position_x": element.position_x,
+                    "position_y": element.position_y,
+                    "image_width": element.image_width,
+                    "image_height": element.image_height
+                }
             }, status=status.HTTP_201_CREATED)
             
         except Club.DoesNotExist:
@@ -1410,4 +1428,59 @@ class AddOpponentLogoElementView(APIView):
             logger.error(f"Error creating opponent logo element: {str(e)}", exc_info=True)
             return Response({
                 "error": f"Failed to create opponent logo element: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DebugOpponentLogoView(APIView):
+    """Debug endpoint to check opponent logo setup."""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        try:
+            # Get user's club and selected pack
+            club = Club.objects.get(user=request.user)
+            pack = club.selected_pack if club.selected_pack else None
+            
+            # Get all text elements for the pack
+            text_elements = []
+            if pack:
+                text_elements = TextElement.objects.filter(graphic_pack=pack, content_type='matchday')
+            
+            # Get a sample match with opponent logo
+            sample_match = None
+            try:
+                sample_match = Match.objects.filter(club=club, opponent_logo__isnull=False).exclude(opponent_logo='').first()
+            except:
+                pass
+            
+            return Response({
+                "club": {
+                    "name": club.name,
+                    "selected_pack_id": pack.id if pack else None,
+                    "selected_pack_name": pack.name if pack else None
+                },
+                "text_elements_count": text_elements.count(),
+                "text_elements": [
+                    {
+                        "id": elem.id,
+                        "element_name": elem.element_name,
+                        "element_type": elem.element_type,
+                        "position_x": elem.position_x,
+                        "position_y": elem.position_y,
+                        "image_width": elem.image_width if elem.element_type == 'image' else None,
+                        "image_height": elem.image_height if elem.element_type == 'image' else None
+                    } for elem in text_elements
+                ],
+                "opponent_logo_element_exists": text_elements.filter(element_name='opponent_logo', element_type='image').exists(),
+                "sample_match": {
+                    "id": sample_match.id if sample_match else None,
+                    "opponent": sample_match.opponent if sample_match else None,
+                    "opponent_logo": sample_match.opponent_logo if sample_match else None
+                } if sample_match else None
+            })
+            
+        except Exception as e:
+            logger.error(f"Error in debug endpoint: {str(e)}", exc_info=True)
+            return Response({
+                "error": f"Debug failed: {str(e)}"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -13,7 +13,8 @@ from .views import (
     SimpleTestView,
     TemplateDebugView,
     TextElementListView, TextElementCreateView, TextElementUpdateView, 
-    TextElementDeleteView, TextElementByGraphicPackView, AddOpponentLogoElementView
+    TextElementDeleteView, TextElementByGraphicPackView, AddOpponentLogoElementView,
+    DebugOpponentLogoView
 )
 
 urlpatterns = [
@@ -45,4 +46,5 @@ urlpatterns = [
     path('text-elements/<int:element_id>/delete/', TextElementDeleteView.as_view(), name='text-element-delete'),
     path('text-elements/<int:graphic_pack_id>/<str:content_type>/', TextElementByGraphicPackView.as_view(), name='text-element-by-pack'),
     path('add-opponent-logo-element/', AddOpponentLogoElementView.as_view(), name='add-opponent-logo-element'),
+    path('debug-opponent-logo/', DebugOpponentLogoView.as_view(), name='debug-opponent-logo'),
 ]

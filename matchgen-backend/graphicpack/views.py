@@ -1,16 +1,13 @@
 import logging
 import time
 from io import BytesIO
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 import cloudinary.uploader
 import requests
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageOps
 import os
 from django.conf import settings
-from django.core.cache import cache
-from django.db import connection
-from django.utils import timezone
 from rest_framework import status
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -29,20 +26,20 @@ def apply_image_color_modifications(img, element):
     """Apply color modifications to an image based on element settings."""
     if element.image_color_filter == 'none':
         return img
-    
+
     # Apply brightness, contrast, and saturation adjustments
     if element.image_brightness != 1.0:
         enhancer = ImageEnhance.Brightness(img)
         img = enhancer.enhance(element.image_brightness)
-    
+
     if element.image_contrast != 1.0:
         enhancer = ImageEnhance.Contrast(img)
         img = enhancer.enhance(element.image_contrast)
-    
+
     if element.image_saturation != 1.0:
         enhancer = ImageEnhance.Color(img)
         img = enhancer.enhance(element.image_saturation)
-    
+
     # Apply color filters
     if element.image_color_filter == 'grayscale':
         img = img.convert('L').convert('RGBA')
@@ -69,14 +66,39 @@ def apply_image_color_modifications(img, element):
             r = int(tint_color[0:2], 16)
             g = int(tint_color[2:4], 16)
             b = int(tint_color[4:6], 16)
-            
+
             # Create a tint overlay
             tint_overlay = Image.new('RGBA', img.size, (r, g, b, 128))
             img = Image.alpha_composite(img, tint_overlay)
         except (ValueError, IndexError):
             logger.warning(f"Invalid tint color: {element.image_color_tint}")
-    
+
     return img
+
+
+def get_font(font_family, font_size, font_weight='normal'):
+    """Get a font with the specified family, size, and weight."""
+    try:
+        # Try to load the specified font family
+        if font_family.lower() == 'arial':
+            # Try system Arial font
+            font_paths = [
+                '/System/Library/Fonts/Arial.ttf',  # macOS
+                '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf',  # Linux
+                'C:/Windows/Fonts/arial.ttf',  # Windows
+            ]
+            
+            for font_path in font_paths:
+                if os.path.exists(font_path):
+                    return ImageFont.truetype(font_path, font_size)
+        
+        # Try to load from Cloudinary or other sources
+        # For now, fall back to default font
+        return ImageFont.load_default()
+        
+    except Exception as e:
+        logger.warning(f"Failed to load font {font_family}: {str(e)}")
+        return ImageFont.load_default()
 
 
 class GraphicPackListView(ListAPIView):
@@ -329,6 +351,7 @@ class MatchdayPostGenerator(APIView):
 
             # Get the matchday template using raw SQL to avoid column issues
             try:
+                from django.db import connection
                 with connection.cursor() as cursor:
                     cursor.execute("""
                         SELECT id, content_type, sport, graphic_pack_id, image_url
@@ -417,108 +440,45 @@ class MatchdayPostGenerator(APIView):
             logger.error(f"Error getting text elements: {str(e)}")
             return {"error": f"Failed to get text elements: {str(e)}"}
         
-        # Render each element (text or image)
-        for element in text_elements:
-            logger.info(f"Processing element: {element.element_name} (type: {element.element_type})")
+        # Render each text element
+        for text_element in text_elements:
+            # Get the value for this element
+            value = fixture_data.get(text_element.element_name, "")
+            if not value:
+                logger.info(f"Skipping {text_element.element_name} - no value available")
+                continue
+                
+            logger.info(f"Rendering: {text_element.element_name} = '{value}'")
 
             try:
-                if element.element_type == 'text':
-                    # Handle text elements
-                    value = fixture_data.get(element.element_name, "")
-                    if not value:
-                        logger.info(f"Skipping {element.element_name} - no value available")
-                        continue
-                        
-                    logger.info(f"Rendering text: {element.element_name} = '{value}'")
-
-                    # Get font settings directly from TextElement
-                    font_size = element.font_size
-                    font_family = element.font_family
-                    font_color = element.font_color
-                    position_x = element.position_x
-                    position_y = element.position_y
-                    alignment = element.alignment
-                    
-                    logger.info(f"Font settings: size={font_size}, family={font_family}, color={font_color}, pos=({position_x},{position_y})")
-                    
-                    # Load font using the dedicated function
-                    font = get_font(font_family, font_size)
-                    
-                    # Calculate anchor point for precise positioning
-                    if alignment == 'center':
-                        anchor = 'mm'  # middle-middle (center horizontally and vertically)
-                    elif alignment == 'right':
-                        anchor = 'rm'  # right-middle (right-aligned, middle vertically)
-                    else:  # left
-                        anchor = 'lm'  # left-middle (left-aligned, middle vertically)
-                    
-                    # Draw the text with anchor point for precise positioning
-                    draw.text((position_x, position_y), value, font=font, fill=font_color, anchor=anchor)
-                    
-                    logger.info(f"Rendered text '{value}' at ({position_x}, {position_y}) with anchor '{anchor}' and size {font_size}")
+                # Get font settings directly from TextElement
+                font_size = text_element.font_size
+                font_family = text_element.font_family
+                font_color = text_element.font_color
+                position_x = text_element.position_x
+                position_y = text_element.position_y
+                alignment = text_element.alignment
                 
-                elif element.element_type == 'image':
-                    # Handle image elements
-                    image_url = fixture_data.get(element.element_name, "")
-                    if not image_url:
-                        logger.info(f"Skipping {element.element_name} - no image URL available")
-                        continue
-                        
-                    logger.info(f"Rendering image: {element.element_name} = '{image_url}'")
-
-                    try:
-                        # Download the image
-                        img_response = requests.get(image_url, timeout=10)
-                        img_response.raise_for_status()
-                        
-                        # Open the image
-                        img = Image.open(BytesIO(img_response.content)).convert("RGBA")
-                        logger.info(f"Loaded image: {img.size}")
-                        
-                        # Apply color modifications if specified
-                        img = apply_image_color_modifications(img, element)
-                        logger.info(f"Image after color modifications: {img.size}")
-
-                        # Get position and size settings based on home/away
-                        if fixture_data.get('home_away') == 'HOME':
-                            position_x = element.home_position_x
-                            position_y = element.home_position_y
-                        elif fixture_data.get('home_away') == 'AWAY':
-                            position_x = element.away_position_x
-                            position_y = element.away_position_y
-                        else:
-                            # Fallback to default position
-                            position_x = element.position_x
-                            position_y = element.position_y
-                            
-                        target_width = element.image_width
-                        target_height = element.image_height
-                        maintain_aspect = element.maintain_aspect_ratio
-                        
-                        # Resize the image
-                        if maintain_aspect:
-                            img.thumbnail((target_width, target_height), Image.Resampling.LANCZOS)
-                        else:
-                            img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
-                        
-                        logger.info(f"Resized image to: {img.size}")
-                        
-                        # Calculate position (center the image at the specified position)
-                        img_width, img_height = img.size
-                        paste_x = position_x - (img_width // 2)
-                        paste_y = position_y - (img_height // 2)
-                        
-                        # Paste the image onto the base image
-                        base_image.paste(img, (paste_x, paste_y), img)
-                        
-                        logger.info(f"Rendered image at ({paste_x}, {paste_y}) with size {img.size}")
-                        
-                    except Exception as img_error:
-                        logger.error(f"Error loading image {element.element_name}: {str(img_error)}")
-                        continue
+                logger.info(f"Font settings: size={font_size}, family={font_family}, color={font_color}, pos=({position_x},{position_y})")
+                
+                # Load font using the dedicated function
+                font = get_font(font_family, font_size)
+                
+                # Calculate anchor point for precise positioning
+                if alignment == 'center':
+                    anchor = 'mm'  # middle-middle (center horizontally and vertically)
+                elif alignment == 'right':
+                    anchor = 'rm'  # right-middle (right-aligned, middle vertically)
+                else:  # left
+                    anchor = 'lm'  # left-middle (left-aligned, middle vertically)
+                
+                # Draw the text with anchor point for precise positioning
+                draw.text((position_x, position_y), value, font=font, fill=font_color, anchor=anchor)
+                
+                logger.info(f"Rendered '{value}' at ({position_x}, {position_y}) with anchor '{anchor}' and size {font_size}")
                 
             except Exception as e:
-                logger.error(f"Error rendering element {element.element_name}: {str(e)}")
+                logger.error(f"Error rendering text element {text_element.element_name}: {str(e)}")
                 continue
 
         # Save to buffer with high resolution
@@ -583,22 +543,15 @@ class MatchdayPostGenerator(APIView):
         # Get opponent
         opponent_str = match.opponent or "Opponent TBC"
         
-        # Get home/away status from the match model
-        home_away = match.home_away if hasattr(match, 'home_away') and match.home_away else "HOME"
-        
-        # Get opponent logo URL from the match model
-        opponent_logo_url = match.opponent_logo or ""
-        
-        # Get club logo URL from the club model
-        club_logo_url = match.club.logo if match.club and match.club.logo else ""
+        # Since there's no is_home field, we'll use a default or determine from venue
+        # For now, let's assume home games are at the club's venue
+        home_away = "HOME"  # Default to HOME since we can't determine from current model
         
         return {
             "date": date_str,
             "time": time_str,
             "venue": venue_str,
             "opponent": opponent_str,
-            "opponent_logo": opponent_logo_url,  # Add opponent logo URL
-            "club_logo": club_logo_url,  # Add club logo URL
             "home_away": home_away,
             "club_name": match.club.name if match.club else "Club"
         }
@@ -750,6 +703,7 @@ class TestEndpointView(APIView):
             logger.info("Testing basic database connection...")
             
             # Test 1: Basic database connection
+            from django.db import connection
             with connection.cursor() as cursor:
                 cursor.execute("SELECT 1 as test_value")
                 result = cursor.fetchone()
@@ -835,6 +789,7 @@ class TestEndpointView(APIView):
             logger.info("Testing database operations...")
             
             # Test 1: Basic Django database connection
+            from django.db import connection
             with connection.cursor() as cursor:
                 cursor.execute("SELECT 1")
                 result = cursor.fetchone()
@@ -1101,6 +1056,7 @@ class TemplateDebugView(APIView):
             
             # Check migration status
             try:
+                from django.db import connection
                 with connection.cursor() as cursor:
                     # Check if template_config column exists
                     cursor.execute("""
@@ -1144,6 +1100,7 @@ class TemplateDebugView(APIView):
             
             # Try raw SQL first
             try:
+                from django.db import connection
                 with connection.cursor() as cursor:
                     cursor.execute("""
                         SELECT id, content_type, sport, graphic_pack_id 
@@ -1258,6 +1215,7 @@ class DiagnosticView(APIView):
                     logger.info(f"Looking for matchday template with graphic_pack={pack.id} and content_type='matchday'")
                     
                     # Use raw SQL to check for matchday template since ORM has column issues
+                    from django.db import connection
                     with connection.cursor() as cursor:
                         cursor.execute("""
                             SELECT id, content_type, sport, graphic_pack_id 

@@ -10,9 +10,15 @@ from users.models import Club, User
 
 # Create your models here.
 class Match(models.Model):
+    HOME_AWAY_CHOICES = [
+        ('HOME', 'Home'),
+        ('AWAY', 'Away'),
+    ]
+    
     club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name="matches")
     match_type = models.CharField(max_length=255, default="League")
     opponent = models.CharField(max_length=255)
+    home_away = models.CharField(max_length=4, choices=HOME_AWAY_CHOICES, default='HOME')
     club_logo = models.URLField(max_length=500, blank=True, null=True)
     opponent_logo = models.URLField(max_length=500, blank=True, null=True)
     sponsor = models.URLField(max_length=500, blank=True, null=True)

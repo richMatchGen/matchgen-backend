@@ -518,15 +518,8 @@ class MatchdayPostGenerator(APIView):
         # For now, let's assume home games are at the club's venue
         home_away = "HOME"  # Default to HOME since we can't determine from current model
         
-        # Get opponent logo URL (you'll need to implement this based on your data structure)
-        # For now, we'll use a placeholder or get it from the match/opponent model
-        opponent_logo_url = ""
-        try:
-            # If you have an opponent model with logo field, you can get it here
-            # opponent_logo_url = match.opponent.logo_url if hasattr(match, 'opponent') and match.opponent else ""
-            pass
-        except:
-            pass
+        # Get opponent logo URL from the match model
+        opponent_logo_url = match.opponent_logo or ""
         
         return {
             "date": date_str,

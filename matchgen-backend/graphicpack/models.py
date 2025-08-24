@@ -96,6 +96,12 @@ class TextElement(models.Model):
     position_x = models.IntegerField(default=400, validators=[MinValueValidator(0), MaxValueValidator(2000)])
     position_y = models.IntegerField(default=150, validators=[MinValueValidator(0), MaxValueValidator(2000)])
     
+    # Home/Away specific positioning for images
+    home_position_x = models.IntegerField(default=400, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="X position for home fixtures")
+    home_position_y = models.IntegerField(default=150, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Y position for home fixtures")
+    away_position_x = models.IntegerField(default=400, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="X position for away fixtures")
+    away_position_y = models.IntegerField(default=150, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Y position for away fixtures")
+    
     # Font settings
     font_size = models.IntegerField(default=24, validators=[MinValueValidator(8), MaxValueValidator(100)])
     font_family = models.CharField(max_length=100, default='Arial')

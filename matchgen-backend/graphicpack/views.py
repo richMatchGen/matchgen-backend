@@ -419,9 +419,18 @@ class MatchdayPostGenerator(APIView):
                         img = Image.open(BytesIO(img_response.content)).convert("RGBA")
                         logger.info(f"Loaded image: {img.size}")
                         
-                        # Get position and size settings
-                        position_x = element.position_x
-                        position_y = element.position_y
+                        # Get position and size settings based on home/away
+                        if fixture_data.get('home_away') == 'HOME':
+                            position_x = element.home_position_x
+                            position_y = element.home_position_y
+                        elif fixture_data.get('home_away') == 'AWAY':
+                            position_x = element.away_position_x
+                            position_y = element.away_position_y
+                        else:
+                            # Fallback to default position
+                            position_x = element.position_x
+                            position_y = element.position_y
+                            
                         target_width = element.image_width
                         target_height = element.image_height
                         maintain_aspect = element.maintain_aspect_ratio

@@ -72,7 +72,8 @@ class TextElementSerializer(serializers.ModelSerializer):
         model = TextElement
         fields = [
             'id', 'graphic_pack', 'graphic_pack_name', 'content_type', 'element_name',
-            'element_type', 'position_x', 'position_y', 'font_size', 'font_family', 'font_color',
+            'element_type', 'position_x', 'position_y', 'home_position_x', 'home_position_y',
+            'away_position_x', 'away_position_y', 'font_size', 'font_family', 'font_color',
             'alignment', 'font_weight', 'image_width', 'image_height', 'maintain_aspect_ratio',
             'created_at', 'updated_at'
         ]

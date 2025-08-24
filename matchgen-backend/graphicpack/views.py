@@ -523,9 +523,8 @@ class MatchdayPostGenerator(APIView):
         # Get opponent
         opponent_str = match.opponent or "Opponent TBC"
         
-        # Since there's no is_home field, we'll use a default or determine from venue
-        # For now, let's assume home games are at the club's venue
-        home_away = "HOME"  # Default to HOME since we can't determine from current model
+        # Get home/away status from the match model
+        home_away = match.home_away if hasattr(match, 'home_away') and match.home_away else "HOME"
         
         # Get opponent logo URL from the match model
         opponent_logo_url = match.opponent_logo or ""

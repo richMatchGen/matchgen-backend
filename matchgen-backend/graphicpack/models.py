@@ -79,10 +79,18 @@ class Template(models.Model):
 
 
 class TextElement(models.Model):
-    """Text element configuration for graphic packs."""
+    """Text and image element configuration for graphic packs."""
     graphic_pack = models.ForeignKey(GraphicPack, on_delete=models.CASCADE, related_name='text_elements')
     content_type = models.CharField(max_length=50, help_text="e.g., matchday, upcoming, startingxi")
-    element_name = models.CharField(max_length=50, help_text="e.g., date, time, venue, opponent")
+    element_name = models.CharField(max_length=50, help_text="e.g., date, time, venue, opponent, logo")
+    
+    # Element type
+    element_type = models.CharField(
+        max_length=10,
+        choices=[('text', 'Text'), ('image', 'Image')],
+        default='text',
+        help_text="Type of element to render"
+    )
     
     # Position
     position_x = models.IntegerField(default=400, validators=[MinValueValidator(0), MaxValueValidator(2000)])
@@ -107,6 +115,11 @@ class TextElement(models.Model):
         default='normal'
     )
     
+    # Image-specific settings
+    image_width = models.IntegerField(default=100, validators=[MinValueValidator(10), MaxValueValidator(500)], help_text="Width of image in pixels")
+    image_height = models.IntegerField(default=100, validators=[MinValueValidator(10), MaxValueValidator(500)], help_text="Height of image in pixels")
+    maintain_aspect_ratio = models.BooleanField(default=True, help_text="Maintain aspect ratio when resizing image")
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -123,10 +136,17 @@ class TextElement(models.Model):
     
     @property
     def style(self):
-        return {
-            'fontSize': self.font_size,
-            'fontFamily': self.font_family,
-            'color': self.font_color,
-            'alignment': self.alignment,
-            'fontWeight': self.font_weight
-        }
+        if self.element_type == 'text':
+            return {
+                'fontSize': self.font_size,
+                'fontFamily': self.font_family,
+                'color': self.font_color,
+                'alignment': self.alignment,
+                'fontWeight': self.font_weight
+            }
+        else:  # image
+            return {
+                'width': self.image_width,
+                'height': self.image_height,
+                'maintainAspectRatio': self.maintain_aspect_ratio
+            }

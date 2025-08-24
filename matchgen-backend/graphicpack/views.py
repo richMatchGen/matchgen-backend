@@ -361,45 +361,95 @@ class MatchdayPostGenerator(APIView):
             logger.error(f"Error getting text elements: {str(e)}")
             return {"error": f"Failed to get text elements: {str(e)}"}
         
-        # Render each text element
-        for text_element in text_elements:
-            # Get the value for this element
-            value = fixture_data.get(text_element.element_name, "")
-            if not value:
-                logger.info(f"Skipping {text_element.element_name} - no value available")
-                continue
-                
-            logger.info(f"Rendering: {text_element.element_name} = '{value}'")
+        # Render each element (text or image)
+        for element in text_elements:
+            logger.info(f"Processing element: {element.element_name} (type: {element.element_type})")
 
             try:
-                # Get font settings directly from TextElement
-                font_size = text_element.font_size
-                font_family = text_element.font_family
-                font_color = text_element.font_color
-                position_x = text_element.position_x
-                position_y = text_element.position_y
-                alignment = text_element.alignment
+                if element.element_type == 'text':
+                    # Handle text elements
+                    value = fixture_data.get(element.element_name, "")
+                    if not value:
+                        logger.info(f"Skipping {element.element_name} - no value available")
+                        continue
+                        
+                    logger.info(f"Rendering text: {element.element_name} = '{value}'")
+
+                    # Get font settings directly from TextElement
+                    font_size = element.font_size
+                    font_family = element.font_family
+                    font_color = element.font_color
+                    position_x = element.position_x
+                    position_y = element.position_y
+                    alignment = element.alignment
+                    
+                    logger.info(f"Font settings: size={font_size}, family={font_family}, color={font_color}, pos=({position_x},{position_y})")
+                    
+                    # Load font using the dedicated function
+                    font = get_font(font_family, font_size)
+                    
+                    # Calculate anchor point for precise positioning
+                    if alignment == 'center':
+                        anchor = 'mm'  # middle-middle (center horizontally and vertically)
+                    elif alignment == 'right':
+                        anchor = 'rm'  # right-middle (right-aligned, middle vertically)
+                    else:  # left
+                        anchor = 'lm'  # left-middle (left-aligned, middle vertically)
+                    
+                    # Draw the text with anchor point for precise positioning
+                    draw.text((position_x, position_y), value, font=font, fill=font_color, anchor=anchor)
+                    
+                    logger.info(f"Rendered text '{value}' at ({position_x}, {position_y}) with anchor '{anchor}' and size {font_size}")
                 
-                logger.info(f"Font settings: size={font_size}, family={font_family}, color={font_color}, pos=({position_x},{position_y})")
-                
-                # Load font using the dedicated function
-                font = get_font(font_family, font_size)
-                
-                # Calculate anchor point for precise positioning
-                if alignment == 'center':
-                    anchor = 'mm'  # middle-middle (center horizontally and vertically)
-                elif alignment == 'right':
-                    anchor = 'rm'  # right-middle (right-aligned, middle vertically)
-                else:  # left
-                    anchor = 'lm'  # left-middle (left-aligned, middle vertically)
-                
-                # Draw the text with anchor point for precise positioning
-                draw.text((position_x, position_y), value, font=font, fill=font_color, anchor=anchor)
-                
-                logger.info(f"Rendered '{value}' at ({position_x}, {position_y}) with anchor '{anchor}' and size {font_size}")
+                elif element.element_type == 'image':
+                    # Handle image elements
+                    image_url = fixture_data.get(element.element_name, "")
+                    if not image_url:
+                        logger.info(f"Skipping {element.element_name} - no image URL available")
+                        continue
+                        
+                    logger.info(f"Rendering image: {element.element_name} = '{image_url}'")
+
+                    try:
+                        # Download the image
+                        img_response = requests.get(image_url, timeout=10)
+                        img_response.raise_for_status()
+                        
+                        # Open the image
+                        img = Image.open(BytesIO(img_response.content)).convert("RGBA")
+                        logger.info(f"Loaded image: {img.size}")
+                        
+                        # Get position and size settings
+                        position_x = element.position_x
+                        position_y = element.position_y
+                        target_width = element.image_width
+                        target_height = element.image_height
+                        maintain_aspect = element.maintain_aspect_ratio
+                        
+                        # Resize the image
+                        if maintain_aspect:
+                            img.thumbnail((target_width, target_height), Image.Resampling.LANCZOS)
+                        else:
+                            img = img.resize((target_width, target_height), Image.Resampling.LANCZOS)
+                        
+                        logger.info(f"Resized image to: {img.size}")
+                        
+                        # Calculate position (center the image at the specified position)
+                        img_width, img_height = img.size
+                        paste_x = position_x - (img_width // 2)
+                        paste_y = position_y - (img_height // 2)
+                        
+                        # Paste the image onto the base image
+                        base_image.paste(img, (paste_x, paste_y), img)
+                        
+                        logger.info(f"Rendered image at ({paste_x}, {paste_y}) with size {img.size}")
+                        
+                    except Exception as img_error:
+                        logger.error(f"Error loading image {element.element_name}: {str(img_error)}")
+                        continue
                 
             except Exception as e:
-                logger.error(f"Error rendering text element {text_element.element_name}: {str(e)}")
+                logger.error(f"Error rendering element {element.element_name}: {str(e)}")
                 continue
 
         # Save to buffer with high resolution
@@ -468,11 +518,22 @@ class MatchdayPostGenerator(APIView):
         # For now, let's assume home games are at the club's venue
         home_away = "HOME"  # Default to HOME since we can't determine from current model
         
+        # Get opponent logo URL (you'll need to implement this based on your data structure)
+        # For now, we'll use a placeholder or get it from the match/opponent model
+        opponent_logo_url = ""
+        try:
+            # If you have an opponent model with logo field, you can get it here
+            # opponent_logo_url = match.opponent.logo_url if hasattr(match, 'opponent') and match.opponent else ""
+            pass
+        except:
+            pass
+        
         return {
             "date": date_str,
             "time": time_str,
             "venue": venue_str,
             "opponent": opponent_str,
+            "opponent_logo": opponent_logo_url,  # Add opponent logo URL
             "home_away": home_away,
             "club_name": match.club.name if match.club else "Club"
         }

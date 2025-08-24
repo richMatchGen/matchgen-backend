@@ -710,20 +710,27 @@ class SocialMediaPostGenerator(APIView):
         # Process text elements
         elements_to_render = []
         for element in text_elements:
-            logger.info(f"Text element: {element.element_name} - size: {element.font_size}, position: ({element.position_x}, {element.position_y})")
+            logger.info(f"Processing element: {element.element_name} (type: {element.element_type}) - size: {element.font_size}, position: ({element.position_x}, {element.position_y})")
             
             # Get the content for this element
             content = fixture_data.get(element.element_name, '')
+            logger.info(f"Content for {element.element_name}: '{content}'")
             
             if content:
                 elements_to_render.append(element.element_name)
                 
                 if element.element_type == 'text':
+                    logger.info(f"Rendering TEXT element: {element.element_name}")
                     # Render text element
                     self._render_text_element(base_image, element, content, match)
                 elif element.element_type == 'image':
+                    logger.info(f"Rendering IMAGE element: {element.element_name}")
                     # Render image element
                     self._render_image_element(base_image, element, content, match)
+                else:
+                    logger.warning(f"Unknown element type: {element.element_type} for element {element.element_name}")
+            else:
+                logger.info(f"No content found for element: {element.element_name}")
         
         logger.info(f"Rendering {len(elements_to_render)} text elements")
         logger.info(f"Elements to render: {elements_to_render}")
@@ -823,7 +830,13 @@ class SocialMediaPostGenerator(APIView):
     
     def _render_image_element(self, base_image, element, content, match):
         """Render an image element on the base image."""
+        logger.info(f"=== IMAGE ELEMENT RENDERING START ===")
+        logger.info(f"Element name: {element.element_name}")
+        logger.info(f"Element type: {element.element_type}")
+        logger.info(f"Content (URL): {content}")
+        
         if not content:  # Skip if no image URL
+            logger.info("No content provided, skipping image element")
             return
             
         logger.info(f"Rendering image element: {element.element_name} from URL: {content}")

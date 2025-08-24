@@ -441,7 +441,7 @@ class MatchdayPostGenerator(APIView):
             logger.error(f"Error getting text elements: {str(e)}")
             return {"error": f"Failed to get text elements: {str(e)}"}
         
-        # Render each text element
+        # Render each element (text or image)
         for text_element in text_elements:
             # Get the value for this element
             value = fixture_data.get(text_element.element_name, "")
@@ -449,38 +449,114 @@ class MatchdayPostGenerator(APIView):
                 logger.info(f"Skipping {text_element.element_name} - no value available")
                 continue
                 
-            logger.info(f"Rendering: {text_element.element_name} = '{value}'")
-
-            try:
-                # Get font settings directly from TextElement
-                font_size = text_element.font_size
-                font_family = text_element.font_family
-                font_color = text_element.font_color
-                position_x = text_element.position_x
-                position_y = text_element.position_y
-                alignment = text_element.alignment
-                
-                logger.info(f"Font settings: size={font_size}, family={font_family}, color={font_color}, pos=({position_x},{position_y})")
-                
-                # Load font using the dedicated function
-                font = get_font(font_family, font_size)
-                
-                # Calculate anchor point for precise positioning
-                if alignment == 'center':
-                    anchor = 'mm'  # middle-middle (center horizontally and vertically)
-                elif alignment == 'right':
-                    anchor = 'rm'  # right-middle (right-aligned, middle vertically)
-                else:  # left
-                    anchor = 'lm'  # left-middle (left-aligned, middle vertically)
-                
-                # Draw the text with anchor point for precise positioning
-                draw.text((position_x, position_y), value, font=font, fill=font_color, anchor=anchor)
-                
-                logger.info(f"Rendered '{value}' at ({position_x}, {position_y}) with anchor '{anchor}' and size {font_size}")
-                
-            except Exception as e:
-                logger.error(f"Error rendering text element {text_element.element_name}: {str(e)}")
-                continue
+            logger.info(f"Processing element: {text_element.element_name} (type: {text_element.element_type}) = '{value}'")
+            
+            # Auto-detect image elements by checking if content is a URL and element_name contains 'logo'
+            if text_element.element_name in ['opponent_logo', 'club_logo'] and value.startswith('http'):
+                logger.info(f"Auto-detected image element: {text_element.element_name} (URL detected)")
+                text_element.element_type = 'image'
+            
+            if text_element.element_type == 'text':
+                logger.info(f"Rendering TEXT element: {text_element.element_name}")
+                try:
+                    # Get font settings directly from TextElement
+                    font_size = text_element.font_size
+                    font_family = text_element.font_family
+                    font_color = text_element.font_color
+                    position_x = text_element.position_x
+                    position_y = text_element.position_y
+                    alignment = text_element.alignment
+                    
+                    logger.info(f"Font settings: size={font_size}, family={font_family}, color={font_color}, pos=({position_x},{position_y})")
+                    
+                    # Load font using the dedicated function
+                    font = get_font(font_family, font_size)
+                    
+                    # Calculate anchor point for precise positioning
+                    if alignment == 'center':
+                        anchor = 'mm'  # middle-middle (center horizontally and vertically)
+                    elif alignment == 'right':
+                        anchor = 'rm'  # right-middle (right-aligned, middle vertically)
+                    else:  # left
+                        anchor = 'lm'  # left-middle (left-aligned, middle vertically)
+                    
+                    # Draw the text with anchor point for precise positioning
+                    draw.text((position_x, position_y), value, font=font, fill=font_color, anchor=anchor)
+                    
+                    logger.info(f"Rendered text '{value}' at ({position_x}, {position_y}) with anchor '{anchor}' and size {font_size}")
+                    
+                except Exception as e:
+                    logger.error(f"Error rendering text element {text_element.element_name}: {str(e)}")
+                    continue
+                    
+            elif text_element.element_type == 'image':
+                logger.info(f"Rendering IMAGE element: {text_element.element_name}")
+                try:
+                    # Download the image
+                    response = requests.get(value)
+                    response.raise_for_status()
+                    
+                    # Load the image
+                    img = Image.open(BytesIO(response.content))
+                    logger.info(f"Image downloaded successfully: {img.size}")
+                    
+                    # Resize image if needed
+                    if hasattr(text_element, 'image_width') and hasattr(text_element, 'image_height') and text_element.image_width and text_element.image_height:
+                        if hasattr(text_element, 'maintain_aspect_ratio') and text_element.maintain_aspect_ratio:
+                            # Calculate aspect ratio
+                            img_ratio = img.width / img.height
+                            target_ratio = text_element.image_width / text_element.image_height
+                            
+                            if img_ratio > target_ratio:
+                                # Image is wider, fit to width
+                                new_width = text_element.image_width
+                                new_height = int(text_element.image_width / img_ratio)
+                            else:
+                                # Image is taller, fit to height
+                                new_height = text_element.image_height
+                                new_width = int(text_element.image_height * img_ratio)
+                        else:
+                            new_width = text_element.image_width
+                            new_height = text_element.image_height
+                        
+                        img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+                        logger.info(f"Image resized to: {img.size}")
+                    
+                    # Apply color modifications if specified
+                    if hasattr(text_element, 'image_color_filter') and text_element.image_color_filter != 'none':
+                        img = apply_image_color_modifications(img, text_element)
+                        logger.info(f"Image after color modifications: {img.size}")
+                    
+                    # Calculate position
+                    x = text_element.position_x
+                    y = text_element.position_y
+                    
+                    # Use home/away specific positioning if available
+                    if hasattr(match, 'home_away') and match.home_away:
+                        if match.home_away == 'HOME' and text_element.home_position_x is not None:
+                            x = text_element.home_position_x
+                            y = text_element.home_position_y
+                        elif match.home_away == 'AWAY' and text_element.away_position_x is not None:
+                            x = text_element.away_position_x
+                            y = text_element.away_position_y
+                    
+                    # Calculate paste position to center the image
+                    paste_x = x - img.width // 2
+                    paste_y = y - img.height // 2
+                    
+                    # Convert to RGBA if needed
+                    if img.mode != 'RGBA':
+                        img = img.convert('RGBA')
+                    
+                    # Paste the image onto the base image
+                    base_image.paste(img, (paste_x, paste_y), img)
+                    logger.info(f"Image pasted at ({paste_x}, {paste_y})")
+                    
+                except Exception as e:
+                    logger.error(f"Failed to render image element {text_element.element_name}: {str(e)}")
+                    continue
+            else:
+                logger.warning(f"Unknown element type: {text_element.element_type} for element {text_element.element_name}")
 
         # Save to buffer with high resolution
         buffer = BytesIO()

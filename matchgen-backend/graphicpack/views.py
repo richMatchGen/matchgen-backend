@@ -589,12 +589,16 @@ class MatchdayPostGenerator(APIView):
         # Get opponent logo URL from the match model
         opponent_logo_url = match.opponent_logo or ""
         
+        # Get club logo URL from the club model
+        club_logo_url = match.club.logo if match.club and match.club.logo else ""
+        
         return {
             "date": date_str,
             "time": time_str,
             "venue": venue_str,
             "opponent": opponent_str,
             "opponent_logo": opponent_logo_url,  # Add opponent logo URL
+            "club_logo": club_logo_url,  # Add club logo URL
             "home_away": home_away,
             "club_name": match.club.name if match.club else "Club"
         }
@@ -1491,6 +1495,87 @@ class AddOpponentLogoElementView(APIView):
             logger.error(f"Error creating opponent logo element: {str(e)}", exc_info=True)
             return Response({
                 "error": f"Failed to create opponent logo element: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AddClubLogoElementView(APIView):
+    """Add club logo image element to user's selected graphic pack."""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        try:
+            logger.info("AddClubLogoElementView called")
+            
+            # Get user's club and selected pack
+            club = Club.objects.get(user=request.user)
+            pack = club.selected_pack
+            
+            if not pack:
+                return Response({
+                    "error": "No graphic pack selected for this club"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if club logo element already exists
+            existing_element = TextElement.objects.filter(
+                graphic_pack=pack,
+                content_type='matchday',
+                element_name='club_logo',
+                element_type='image'
+            ).first()
+            
+            if existing_element:
+                return Response({
+                    "message": "Club logo element already exists",
+                    "element_id": existing_element.id,
+                    "element_details": {
+                        "id": existing_element.id,
+                        "element_type": existing_element.element_type,
+                        "element_name": existing_element.element_name,
+                        "position_x": existing_element.position_x,
+                        "position_y": existing_element.position_y,
+                        "image_width": existing_element.image_width,
+                        "image_height": existing_element.image_height
+                    }
+                }, status=status.HTTP_200_OK)
+            
+            # Create the club logo image element
+            element = TextElement.objects.create(
+                graphic_pack=pack,
+                content_type='matchday',
+                element_name='club_logo',
+                element_type='image',
+                position_x=200,  # Left side of image
+                position_y=200,  # Adjust as needed
+                image_width=150,
+                image_height=150,
+                maintain_aspect_ratio=True
+            )
+            
+            logger.info(f"Created club logo element: {element.id} for pack {pack.name}")
+            
+            return Response({
+                "message": "Club logo element created successfully",
+                "element_id": element.id,
+                "pack_name": pack.name,
+                "element_details": {
+                    "id": element.id,
+                    "element_type": element.element_type,
+                    "element_name": element.element_name,
+                    "position_x": element.position_x,
+                    "position_y": element.position_y,
+                    "image_width": element.image_width,
+                    "image_height": element.image_height
+                }
+            }, status=status.HTTP_201_CREATED)
+            
+        except Club.DoesNotExist:
+            return Response({
+                "error": "No club found for this user"
+            }, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Error creating club logo element: {str(e)}", exc_info=True)
+            return Response({
+                "error": f"Failed to create club logo element: {str(e)}"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 

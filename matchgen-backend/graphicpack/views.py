@@ -716,6 +716,11 @@ class SocialMediaPostGenerator(APIView):
             content = fixture_data.get(element.element_name, '')
             logger.info(f"Content for {element.element_name}: '{content}'")
             
+            # Auto-detect image elements by checking if content is a URL and element_name contains 'logo'
+            if element.element_name in ['opponent_logo', 'club_logo'] and content.startswith('http'):
+                logger.info(f"Auto-detected image element: {element.element_name} (URL detected)")
+                element.element_type = 'image'
+            
             if content:
                 elements_to_render.append(element.element_name)
                 

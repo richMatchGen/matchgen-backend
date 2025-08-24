@@ -5,7 +5,7 @@ import logging
 from django.utils import timezone
 from django.core.cache import cache
 from rest_framework import generics, status
-from rest_framework.generics import ListAPIView
+from rest_framework.generics import ListAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
@@ -105,6 +105,32 @@ class MatchListCreateView(generics.ListCreateAPIView):
                 {"error": "An error occurred while creating the match(es)."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class MatchDetailView(RetrieveUpdateDestroyAPIView):
+    """Retrieve, update, or delete a specific match."""
+    serializer_class = MatchSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Match.objects.filter(club__user=self.request.user)
+
+    def perform_update(self, serializer):
+        try:
+            match = serializer.save()
+            logger.info(f"Match updated: {match.opponent} vs {match.club.name} on {match.date}")
+        except Exception as e:
+            logger.error(f"Error updating match: {str(e)}", exc_info=True)
+            raise
+
+    def perform_destroy(self, instance):
+        try:
+            match_info = f"{instance.opponent} vs {instance.club.name} on {instance.date}"
+            instance.delete()
+            logger.info(f"Match deleted: {match_info}")
+        except Exception as e:
+            logger.error(f"Error deleting match: {str(e)}", exc_info=True)
+            raise
 
 
 class BulkUploadMatchesView(APIView):

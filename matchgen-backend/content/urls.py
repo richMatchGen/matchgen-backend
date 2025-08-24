@@ -5,12 +5,14 @@ from .views import (
     MatchdayView,
     MatchListCreateView,
     MatchListView,
+    MatchDetailView,
     PlayerListCreateView,
     UpcomingMatchView,
 )
 
 urlpatterns = [
     path("matches/", MatchListCreateView.as_view(), name="match-list-create"),
+    path("matches/<int:pk>/", MatchDetailView.as_view(), name="match-detail"),
     path("players/", PlayerListCreateView.as_view(), name="player-list-create"),
     path("matches/last/", LastMatchView.as_view(), name="last-match"),
     path("matches/matchday/", MatchdayView.as_view(), name="match-day"),

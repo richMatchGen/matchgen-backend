@@ -796,6 +796,34 @@ class SocialMediaPostGenerator(APIView):
             
             logger.info(f"Substitution data: Player On={player_on}, Player Off={player_off}, Minute={minute}")
         
+        # Handle halftime score data from request
+        if post_type == 'halftime' and request:
+            # Get halftime score data from request
+            home_score_ht = request.data.get('home_score_ht', '0')
+            away_score_ht = request.data.get('away_score_ht', '0')
+            
+            # Update fixture data with halftime score values
+            fixture_data.update({
+                "home_score_ht": home_score_ht,
+                "away_score_ht": away_score_ht
+            })
+            
+            logger.info(f"Halftime score data: Home={home_score_ht}, Away={away_score_ht}")
+        
+        # Handle fulltime score data from request
+        if post_type == 'fulltime' and request:
+            # Get fulltime score data from request
+            home_score_ft = request.data.get('home_score_ft', '0')
+            away_score_ft = request.data.get('away_score_ft', '0')
+            
+            # Update fixture data with fulltime score values
+            fixture_data.update({
+                "home_score_ft": home_score_ft,
+                "away_score_ft": away_score_ft
+            })
+            
+            logger.info(f"Fulltime score data: Home={home_score_ft}, Away={away_score_ft}")
+        
         # Create a copy of the template image to work with
         base_image = template_image.copy()
         
@@ -1056,6 +1084,20 @@ class SocialMediaPostGenerator(APIView):
                 "player_on": "Player On",  # This will be overridden by request data
                 "player_off": "Player Off",  # This will be overridden by request data
                 "minute": "Minute"  # This will be overridden by request data
+            })
+        
+        # Add halftime score data if post type is 'halftime'
+        if post_type == 'halftime':
+            fixture_data.update({
+                "home_score_ht": "0",  # This will be overridden by request data
+                "away_score_ht": "0"   # This will be overridden by request data
+            })
+        
+        # Add fulltime score data if post type is 'fulltime'
+        if post_type == 'fulltime':
+            fixture_data.update({
+                "home_score_ft": "0",  # This will be overridden by request data
+                "away_score_ft": "0"   # This will be overridden by request data
             })
         
         return fixture_data

@@ -824,6 +824,24 @@ class SocialMediaPostGenerator(APIView):
             
             logger.info(f"Fulltime score data: Home={home_score_ft}, Away={away_score_ft}")
         
+        # Handle starting XI data from request
+        if post_type == 'startingXI' and request:
+            # Get starting XI data from request
+            starting_lineup = request.data.get('starting_lineup', [])
+            substitutes = request.data.get('substitutes', [])
+            
+            # Format as lists for display
+            starting_lineup_text = '\n'.join([f"{player}" for player in starting_lineup]) if starting_lineup else "Starting XI TBC"
+            substitutes_text = '\n'.join([f"{player}" for player in substitutes]) if substitutes else "Substitutes TBC"
+            
+            # Update fixture data with starting XI values
+            fixture_data.update({
+                "starting_lineup": starting_lineup_text,
+                "substitutes": substitutes_text
+            })
+            
+            logger.info(f"Starting XI data: {len(starting_lineup)} starters, {len(substitutes)} substitutes")
+        
         # Create a copy of the template image to work with
         base_image = template_image.copy()
         
@@ -1123,6 +1141,13 @@ class SocialMediaPostGenerator(APIView):
             fixture_data.update({
                 "home_score_ft": "0",  # This will be overridden by request data
                 "away_score_ft": "0"   # This will be overridden by request data
+            })
+        
+        # Add starting XI data if post type is 'startingXI'
+        if post_type == 'startingXI':
+            fixture_data.update({
+                "starting_lineup": "Starting XI TBC",  # This will be overridden by request data
+                "substitutes": "Substitutes TBC"       # This will be overridden by request data
             })
         
         return fixture_data

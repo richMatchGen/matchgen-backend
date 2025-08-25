@@ -367,3 +367,42 @@ class UpcomingMatchView(APIView):
                 {"error": "An error occurred while fetching the upcoming match."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class SubstitutionPlayersView(APIView):
+    """Get players for substitution dropdowns."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            user = request.user
+            club = user.clubs.first()
+
+            if not club:
+                return Response(
+                    {"detail": "User is not associated with any clubs."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            players = Player.objects.filter(club=club).order_by('name')
+            
+            # Return simplified player data for dropdowns
+            player_data = [
+                {
+                    "id": player.id,
+                    "name": player.name,
+                    "squad_no": player.squad_no,
+                    "position": player.position
+                }
+                for player in players
+            ]
+
+            logger.info(f"Retrieved {len(player_data)} players for substitution dropdowns for club {club.name}")
+            return Response(player_data)
+
+        except Exception as e:
+            logger.error(f"Error fetching players for substitution: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while fetching players."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

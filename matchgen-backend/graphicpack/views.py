@@ -1871,11 +1871,17 @@ class TextElementUpdateView(APIView):
                     status=status.HTTP_404_NOT_FOUND,
                 )
             
+            # Log the incoming data for debugging
+            logger.info(f"Updating text element {element_id} with data: {request.data}")
+            
             serializer = TextElementSerializer(text_element, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()
+                logger.info(f"Text element {element_id} updated successfully")
                 return Response(serializer.data, status=status.HTTP_200_OK)
-            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            else:
+                logger.error(f"Validation errors for text element {element_id}: {serializer.errors}")
+                return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
         except Exception as e:
             logger.error(f"Error updating text element: {str(e)}", exc_info=True)
             return Response(

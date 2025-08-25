@@ -924,13 +924,25 @@ class SocialMediaPostGenerator(APIView):
         y = element.position_y
         
         # Use home/away specific positioning if available
+        logger.info(f"=== HOME/AWAY POSITIONING DEBUG ===")
+        logger.info(f"Match home_away: {getattr(match, 'home_away', 'Not set')}")
+        logger.info(f"Element home_position_x: {getattr(element, 'home_position_x', 'Not set')}")
+        logger.info(f"Element away_position_x: {getattr(element, 'away_position_x', 'Not set')}")
+        logger.info(f"Default position: ({x}, {y})")
+        
         if hasattr(match, 'home_away') and match.home_away:
             if match.home_away == 'HOME' and element.home_position_x is not None:
                 x = element.home_position_x
                 y = element.home_position_y
+                logger.info(f"Using HOME position: ({x}, {y})")
             elif match.home_away == 'AWAY' and element.away_position_x is not None:
                 x = element.away_position_x
                 y = element.away_position_y
+                logger.info(f"Using AWAY position: ({x}, {y})")
+            else:
+                logger.info(f"Using default position: ({x}, {y})")
+        else:
+            logger.info(f"No home_away data, using default position: ({x}, {y})")
         
         # Determine anchor based on alignment
         anchor = 'mm'  # Default center
@@ -1007,13 +1019,26 @@ class SocialMediaPostGenerator(APIView):
             y = element.position_y
             
             # Use home/away specific positioning if available
+            logger.info(f"=== IMAGE HOME/AWAY POSITIONING DEBUG ===")
+            logger.info(f"Element: {element.element_name}")
+            logger.info(f"Match home_away: {getattr(match, 'home_away', 'Not set')}")
+            logger.info(f"Element home_position_x: {getattr(element, 'home_position_x', 'Not set')}")
+            logger.info(f"Element away_position_x: {getattr(element, 'away_position_x', 'Not set')}")
+            logger.info(f"Default position: ({x}, {y})")
+            
             if hasattr(match, 'home_away') and match.home_away:
                 if match.home_away == 'HOME' and element.home_position_x is not None:
                     x = element.home_position_x
                     y = element.home_position_y
+                    logger.info(f"Using HOME position: ({x}, {y})")
                 elif match.home_away == 'AWAY' and element.away_position_x is not None:
                     x = element.away_position_x
                     y = element.away_position_y
+                    logger.info(f"Using AWAY position: ({x}, {y})")
+                else:
+                    logger.info(f"Using default position: ({x}, {y})")
+            else:
+                logger.info(f"No home_away data, using default position: ({x}, {y})")
             
             # Calculate paste position to center the image
             paste_x = x - img.width // 2

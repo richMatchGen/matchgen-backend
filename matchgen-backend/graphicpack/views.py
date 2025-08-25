@@ -717,7 +717,7 @@ class SocialMediaPostGenerator(APIView):
             
             # Generate the post
             try:
-                image_url = self._generate_social_media_post(match, club, pack, template, post_type)
+                image_url = self._generate_social_media_post(match, club, pack, template, post_type, request)
                 
                 logger.info(f"{post_type.capitalize()} post generated successfully")
                 
@@ -742,7 +742,7 @@ class SocialMediaPostGenerator(APIView):
                 "error": f"Internal server error: {str(e)}"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-    def _generate_social_media_post(self, match, club, pack, template, post_type):
+    def _generate_social_media_post(self, match, club, pack, template, post_type, request=None):
         """Generate a social media post for the specified post type."""
         logger.info(f"=== {post_type.upper()} POST GENERATION STARTED ===")
         logger.info(f"Generating {post_type} post for match {match.id}, club {club.name}")
@@ -778,7 +778,23 @@ class SocialMediaPostGenerator(APIView):
         logger.info(f"Found {text_elements.count()} text elements for graphic pack {pack.id}")
         
         # Prepare fixture data
-        fixture_data = self._prepare_fixture_data(match)
+        fixture_data = self._prepare_fixture_data(match, post_type)
+        
+        # Handle substitution-specific data from request
+        if post_type == 'sub' and request:
+            # Get substitution data from request
+            player_on = request.data.get('player_on', 'Player On')
+            player_off = request.data.get('player_off', 'Player Off')
+            minute = request.data.get('minute', 'Minute')
+            
+            # Update fixture data with substitution-specific values
+            fixture_data.update({
+                "player_on": player_on,
+                "player_off": player_off,
+                "minute": minute
+            })
+            
+            logger.info(f"Substitution data: Player On={player_on}, Player Off={player_off}, Minute={minute}")
         
         # Create a copy of the template image to work with
         base_image = template_image.copy()
@@ -987,7 +1003,7 @@ class SocialMediaPostGenerator(APIView):
             logger.error(f"Failed to render image element {element.element_name}: {str(e)}")
             # Continue with other elements instead of failing completely
     
-    def _prepare_fixture_data(self, match):
+    def _prepare_fixture_data(self, match, post_type=None):
         """Prepare fixture data for text rendering."""
         # Format date
         if match.date:
@@ -1020,7 +1036,8 @@ class SocialMediaPostGenerator(APIView):
         # Get home/away status from the match model
         home_away = match.home_away if hasattr(match, 'home_away') and match.home_away else "HOME"
         
-        return {
+        # Base fixture data
+        fixture_data = {
             "date": date_str,
             "time": time_str,
             "venue": venue_str,
@@ -1030,6 +1047,18 @@ class SocialMediaPostGenerator(APIView):
             "home_away": home_away,
             "club_name": match.club.name if match.club else "Club"
         }
+        
+        # Add substitution-specific data if post type is 'sub'
+        if post_type == 'sub':
+            # For substitution posts, we'll need to get this data from the request
+            # For now, we'll add placeholder values that can be overridden
+            fixture_data.update({
+                "player_on": "Player On",  # This will be overridden by request data
+                "player_off": "Player Off",  # This will be overridden by request data
+                "minute": "Minute"  # This will be overridden by request data
+            })
+        
+        return fixture_data
 
 
 class DebugTemplatesView(APIView):

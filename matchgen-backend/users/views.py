@@ -612,7 +612,7 @@ class FeatureAccessView(APIView):
             'feature_access': feature_access
         }
         
-        return Response(FeatureAccessSerializer(data).data)
+        return Response(data)
 
 
 class FeaturesView(APIView):

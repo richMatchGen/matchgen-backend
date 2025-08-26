@@ -251,7 +251,21 @@ class LastMatchView(APIView):
     def get(self, request):
         try:
             user = request.user
-            club = user.clubs.first()
+            
+            # Try to get club with error handling for migration issues
+            try:
+                club = user.clubs.first()
+            except Exception as club_error:
+                logger.error(f"Error accessing user clubs: {str(club_error)}", exc_info=True)
+                # Fallback: try direct Club query
+                try:
+                    club = Club.objects.filter(user=user).first()
+                except Exception as fallback_error:
+                    logger.error(f"Fallback club query also failed: {str(fallback_error)}", exc_info=True)
+                    return Response(
+                        {"detail": "Database migration in progress. Please try again later."},
+                        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    )
 
             if not club:
                 return Response(
@@ -291,7 +305,21 @@ class MatchdayView(APIView):
     def get(self, request):
         try:
             user = request.user
-            club = user.clubs.first()
+            
+            # Try to get club with error handling for migration issues
+            try:
+                club = user.clubs.first()
+            except Exception as club_error:
+                logger.error(f"Error accessing user clubs: {str(club_error)}", exc_info=True)
+                # Fallback: try direct Club query
+                try:
+                    club = Club.objects.filter(user=user).first()
+                except Exception as fallback_error:
+                    logger.error(f"Fallback club query also failed: {str(fallback_error)}", exc_info=True)
+                    return Response(
+                        {"detail": "Database migration in progress. Please try again later."},
+                        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    )
 
             if not club:
                 return Response(
@@ -331,7 +359,21 @@ class UpcomingMatchView(APIView):
     def get(self, request):
         try:
             user = request.user
-            club = user.clubs.first()
+            
+            # Try to get club with error handling for migration issues
+            try:
+                club = user.clubs.first()
+            except Exception as club_error:
+                logger.error(f"Error accessing user clubs: {str(club_error)}", exc_info=True)
+                # Fallback: try direct Club query
+                try:
+                    club = Club.objects.filter(user=user).first()
+                except Exception as fallback_error:
+                    logger.error(f"Fallback club query also failed: {str(fallback_error)}", exc_info=True)
+                    return Response(
+                        {"detail": "Database migration in progress. Please try again later."},
+                        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    )
 
             if not club:
                 return Response(
@@ -376,7 +418,21 @@ class SubstitutionPlayersView(APIView):
     def get(self, request):
         try:
             user = request.user
-            club = user.clubs.first()
+            
+            # Try to get club with error handling for migration issues
+            try:
+                club = user.clubs.first()
+            except Exception as club_error:
+                logger.error(f"Error accessing user clubs: {str(club_error)}", exc_info=True)
+                # Fallback: try direct Club query
+                try:
+                    club = Club.objects.filter(user=user).first()
+                except Exception as fallback_error:
+                    logger.error(f"Fallback club query also failed: {str(fallback_error)}", exc_info=True)
+                    return Response(
+                        {"detail": "Database migration in progress. Please try again later."},
+                        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    )
 
             if not club:
                 return Response(

@@ -67,102 +67,103 @@ class Club(models.Model):
         GraphicPack, on_delete=models.SET_NULL, null=True, blank=True
     )
     
-    # Subscription fields
-    subscription_tier = models.CharField(
-        max_length=20, 
-        choices=SUBSCRIPTION_TIERS, 
-        default='basic'
-    )
-    subscription_active = models.BooleanField(default=True)
-    subscription_start_date = models.DateTimeField(default=timezone.now)
-    subscription_end_date = models.DateTimeField(blank=True, null=True)
+    # Subscription fields - TEMPORARILY COMMENTED OUT FOR PRODUCTION FIX
+    # subscription_tier = models.CharField(
+    #     max_length=20, 
+    #     choices=SUBSCRIPTION_TIERS, 
+    #     default='basic'
+    # )
+    # subscription_active = models.BooleanField(default=True)
+    # subscription_start_date = models.DateTimeField(default=timezone.now)
+    # subscription_end_date = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):
         return self.name
 
 
-class UserRole(models.Model):
-    ROLE_CHOICES = [
-        ('owner', 'Owner'),
-        ('admin', 'Admin'),
-        ('editor', 'Editor'),
-        ('viewer', 'Viewer'),
-    ]
-    
-    name = models.CharField(max_length=20, choices=ROLE_CHOICES, unique=True)
-    description = models.TextField(blank=True)
-    
-    def __str__(self):
-        return self.get_name_display()
+# TEMPORARILY COMMENTED OUT FOR PRODUCTION FIX
+# class UserRole(models.Model):
+#     ROLE_CHOICES = [
+#         ('owner', 'Owner'),
+#         ('admin', 'Admin'),
+#         ('editor', 'Editor'),
+#         ('viewer', 'Viewer'),
+#     ]
+#     
+#     name = models.CharField(max_length=20, choices=ROLE_CHOICES, unique=True)
+#     description = models.TextField(blank=True)
+#     
+#     def __str__(self):
+#         return self.get_name_display()
 
 
-class ClubMembership(models.Model):
-    STATUS_CHOICES = [
-        ('pending', 'Pending'),
-        ('active', 'Active'),
-        ('inactive', 'Inactive'),
-    ]
-    
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='club_memberships')
-    club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name='memberships')
-    role = models.ForeignKey(UserRole, on_delete=models.CASCADE)
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
-    invited_by = models.ForeignKey(
-        User, 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
-        related_name='sent_invites'
-    )
-    invited_at = models.DateTimeField(auto_now_add=True)
-    accepted_at = models.DateTimeField(blank=True, null=True)
-    
-    class Meta:
-        unique_together = ('user', 'club')
-    
-    def __str__(self):
-        return f"{self.user.email} - {self.club.name} ({self.role.name})"
+# class ClubMembership(models.Model):
+#     STATUS_CHOICES = [
+#         ('pending', 'Pending'),
+#         ('active', 'Active'),
+#         ('inactive', 'Inactive'),
+#     ]
+#     
+#     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='club_memberships')
+#     club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name='memberships')
+#     role = models.ForeignKey(UserRole, on_delete=models.CASCADE)
+#     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+#     invited_by = models.ForeignKey(
+#         User, 
+#         on_delete=models.SET_NULL, 
+#         null=True, 
+#         blank=True, 
+#         related_name='sent_invites'
+#     )
+#     invited_at = models.DateTimeField(auto_now_add=True)
+#     accepted_at = models.DateTimeField(blank=True, null=True)
+#     
+#     class Meta:
+#         unique_together = ('user', 'club')
+#     
+#     def __str__(self):
+#         return f"{self.user.email} - {self.club.name} ({self.role.name})"
 
 
-class Feature(models.Model):
-    name = models.CharField(max_length=100, unique=True)
-    code = models.CharField(max_length=50, unique=True)  # e.g., 'post.matchday', 'post.result'
-    description = models.TextField(blank=True)
-    is_active = models.BooleanField(default=True)
-    
-    def __str__(self):
-        return self.name
+# class Feature(models.Model):
+#     name = models.CharField(max_length=100, unique=True)
+#     code = models.CharField(max_length=50, unique=True)  # e.g., 'post.matchday', 'post.result'
+#     description = models.TextField(blank=True)
+#     is_active = models.BooleanField(default=True)
+#     
+#     def __str__(self):
+#         return self.name
 
 
-class SubscriptionTierFeature(models.Model):
-    subscription_tier = models.CharField(max_length=20, choices=Club.SUBSCRIPTION_TIERS)
-    feature = models.ForeignKey(Feature, on_delete=models.CASCADE)
+# class SubscriptionTierFeature(models.Model):
+#     subscription_tier = models.CharField(max_length=20, choices=Club.SUBSCRIPTION_TIERS)
+#     feature = models.ForeignKey(Feature, on_delete=models.CASCADE)
     
-    class Meta:
-        unique_together = ('subscription_tier', 'feature')
+#     class Meta:
+#         unique_together = ('subscription_tier', 'feature')
     
-    def __str__(self):
-        return f"{self.subscription_tier} - {self.feature.name}"
+#     def __str__(self):
+#         return f"{self.subscription_tier} - {self.feature.name}"
 
 
-class AuditLog(models.Model):
-    ACTION_CHOICES = [
-        ('login', 'Login'),
-        ('invite_sent', 'Invite Sent'),
-        ('invite_accepted', 'Invite Accepted'),
-        ('role_changed', 'Role Changed'),
-        ('role_revoked', 'Role Revoked'),
-        ('feature_access', 'Feature Access'),
-        ('subscription_changed', 'Subscription Changed'),
-    ]
+# class AuditLog(models.Model):
+#     ACTION_CHOICES = [
+#         ('login', 'Login'),
+#         ('invite_sent', 'Invite Sent'),
+#         ('invite_accepted', 'Invite Accepted'),
+#         ('role_changed', 'Role Changed'),
+#         ('role_revoked', 'Role Revoked'),
+#         ('feature_access', 'Feature Access'),
+#         ('subscription_changed', 'Subscription Changed'),
+#     ]
     
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='audit_logs')
-    club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name='audit_logs')
-    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
-    details = models.JSONField(default=dict)
-    ip_address = models.GenericIPAddressField(blank=True, null=True)
-    user_agent = models.TextField(blank=True)
-    timestamp = models.DateTimeField(auto_now_add=True)
+#     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='audit_logs')
+#     club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name='audit_logs')
+#     action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+#     details = models.JSONField(default=dict)
+#     ip_address = models.GenericIPAddressField(blank=True, null=True)
+#     user_agent = models.TextField(blank=True)
+#     timestamp = models.DateTimeField(auto_now_add=True)
     
-    def __str__(self):
-        return f"{self.user.email} - {self.action} - {self.timestamp}"
+#     def __str__(self):
+#         return f"{self.user.email} - {self.action} - {self.timestamp}"

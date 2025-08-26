@@ -16,7 +16,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from users.models import Club
 from content.models import Match
-# from users.permissions import HasFeaturePermission, FeaturePermission
+from users.permissions import HasFeaturePermission, FeaturePermission
 
 from .models import GraphicPack, Template, TextElement
 from .serializers import GraphicPackSerializer, TextElementSerializer
@@ -659,21 +659,21 @@ class SocialMediaPostGenerator(APIView):
             'fulltime': 'post.fulltime'
         }
         
-        # Check feature access - TEMPORARILY DISABLED FOR MIGRATION
-        # feature_code = feature_mapping.get(post_type)
-        # if feature_code:
-        #     try:
-        #         club = Club.objects.get(user=request.user)
-        #         if not FeaturePermission.has_feature_access(request.user, club, feature_code):
-        #             return Response({
-        #                 "error": f"Feature '{post_type}' is not available in your current subscription tier",
-        #                 "feature_code": feature_code,
-        #                 "upgrade_required": True
-        #             }, status=status.HTTP_403_FORBIDDEN)
-        #     except Club.DoesNotExist:
-        #         return Response({
-        #         "error": "No club found for this user"
-        #     }, status=status.HTTP_404_NOT_FOUND)
+        # Check feature access
+        feature_code = feature_mapping.get(post_type)
+        if feature_code:
+            try:
+                club = Club.objects.get(user=request.user)
+                if not FeaturePermission.has_feature_access(request.user, club, feature_code):
+                    return Response({
+                        "error": f"Feature '{post_type}' is not available in your current subscription tier",
+                        "feature_code": feature_code,
+                        "upgrade_required": True
+                    }, status=status.HTTP_403_FORBIDDEN)
+            except Club.DoesNotExist:
+                return Response({
+                    "error": "No club found for this user"
+                }, status=status.HTTP_404_NOT_FOUND)
         try:
             logger.info(f"SocialMediaPostGenerator called for post type: {post_type}")
             

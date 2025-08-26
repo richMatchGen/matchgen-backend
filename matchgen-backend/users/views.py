@@ -484,103 +484,102 @@ class TeamManagementView(APIView):
         return Response(serializer.errors, status=400)
 
 
-# TEMPORARILY COMMENTED OUT FOR PRODUCTION FIX
-# class UpdateMemberRoleView(APIView):
-#     """View for updating member roles"""
-#     permission_classes = [HasRolePermission]
-#     
-#     def __init__(self, **kwargs):
-#         super().__init__(**kwargs)
-#         self.permission_classes = [HasRolePermission(required_roles=['owner', 'admin'])]
-#     
-#     def put(self, request, membership_id):
-#         """Update member role"""
-#         try:
-#             membership = ClubMembership.objects.get(id=membership_id)
-#         except ClubMembership.DoesNotExist:
-#             return Response({"error": "Membership not found"}, status=404)
-#         
-#         # Check if user can manage this club
-#         if not can_manage_team_members(request.user, membership.club):
-#             return Response({"error": "You don't have permission to update roles"}, status=403)
-#         
-#         role_id = request.data.get('role_id')
-#         if not role_id:
-#             return Response({"error": "Role ID is required"}, status=400)
-#         
-#         try:
-#             new_role = UserRole.objects.get(id=role_id)
-#         except UserRole.DoesNotExist:
-#             return Response({"error": "Invalid role ID"}, status=400)
-#         
-#         old_role = membership.role.name
-#         membership.role = new_role
-#         membership.save()
-#         
-#         # Log audit event
-#         AuditLogger.log_event(
-#             user=request.user,
-#             club=membership.club,
-#             action='role_changed',
-#             details={
-#                 'member_email': membership.user.email,
-#                 'old_role': old_role,
-#                 'new_role': new_role.name
-#             },
-#             request=request
-#         )
-#         
-#         return Response({
-#             "message": f"Role updated for {membership.user.email}",
-#             "membership": ClubMembershipSerializer(membership).data
-#         })
+class UpdateMemberRoleView(APIView):
+    """View for updating member roles"""
+    permission_classes = [HasRolePermission]
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.permission_classes = [HasRolePermission(required_roles=['owner', 'admin'])]
+    
+    def put(self, request, membership_id):
+        """Update member role"""
+        try:
+            membership = ClubMembership.objects.get(id=membership_id)
+        except ClubMembership.DoesNotExist:
+            return Response({"error": "Membership not found"}, status=404)
+        
+        # Check if user can manage this club
+        if not can_manage_team_members(request.user, membership.club):
+            return Response({"error": "You don't have permission to update roles"}, status=403)
+        
+        role_id = request.data.get('role_id')
+        if not role_id:
+            return Response({"error": "Role ID is required"}, status=400)
+        
+        try:
+            new_role = UserRole.objects.get(id=role_id)
+        except UserRole.DoesNotExist:
+            return Response({"error": "Invalid role ID"}, status=400)
+        
+        old_role = membership.role.name
+        membership.role = new_role
+        membership.save()
+        
+        # Log audit event
+        AuditLogger.log_event(
+            user=request.user,
+            club=membership.club,
+            action='role_changed',
+            details={
+                'member_email': membership.user.email,
+                'old_role': old_role,
+                'new_role': new_role.name
+            },
+            request=request
+        )
+        
+        return Response({
+            "message": f"Role updated for {membership.user.email}",
+            "membership": ClubMembershipSerializer(membership).data
+        })
 
 
-# class RemoveMemberView(APIView):
-#     """View for removing team members"""
-#     permission_classes = [HasRolePermission]
-#     
-#     def __init__(self, **kwargs):
-#         super().__init__(**kwargs)
-#         self.permission_classes = [HasRolePermission(required_roles=['owner', 'admin'])]
-#     
-#     def delete(self, request, membership_id):
-#         """Remove team member"""
-#         try:
-#             membership = ClubMembership.objects.get(id=membership_id)
-#         except ClubMembership.DoesNotExist:
-#             return Response({"error": "Membership not found"}, status=404)
-#         
-#         # Check if user can manage this club
-#         if not can_manage_team_members(request.user, membership.club):
-#             return Response({"error": "You don't have permission to remove members"}, status=403)
-#         
-#         # Don't allow removing the last owner
-#         if membership.role.name == 'owner':
-#             owner_count = ClubMembership.objects.filter(
-#                 club=membership.club, 
-#                 role__name='owner', 
-#                 status='active'
-#             ).count()
-#             if owner_count <= 1:
-#                 return Response({"error": "Cannot remove the last owner"}, status=400)
-#         
-#         member_email = membership.user.email
-#         membership.delete()
-#         
-#         # Log audit event
-#         AuditLogger.log_event(
-#             user=request.user,
-#             club=membership.club,
-#             action='role_revoked',
-#             details={
-#                 'member_email': member_email,
-#                 'role': membership.role.name
-#             },
-#             request=request
-#         )
-#         
-#         return Response({"message": f"Member {member_email} removed from team"})
+class RemoveMemberView(APIView):
+    """View for removing team members"""
+    permission_classes = [HasRolePermission]
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.permission_classes = [HasRolePermission(required_roles=['owner', 'admin'])]
+    
+    def delete(self, request, membership_id):
+        """Remove team member"""
+        try:
+            membership = ClubMembership.objects.get(id=membership_id)
+        except ClubMembership.DoesNotExist:
+            return Response({"error": "Membership not found"}, status=404)
+        
+        # Check if user can manage this club
+        if not can_manage_team_members(request.user, membership.club):
+            return Response({"error": "You don't have permission to remove members"}, status=403)
+        
+        # Don't allow removing the last owner
+        if membership.role.name == 'owner':
+            owner_count = ClubMembership.objects.filter(
+                club=membership.club, 
+                role__name='owner', 
+                status='active'
+            ).count()
+            if owner_count <= 1:
+                return Response({"error": "Cannot remove the last owner"}, status=400)
+        
+        member_email = membership.user.email
+        membership.delete()
+        
+        # Log audit event
+        AuditLogger.log_event(
+            user=request.user,
+            club=membership.club,
+            action='role_revoked',
+            details={
+                'member_email': member_email,
+                'role': membership.role.name
+            },
+            request=request
+        )
+        
+        return Response({"message": f"Member {member_email} removed from team"})
 
 
 class FeatureAccessView(APIView):
@@ -626,86 +625,86 @@ class FeaturesView(APIView):
         return Response(FeatureSerializer(features, many=True).data)
 
 
-# class AuditLogView(APIView):
-#     """View for viewing audit logs"""
-#     permission_classes = [HasRolePermission]
-#     
-#     def __init__(self, **kwargs):
-#         super().__init__(**kwargs)
-#         self.permission_classes = [HasRolePermission(required_roles=['owner', 'admin'])]
-#     
-#     def get(self, request):
-#         """Get audit logs for a club"""
-#         club_id = request.query_params.get('club_id')
-#         if not club_id:
-#             return Response({"error": "Club ID is required"}, status=400)
-#         
-#         try:
-#             club = Club.objects.get(id=club_id)
-#         except Club.DoesNotExist:
-#             return Response({"error": "Club not found"}, status=404)
-#         
-#         # Check if user can view audit logs
-#         if not can_manage_team_members(request.user, club):
-#             return Response({"error": "You don't have permission to view audit logs"}, status=403)
-#         
-#         logs = AuditLog.objects.filter(club=club).select_related('user').order_by('-timestamp')[:100]
-#         
-#         return Response(AuditLogSerializer(logs, many=True).data)
+class AuditLogView(APIView):
+    """View for viewing audit logs"""
+    permission_classes = [HasRolePermission]
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.permission_classes = [HasRolePermission(required_roles=['owner', 'admin'])]
+    
+    def get(self, request):
+        """Get audit logs for a club"""
+        club_id = request.query_params.get('club_id')
+        if not club_id:
+            return Response({"error": "Club ID is required"}, status=400)
+        
+        try:
+            club = Club.objects.get(id=club_id)
+        except Club.DoesNotExist:
+            return Response({"error": "Club not found"}, status=404)
+        
+        # Check if user can view audit logs
+        if not can_manage_team_members(request.user, club):
+            return Response({"error": "You don't have permission to view audit logs"}, status=403)
+        
+        logs = AuditLog.objects.filter(club=club).select_related('user').order_by('-timestamp')[:100]
+        
+        return Response(AuditLogSerializer(logs, many=True).data)
 
 
-# class AcceptInviteView(APIView):
-#     """View for accepting team invitations"""
-#     permission_classes = [permissions.IsAuthenticated]
-#     
-#     def post(self, request):
-#         """Accept an invitation"""
-#         membership_id = request.data.get('membership_id')
-#         if not membership_id:
-#             return Response({"error": "Membership ID is required"}, status=400)
-#         
-#         try:
-#             membership = ClubMembership.objects.get(
-#                 id=membership_id,
-#                 user=request.user,
-#                 status='pending'
-#             )
-#         except ClubMembership.DoesNotExist:
-#             return Response({"error": "Invitation not found or already accepted"}, status=404)
-#         
-#         membership.status = 'active'
-#         membership.save()
-#         
-#         # Log audit event
-#         AuditLogger.log_event(
-#             user=request.user,
-#             club=membership.club,
-#             action='invite_accepted',
-#             details={
-#                 'role': membership.role.name,
-#                 'invited_by': membership.invited_by.email if membership.invited_by else None
-#             },
-#             request=request
-#         )
-#         
-#         return Response({
-#             "message": f"Successfully joined {membership.club.name}",
-#             "membership": ClubMembershipSerializer(membership).data
-#         })
+class AcceptInviteView(APIView):
+    """View for accepting team invitations"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request):
+        """Accept an invitation"""
+        membership_id = request.data.get('membership_id')
+        if not membership_id:
+            return Response({"error": "Membership ID is required"}, status=400)
+        
+        try:
+            membership = ClubMembership.objects.get(
+                id=membership_id,
+                user=request.user,
+                status='pending'
+            )
+        except ClubMembership.DoesNotExist:
+            return Response({"error": "Invitation not found or already accepted"}, status=404)
+        
+        membership.status = 'active'
+        membership.save()
+        
+        # Log audit event
+        AuditLogger.log_event(
+            user=request.user,
+            club=membership.club,
+            action='invite_accepted',
+            details={
+                'role': membership.role.name,
+                'invited_by': membership.invited_by.email if membership.invited_by else None
+            },
+            request=request
+        )
+        
+        return Response({
+            "message": f"Successfully joined {membership.club.name}",
+            "membership": ClubMembershipSerializer(membership).data
+        })
 
 
-# class PendingInvitesView(APIView):
-#     """View for getting pending invitations"""
-#     permission_classes = [permissions.IsAuthenticated]
-#     
-#     def get(self, request):
-#         """Get pending invitations for the current user"""
-#         pending_invites = ClubMembership.objects.filter(
-#             user=request.user,
-#             status='pending'
-#         ).select_related('club', 'role', 'invited_by')
-#         
-#         return Response(ClubMembershipSerializer(pending_invites, many=True).data)
+class PendingInvitesView(APIView):
+    """View for getting pending invitations"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        """Get pending invitations for the current user"""
+        pending_invites = ClubMembership.objects.filter(
+            user=request.user,
+            status='pending'
+        ).select_related('club', 'role', 'invited_by')
+        
+        return Response(ClubMembershipSerializer(pending_invites, many=True).data)
 
 
 class UserProfileView(APIView):

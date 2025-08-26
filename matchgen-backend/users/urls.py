@@ -17,6 +17,18 @@ from .views import (
     UploadLogoView,
     UserDetailView,
     UserListView,
+    UserProfileView,
+    ClubListView,
+    ClubCreateView,
+    ClubUpdateView,
+    ClubDeleteView,
+    TeamManagementView,
+    UpdateMemberRoleView,
+    RemoveMemberView,
+    FeatureAccessView,
+    AuditLogView,
+    AcceptInviteView,
+    PendingInvitesView
 )
 
 
@@ -48,4 +60,29 @@ urlpatterns = [
     path("club/<int:id>/", ClubDetailView.as_view(), name="club-detail"),
     path("club/upload-logo/", UploadLogoView.as_view(), name="upload-logo"),
     path("my-club/", MyClubView.as_view(), name="my-club"),
+
+    # User Profile
+    path('profile/', UserProfileView.as_view(), name='user_profile'),
+    
+    # Club Management
+    path('clubs/', ClubListView.as_view(), name='club_list'),
+    path('clubs/create/', ClubCreateView.as_view(), name='club_create'),
+    path('clubs/<int:pk>/', ClubDetailView.as_view(), name='club_detail'),
+    path('clubs/<int:pk>/update/', ClubUpdateView.as_view(), name='club_update'),
+    path('clubs/<int:pk>/delete/', ClubDeleteView.as_view(), name='club_delete'),
+    
+    # Team Management
+    path('team-management/', TeamManagementView.as_view(), name='team_management'),
+    path('members/<int:membership_id>/update-role/', UpdateMemberRoleView.as_view(), name='update_member_role'),
+    path('members/<int:membership_id>/remove/', RemoveMemberView.as_view(), name='remove_member'),
+    
+    # Feature Access
+    path('feature-access/', FeatureAccessView.as_view(), name='feature_access'),
+    
+    # Audit Logs
+    path('audit-logs/', AuditLogView.as_view(), name='audit_logs'),
+    
+    # Invitations
+    path('accept-invite/', AcceptInviteView.as_view(), name='accept_invite'),
+    path('pending-invites/', PendingInvitesView.as_view(), name='pending_invites'),
 ] + router.urls

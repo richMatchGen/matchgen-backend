@@ -75,8 +75,7 @@ class APIHealthCheckView(APIView):
                     "test_token_refresh": "/api/test-token-refresh/",
                 },
                 "database": "connected",
-                "authentication": "jwt_enabled",
-                "cors_test": "CORS health check successful"
+                "authentication": "jwt_enabled"
             }
             return Response(health_status, status=status.HTTP_200_OK)
         except Exception as e:
@@ -87,18 +86,6 @@ class APIHealthCheckView(APIView):
                 {"error": f"Health check failed: {str(e)}"}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
-    def options(self, request):
-        """Handle preflight OPTIONS requests for CORS."""
-        response = Response(
-            {
-                "status": "success",
-                "message": "CORS preflight request successful",
-                "method": "OPTIONS"
-            },
-            status=status.HTTP_200_OK
-        )
-        return response
 
 
 urlpatterns = [

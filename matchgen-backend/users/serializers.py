@@ -2,8 +2,14 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from django.contrib.auth import authenticate
+from django.contrib.auth.password_validation import validate_password
+from .models import (
+    User, Club, UserRole, ClubMembership, Feature, 
+    SubscriptionTierFeature, AuditLog
+)
+from .permissions import FeaturePermission, get_user_role_in_club
 
-from .models import Club
 
 User = get_user_model()
 
@@ -54,12 +60,12 @@ class UserSerializer(serializers.ModelSerializer):
 
 class RegisterSerializer(serializers.ModelSerializer):
     """Serializer for user registration."""
-    password = serializers.CharField(write_only=True, min_length=8)
-    password_confirm = serializers.CharField(write_only=True)
+    password = serializers.CharField(write_only=True, validators=[validate_password])
+    password2 = serializers.CharField(write_only=True)
 
     class Meta:
         model = User
-        fields = ["id", "email", "username", "password", "password_confirm"]
+        fields = ["id", "email", "username", "password", "password2"]
 
     def validate_email(self, value):
         """Validate email uniqueness."""
@@ -85,13 +91,13 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         """Validate password confirmation."""
-        if data['password'] != data['password_confirm']:
+        if data['password'] != data['password2']:
             raise serializers.ValidationError("Passwords do not match.")
         return data
 
     def create(self, validated_data):
         """Create a new user."""
-        validated_data.pop('password_confirm')
+        validated_data.pop('password2')
         user = User.objects.create_user(
             email=validated_data["email"],
             username=validated_data.get("username"),
@@ -130,15 +136,27 @@ class LoginSerializer(serializers.Serializer):
 class ClubSerializer(serializers.ModelSerializer):
     """Serializer for club details."""
     user_email = serializers.EmailField(source='user.email', read_only=True)
+    user_role = serializers.SerializerMethodField()
+    available_features = serializers.SerializerMethodField()
     
     class Meta:
         model = Club
         fields = [
             "id", "name", "sport", "logo", "location", "founded_year", 
             "venue_name", "website", "primary_color", "secondary_color", 
-            "bio", "league", "selected_pack", "user_email"
+            "bio", "league", "selected_pack", "user_email", "user_role", "available_features",
+            "subscription_tier", "subscription_active", "subscription_start_date", "subscription_end_date"
         ]
-        read_only_fields = ["id", "user_email"]
+        read_only_fields = ["id", "user_email", "subscription_start_date"]
+
+    def get_user_role(self, obj):
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return get_user_role_in_club(request.user, obj)
+        return None
+    
+    def get_available_features(self, obj):
+        return FeaturePermission.get_available_features(obj)
 
     def validate_name(self, value):
         """Validate club name."""
@@ -184,5 +202,109 @@ class ClubSerializer(serializers.ModelSerializer):
         if value and not value.startswith('#') or len(value) != 7:
             raise serializers.ValidationError("Secondary color must be a valid hex color (e.g., #FF0000)")
         return value
+
+
+class UserRoleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserRole
+        fields = ('id', 'name', 'description')
+
+
+class ClubMembershipSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    role = UserRoleSerializer(read_only=True)
+    invited_by = UserSerializer(read_only=True)
+    role_id = serializers.IntegerField(write_only=True)
+    
+    class Meta:
+        model = ClubMembership
+        fields = (
+            'id', 'user', 'club', 'role', 'status', 'invited_by',
+            'invited_at', 'accepted_at', 'role_id'
+        )
+        read_only_fields = ('id', 'user', 'club', 'invited_by', 'invited_at', 'accepted_at')
+    
+    def create(self, validated_data):
+        role_id = validated_data.pop('role_id')
+        try:
+            role = UserRole.objects.get(id=role_id)
+        except UserRole.DoesNotExist:
+            raise serializers.ValidationError("Invalid role ID")
+        
+        validated_data['role'] = role
+        return super().create(validated_data)
+
+
+class InviteUserSerializer(serializers.Serializer):
+    email = serializers.EmailField()
+    role_id = serializers.IntegerField()
+    message = serializers.CharField(required=False, allow_blank=True)
+    
+    def validate_email(self, value):
+        # Check if user already has membership in this club
+        club = self.context.get('club')
+        try:
+            user = User.objects.get(email=value)
+            if ClubMembership.objects.filter(user=user, club=club).exists():
+                raise serializers.ValidationError("User is already a member of this club")
+        except User.DoesNotExist:
+            # User doesn't exist yet, which is fine for invites
+            pass
+        return value
+    
+    def validate_role_id(self, value):
+        try:
+            UserRole.objects.get(id=value)
+        except UserRole.DoesNotExist:
+            raise serializers.ValidationError("Invalid role ID")
+        return value
+
+
+class FeatureSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Feature
+        fields = ('id', 'name', 'code', 'description', 'is_active')
+
+
+class SubscriptionTierFeatureSerializer(serializers.ModelSerializer):
+    feature = FeatureSerializer(read_only=True)
+    
+    class Meta:
+        model = SubscriptionTierFeature
+        fields = ('id', 'subscription_tier', 'feature')
+
+
+class AuditLogSerializer(serializers.ModelSerializer):
+    user = UserSerializer(read_only=True)
+    club = ClubSerializer(read_only=True)
+    
+    class Meta:
+        model = AuditLog
+        fields = (
+            'id', 'user', 'club', 'action', 'details', 'ip_address',
+            'user_agent', 'timestamp'
+        )
+        read_only_fields = ('id', 'user', 'club', 'action', 'details', 'ip_address', 'user_agent', 'timestamp')
+
+
+class TeamManagementSerializer(serializers.Serializer):
+    """Serializer for team management data"""
+    members = ClubMembershipSerializer(many=True, read_only=True)
+    available_roles = UserRoleSerializer(many=True, read_only=True)
+    can_manage_members = serializers.BooleanField(read_only=True)
+    can_manage_billing = serializers.BooleanField(read_only=True)
+
+
+class FeatureAccessSerializer(serializers.Serializer):
+    """Serializer for feature access information"""
+    available_features = serializers.ListField(child=serializers.CharField(), read_only=True)
+    subscription_tier = serializers.CharField(read_only=True)
+    subscription_active = serializers.BooleanField(read_only=True)
+    feature_access = serializers.DictField(read_only=True)  # feature_code: has_access
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(required=True)
+    new_password = serializers.CharField(required=True, validators=[validate_password])
 
 

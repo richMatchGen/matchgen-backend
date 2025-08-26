@@ -22,13 +22,13 @@ from .views import (
     ClubCreateView,
     ClubUpdateView,
     ClubDeleteView,
-    TeamManagementView,
-    UpdateMemberRoleView,
-    RemoveMemberView,
-    FeatureAccessView,
-    AuditLogView,
-    AcceptInviteView,
-    PendingInvitesView
+    # TeamManagementView,
+    # UpdateMemberRoleView,
+    # RemoveMemberView,
+    # FeatureAccessView,
+    # AuditLogView,
+    # AcceptInviteView,
+    # PendingInvitesView
 )
 
 
@@ -71,18 +71,18 @@ urlpatterns = [
     path('clubs/<int:pk>/update/', ClubUpdateView.as_view(), name='club_update'),
     path('clubs/<int:pk>/delete/', ClubDeleteView.as_view(), name='club_delete'),
     
-    # Team Management
-    path('team-management/', TeamManagementView.as_view(), name='team_management'),
-    path('members/<int:membership_id>/update-role/', UpdateMemberRoleView.as_view(), name='update_member_role'),
-    path('members/<int:membership_id>/remove/', RemoveMemberView.as_view(), name='remove_member'),
+    # Team Management - TEMPORARILY COMMENTED OUT FOR PRODUCTION FIX
+    # path('team-management/', TeamManagementView.as_view(), name='team_management'),
+    # path('members/<int:membership_id>/update-role/', UpdateMemberRoleView.as_view(), name='update_member_role'),
+    # path('members/<int:membership_id>/remove/', RemoveMemberView.as_view(), name='remove_member'),
     
-    # Feature Access
-    path('feature-access/', FeatureAccessView.as_view(), name='feature_access'),
+    # Feature Access - TEMPORARILY COMMENTED OUT FOR PRODUCTION FIX
+    # path('feature-access/', FeatureAccessView.as_view(), name='feature_access'),
     
-    # Audit Logs
-    path('audit-logs/', AuditLogView.as_view(), name='audit_logs'),
+    # Audit Logs - TEMPORARILY COMMENTED OUT FOR PRODUCTION FIX
+    # path('audit-logs/', AuditLogView.as_view(), name='audit_logs'),
     
-    # Invitations
-    path('accept-invite/', AcceptInviteView.as_view(), name='accept_invite'),
-    path('pending-invites/', PendingInvitesView.as_view(), name='pending_invites'),
+    # Invitations - TEMPORARILY COMMENTED OUT FOR PRODUCTION FIX
+    # path('accept-invite/', AcceptInviteView.as_view(), name='accept_invite'),
+    # path('pending-invites/', PendingInvitesView.as_view(), name='pending_invites'),
 ] + router.urls

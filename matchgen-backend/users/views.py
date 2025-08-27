@@ -241,13 +241,20 @@ class MyClubView(APIView, RateLimitMixin):
                     status=status.HTTP_429_TOO_MANY_REQUESTS
                 )
             
-            club = Club.objects.filter(user=request.user).first()
-            if not club:
-                logger.warning(f"No club found for user {request.user.email}")
+            # Get user's club through membership (RBAC system)
+            membership = ClubMembership.objects.filter(
+                user=request.user, 
+                status='active'
+            ).select_related('club', 'role').first()
+            
+            if not membership:
+                logger.warning(f"No active club membership found for user {request.user.email}")
                 return Response(
                     {"detail": "No club found for this user."}, 
                     status=status.HTTP_404_NOT_FOUND
                 )
+            
+            club = membership.club
             serializer = ClubSerializer(club)
             logger.info(f"Club data returned for user {request.user.email}: {club.name}")
             return Response(serializer.data)

@@ -247,12 +247,33 @@ class MyClubView(APIView, RateLimitMixin):
                 status='active'
             ).select_related('club', 'role').first()
             
+            # Debug logging
+            logger.info(f"User {request.user.email} - Membership query result: {membership}")
+            
             if not membership:
-                logger.warning(f"No active club membership found for user {request.user.email}")
-                return Response(
-                    {"detail": "No club found for this user."}, 
-                    status=status.HTTP_404_NOT_FOUND
-                )
+                # Fallback: check if user has direct club ownership (legacy)
+                direct_club = Club.objects.filter(user=request.user).first()
+                if direct_club:
+                    logger.info(f"Found direct club ownership for user {request.user.email}: {direct_club.name}")
+                    # Create membership for this user
+                    from users.models import UserRole
+                    owner_role, _ = UserRole.objects.get_or_create(
+                        name='owner',
+                        defaults={'description': 'Club owner with full permissions'}
+                    )
+                    membership = ClubMembership.objects.create(
+                        user=request.user,
+                        club=direct_club,
+                        role=owner_role,
+                        status='active'
+                    )
+                    logger.info(f"Created membership for user {request.user.email} as owner of {direct_club.name}")
+                else:
+                    logger.warning(f"No active club membership or direct club found for user {request.user.email}")
+                    return Response(
+                        {"detail": "No club found for this user."}, 
+                        status=status.HTTP_404_NOT_FOUND
+                    )
             
             club = membership.club
             serializer = ClubSerializer(club)

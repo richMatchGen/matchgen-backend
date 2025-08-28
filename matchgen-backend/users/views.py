@@ -1,6 +1,7 @@
 import logging
 import base64
 import requests
+import stripe
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.utils import timezone
@@ -18,6 +19,7 @@ from django.db import transaction
 from django.core.mail import send_mail
 from django.conf import settings
 from django.shortcuts import get_object_or_404
+from django.urls import reverse
 
 from .models import (
     User, Club, UserRole, ClubMembership, Feature, 
@@ -976,3 +978,353 @@ class ClubDeleteView(APIView):
         
         club.delete()
         return Response({"message": "Club deleted successfully"}, status=status.HTTP_204_NO_CONTENT)
+
+
+# Stripe Integration Views
+class StripeCheckoutView(APIView):
+    """View for creating Stripe checkout sessions"""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        """Create a Stripe checkout session for subscription upgrade"""
+        try:
+            # Configure Stripe
+            stripe.api_key = settings.STRIPE_SECRET_KEY
+            
+            # Get request data
+            tier = request.data.get('tier')
+            club_id = request.data.get('club_id')
+            
+            if not tier or not club_id:
+                return Response(
+                    {"error": "Tier and club_id are required"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Validate tier
+            if tier not in ['basic', 'semipro', 'prem']:
+                return Response(
+                    {"error": "Invalid tier. Must be basic, semipro, or prem"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Get club
+            try:
+                club = Club.objects.get(id=club_id)
+            except Club.DoesNotExist:
+                return Response(
+                    {"error": "Club not found"}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Check if user can manage billing
+            if not can_manage_billing(request.user, club):
+                return Response(
+                    {"error": "You don't have permission to manage billing for this club"}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # Get price ID for the tier
+            price_id = settings.STRIPE_PRICES.get(tier)
+            if not price_id:
+                return Response(
+                    {"error": f"Price ID not configured for {tier} tier"}, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+            
+            # Create checkout session
+            checkout_session = stripe.checkout.Session.create(
+                payment_method_types=['card'],
+                line_items=[{
+                    'price': price_id,
+                    'quantity': 1,
+                }],
+                mode='subscription',
+                success_url=f"{request.build_absolute_uri('/')}subscription?success=true&session_id={{CHECKOUT_SESSION_ID}}",
+                cancel_url=f"{request.build_absolute_uri('/')}subscription?canceled=true",
+                metadata={
+                    'club_id': str(club_id),
+                    'user_id': str(request.user.id),
+                    'tier': tier,
+                    'club_name': club.name
+                },
+                customer_email=request.user.email,
+                allow_promotion_codes=True,
+                billing_address_collection='required',
+                subscription_data={
+                    'metadata': {
+                        'club_id': str(club_id),
+                        'user_id': str(request.user.id),
+                        'tier': tier,
+                        'club_name': club.name
+                    }
+                }
+            )
+            
+            logger.info(f"Stripe checkout session created for user {request.user.email}, club {club.name}, tier {tier}")
+            
+            return Response({
+                'session_id': checkout_session.id,
+                'url': checkout_session.url
+            })
+            
+        except stripe.error.StripeError as e:
+            logger.error(f"Stripe error: {str(e)}")
+            return Response(
+                {"error": "Payment processing error. Please try again."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        except Exception as e:
+            logger.error(f"Checkout session creation error: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while creating checkout session"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class StripeBillingPortalView(APIView):
+    """View for creating Stripe billing portal sessions"""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        """Create a Stripe billing portal session"""
+        try:
+            # Configure Stripe
+            stripe.api_key = settings.STRIPE_SECRET_KEY
+            
+            # Get request data
+            club_id = request.data.get('club_id')
+            
+            if not club_id:
+                return Response(
+                    {"error": "club_id is required"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Get club
+            try:
+                club = Club.objects.get(id=club_id)
+            except Club.DoesNotExist:
+                return Response(
+                    {"error": "Club not found"}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Check if user can manage billing
+            if not can_manage_billing(request.user, club):
+                return Response(
+                    {"error": "You don't have permission to manage billing for this club"}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            
+            # For now, we'll create a customer if they don't exist
+            # In a real implementation, you'd store the customer ID in your database
+            customer = stripe.Customer.create(
+                email=request.user.email,
+                metadata={
+                    'club_id': str(club_id),
+                    'user_id': str(request.user.id),
+                    'club_name': club.name
+                }
+            )
+            
+            # Create billing portal session
+            billing_portal_session = stripe.billing_portal.Session.create(
+                customer=customer.id,
+                return_url=f"{request.build_absolute_uri('/')}subscription",
+            )
+            
+            logger.info(f"Stripe billing portal session created for user {request.user.email}, club {club.name}")
+            
+            return Response({
+                'url': billing_portal_session.url
+            })
+            
+        except stripe.error.StripeError as e:
+            logger.error(f"Stripe error: {str(e)}")
+            return Response(
+                {"error": "Billing portal error. Please try again."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+        except Exception as e:
+            logger.error(f"Billing portal session creation error: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while creating billing portal session"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class StripeWebhookView(APIView):
+    """View for handling Stripe webhooks"""
+    permission_classes = [AllowAny]  # Webhooks don't use authentication
+    
+    def post(self, request):
+        """Handle Stripe webhook events"""
+        try:
+            # Get the webhook payload
+            payload = request.body
+            sig_header = request.META.get('HTTP_STRIPE_SIGNATURE')
+            
+            if not sig_header:
+                return Response(
+                    {"error": "No signature header"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Verify webhook signature
+            try:
+                event = stripe.Webhook.construct_event(
+                    payload, sig_header, settings.STRIPE_WEBHOOK_SECRET
+                )
+            except ValueError as e:
+                logger.error(f"Invalid payload: {str(e)}")
+                return Response(
+                    {"error": "Invalid payload"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            except stripe.error.SignatureVerificationError as e:
+                logger.error(f"Invalid signature: {str(e)}")
+                return Response(
+                    {"error": "Invalid signature"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Handle the event
+            if event['type'] == 'checkout.session.completed':
+                self.handle_checkout_completed(event['data']['object'])
+            elif event['type'] == 'customer.subscription.updated':
+                self.handle_subscription_updated(event['data']['object'])
+            elif event['type'] == 'customer.subscription.deleted':
+                self.handle_subscription_deleted(event['data']['object'])
+            elif event['type'] == 'invoice.payment_succeeded':
+                self.handle_payment_succeeded(event['data']['object'])
+            elif event['type'] == 'invoice.payment_failed':
+                self.handle_payment_failed(event['data']['object'])
+            else:
+                logger.info(f"Unhandled event type: {event['type']}")
+            
+            return Response({"status": "success"})
+            
+        except Exception as e:
+            logger.error(f"Webhook error: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "Webhook processing error"}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def handle_checkout_completed(self, session):
+        """Handle successful checkout completion"""
+        try:
+            metadata = session.get('metadata', {})
+            club_id = metadata.get('club_id')
+            user_id = metadata.get('user_id')
+            tier = metadata.get('tier')
+            
+            if not all([club_id, user_id, tier]):
+                logger.error("Missing metadata in checkout session")
+                return
+            
+            # Update club subscription
+            club = Club.objects.get(id=club_id)
+            club.subscription_tier = tier
+            club.subscription_active = True
+            club.subscription_start_date = timezone.now()
+            club.save()
+            
+            # Log audit event
+            user = User.objects.get(id=user_id)
+            AuditLogger.log_event(
+                user=user,
+                club=club,
+                action='subscription_changed',
+                details={
+                    'new_tier': tier,
+                    'stripe_session_id': session.get('id'),
+                    'payment_status': session.get('payment_status')
+                }
+            )
+            
+            logger.info(f"Subscription updated for club {club.name} to {tier} tier")
+            
+        except Exception as e:
+            logger.error(f"Error handling checkout completion: {str(e)}", exc_info=True)
+    
+    def handle_subscription_updated(self, subscription):
+        """Handle subscription updates"""
+        try:
+            metadata = subscription.get('metadata', {})
+            club_id = metadata.get('club_id')
+            
+            if not club_id:
+                return
+            
+            club = Club.objects.get(id=club_id)
+            
+            # Update subscription status based on Stripe status
+            if subscription.get('status') == 'active':
+                club.subscription_active = True
+            elif subscription.get('status') in ['canceled', 'unpaid', 'past_due']:
+                club.subscription_active = False
+            
+            club.save()
+            
+            logger.info(f"Subscription status updated for club {club.name}: {subscription.get('status')}")
+            
+        except Exception as e:
+            logger.error(f"Error handling subscription update: {str(e)}", exc_info=True)
+    
+    def handle_subscription_deleted(self, subscription):
+        """Handle subscription deletion"""
+        try:
+            metadata = subscription.get('metadata', {})
+            club_id = metadata.get('club_id')
+            
+            if not club_id:
+                return
+            
+            club = Club.objects.get(id=club_id)
+            club.subscription_active = False
+            club.save()
+            
+            logger.info(f"Subscription deactivated for club {club.name}")
+            
+        except Exception as e:
+            logger.error(f"Error handling subscription deletion: {str(e)}", exc_info=True)
+    
+    def handle_payment_succeeded(self, invoice):
+        """Handle successful payment"""
+        try:
+            subscription_id = invoice.get('subscription')
+            if subscription_id:
+                subscription = stripe.Subscription.retrieve(subscription_id)
+                metadata = subscription.get('metadata', {})
+                club_id = metadata.get('club_id')
+                
+                if club_id:
+                    club = Club.objects.get(id=club_id)
+                    club.subscription_active = True
+                    club.save()
+                    
+                    logger.info(f"Payment succeeded for club {club.name}")
+                    
+        except Exception as e:
+            logger.error(f"Error handling payment success: {str(e)}", exc_info=True)
+    
+    def handle_payment_failed(self, invoice):
+        """Handle failed payment"""
+        try:
+            subscription_id = invoice.get('subscription')
+            if subscription_id:
+                subscription = stripe.Subscription.retrieve(subscription_id)
+                metadata = subscription.get('metadata', {})
+                club_id = metadata.get('club_id')
+                
+                if club_id:
+                    club = Club.objects.get(id=club_id)
+                    club.subscription_active = False
+                    club.save()
+                    
+                    logger.info(f"Payment failed for club {club.name}")
+                    
+        except Exception as e:
+            logger.error(f"Error handling payment failure: {str(e)}", exc_info=True)

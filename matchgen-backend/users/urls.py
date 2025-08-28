@@ -31,7 +31,10 @@ from .views import (
     FeatureCatalogView,
     AuditLogView,
     AcceptInviteView,
-    PendingInvitesView
+    PendingInvitesView,
+    StripeCheckoutView,
+    StripeBillingPortalView,
+    StripeWebhookView
 )
 
 
@@ -91,4 +94,9 @@ urlpatterns = [
     # Invitations
     path('accept-invite/', AcceptInviteView.as_view(), name='accept_invite'),
     path('pending-invites/', PendingInvitesView.as_view(), name='pending_invites'),
+    
+    # Stripe Integration
+    path('stripe/checkout/', StripeCheckoutView.as_view(), name='stripe_checkout'),
+    path('stripe/billing-portal/', StripeBillingPortalView.as_view(), name='stripe_billing_portal'),
+    path('stripe/webhook/', StripeWebhookView.as_view(), name='stripe_webhook'),
 ] + router.urls

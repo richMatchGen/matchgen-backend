@@ -316,3 +316,22 @@ SITE_ID = 1
 LOGS_DIR = os.path.join(BASE_DIR, "logs")
 if not os.path.exists(LOGS_DIR):
     os.makedirs(LOGS_DIR)
+
+# Stripe configuration
+STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY")
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")
+STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET")
+
+# Stripe product IDs
+STRIPE_PRODUCTS = {
+    'basic': 'prod_Sx1VvIAylnnVs7',
+    'semipro': 'prod_Sx1VN35EfpytiD',
+    'prem': 'prod_Sx1WOgl58YiJkS'
+}
+
+# Stripe price IDs (you'll need to add these to your environment variables)
+STRIPE_PRICES = {
+    'basic': os.getenv("STRIPE_PRICE_BASIC"),
+    'semipro': os.getenv("STRIPE_PRICE_SEMIPRO"),
+    'prem': os.getenv("STRIPE_PRICE_PREM")
+}

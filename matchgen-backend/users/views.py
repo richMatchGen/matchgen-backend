@@ -11,6 +11,7 @@ from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.exceptions import ValidationError
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.db import transaction
@@ -306,6 +307,13 @@ class CustomTokenObtainPairView(TokenObtainPairView):
             response = super().post(request, *args, **kwargs)
             logger.info(f"Token generated successfully for email: {request.data.get('email')}")
             return response
+        except ValidationError as e:
+            # Handle validation errors properly (like invalid credentials)
+            logger.warning(f"Validation error during token generation: {str(e)}")
+            return Response(
+                {"error": "Invalid email or password."}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
         except Exception as e:
             logger.error(f"Token generation error: {str(e)}", exc_info=True)
             return Response(

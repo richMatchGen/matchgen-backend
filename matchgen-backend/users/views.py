@@ -261,8 +261,8 @@ class RegisterView(APIView):
                 
                 with connection.cursor() as cursor:
                     cursor.execute(
-                        "INSERT INTO users_user (email, password, is_active, is_staff, is_superuser, date_joined) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
-                        [email, make_password(password), True, False, False, timezone.now()]
+                        "INSERT INTO users_user (email, password, is_active, is_staff, is_superuser) VALUES (%s, %s, %s, %s, %s) RETURNING id",
+                        [email, make_password(password), True, False, False]
                     )
                     user_id = cursor.fetchone()[0]
                 

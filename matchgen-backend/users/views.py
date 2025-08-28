@@ -253,16 +253,26 @@ class RegisterView(APIView):
                     email_verified=is_development  # Auto-verify in development
                 )
             except Exception as e:
-                # If email verification fields don't exist, create user without them
+                # If email verification fields don't exist, create user with raw SQL
                 logger.warning(f"Email verification fields not available: {str(e)}")
-                user = User.objects.create_user(
-                    email=email, 
-                    password=password
-                )
-                # Set email_verified to True for existing users
-                if hasattr(user, 'email_verified'):
-                    user.email_verified = True
-                    user.save()
+                
+                from django.contrib.auth.hashers import make_password
+                from django.db import connection
+                
+                with connection.cursor() as cursor:
+                    cursor.execute(
+                        "INSERT INTO users_user (email, password, is_active, is_staff, is_superuser, date_joined) VALUES (%s, %s, %s, %s, %s, %s) RETURNING id",
+                        [email, make_password(password), True, False, False, timezone.now()]
+                    )
+                    user_id = cursor.fetchone()[0]
+                
+                # Create a User object with the basic fields
+                user = User()
+                user.id = user_id
+                user.email = email
+                user.is_active = True
+                user.is_staff = False
+                user.is_superuser = False
             
             # Send verification email (will be skipped if no email settings)
             self._send_verification_email(user, verification_token)

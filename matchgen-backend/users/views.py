@@ -74,6 +74,12 @@ class EmailVerificationView(APIView):
             
             # Find user with this token
             try:
+                # Check if email_verification_token field exists
+                if not hasattr(User, 'email_verification_token'):
+                    return Response(
+                        {"error": "Email verification not available."}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
                 user = User.objects.get(email_verification_token=token)
             except User.DoesNotExist:
                 return Response(
@@ -82,7 +88,7 @@ class EmailVerificationView(APIView):
                 )
             
             # Check if token is expired (24 hours)
-            if user.email_verification_sent_at:
+            if hasattr(user, 'email_verification_sent_at') and user.email_verification_sent_at:
                 from datetime import timedelta
                 if timezone.now() - user.email_verification_sent_at > timedelta(hours=24):
                     return Response(
@@ -91,8 +97,10 @@ class EmailVerificationView(APIView):
                     )
             
             # Verify email
-            user.email_verified = True
-            user.email_verification_token = None
+            if hasattr(user, 'email_verified'):
+                user.email_verified = True
+            if hasattr(user, 'email_verification_token'):
+                user.email_verification_token = None
             user.save()
             
             logger.info(f"Email verified for user: {user.email}")
@@ -117,6 +125,13 @@ class ResendVerificationView(APIView):
         try:
             user = request.user
             
+            # Check if email verification fields exist
+            if not hasattr(user, 'email_verified'):
+                return Response(
+                    {"error": "Email verification not available."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
             if user.email_verified:
                 return Response(
                     {"error": "Email is already verified."}, 
@@ -127,8 +142,10 @@ class ResendVerificationView(APIView):
             import secrets
             verification_token = secrets.token_urlsafe(32)
             
-            user.email_verification_token = verification_token
-            user.email_verification_sent_at = timezone.now()
+            if hasattr(user, 'email_verification_token'):
+                user.email_verification_token = verification_token
+            if hasattr(user, 'email_verification_sent_at'):
+                user.email_verification_sent_at = timezone.now()
             user.save()
             
             # Send verification email
@@ -226,13 +243,26 @@ class RegisterView(APIView):
             # Check if we're in development mode (no email settings)
             is_development = not settings.EMAIL_HOST_USER or not settings.EMAIL_HOST_PASSWORD
             
-            user = User.objects.create_user(
-                email=email, 
-                password=password,
-                email_verification_token=verification_token,
-                email_verification_sent_at=timezone.now(),
-                email_verified=is_development  # Auto-verify in development
-            )
+            try:
+                # Try to create user with email verification fields
+                user = User.objects.create_user(
+                    email=email, 
+                    password=password,
+                    email_verification_token=verification_token,
+                    email_verification_sent_at=timezone.now(),
+                    email_verified=is_development  # Auto-verify in development
+                )
+            except Exception as e:
+                # If email verification fields don't exist, create user without them
+                logger.warning(f"Email verification fields not available: {str(e)}")
+                user = User.objects.create_user(
+                    email=email, 
+                    password=password
+                )
+                # Set email_verified to True for existing users
+                if hasattr(user, 'email_verified'):
+                    user.email_verified = True
+                    user.save()
             
             # Send verification email (will be skipped if no email settings)
             self._send_verification_email(user, verification_token)

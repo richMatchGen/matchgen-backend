@@ -436,30 +436,59 @@ class TeamManagementView(APIView):
     
     def get(self, request):
         """Get team management data"""
-        club_id = request.query_params.get('club_id')
-        if not club_id:
-            return Response({"error": "Club ID is required"}, status=400)
-        
         try:
-            club = Club.objects.get(id=club_id)
-        except Club.DoesNotExist:
-            return Response({"error": "Club not found"}, status=404)
-        
-        # Check if user can manage members
-        if not can_manage_team_members(request.user, club):
-            return Response({"error": "You don't have permission to manage team members"}, status=403)
-        
-        members = ClubMembership.objects.filter(club=club).select_related('user', 'role', 'invited_by')
-        available_roles = UserRole.objects.all()
-        
-        data = {
-            'members': ClubMembershipSerializer(members, many=True).data,
-            'available_roles': UserRoleSerializer(available_roles, many=True).data,
-            'can_manage_members': can_manage_team_members(request.user, club),
-            'can_manage_billing': can_manage_billing(request.user, club),
-        }
-        
-        return Response(TeamManagementSerializer(data).data)
+            logger.info(f"TeamManagementView GET called by user {request.user.email}")
+            
+            club_id = request.query_params.get('club_id')
+            if not club_id:
+                logger.warning("TeamManagementView: No club_id provided")
+                return Response({"error": "Club ID is required"}, status=400)
+            
+            logger.info(f"TeamManagementView: Looking for club_id {club_id}")
+            
+            try:
+                club = Club.objects.get(id=club_id)
+                logger.info(f"TeamManagementView: Found club {club.name}")
+            except Club.DoesNotExist:
+                logger.warning(f"TeamManagementView: Club {club_id} not found")
+                return Response({"error": "Club not found"}, status=404)
+            
+            # Check if user can manage members
+            can_manage = can_manage_team_members(request.user, club)
+            logger.info(f"TeamManagementView: User can manage members: {can_manage}")
+            
+            if not can_manage:
+                logger.warning(f"TeamManagementView: User {request.user.email} cannot manage members")
+                return Response({"error": "You don't have permission to manage team members"}, status=403)
+            
+            # Get members
+            members = ClubMembership.objects.filter(club=club).select_related('user', 'role', 'invited_by')
+            logger.info(f"TeamManagementView: Found {members.count()} members")
+            
+            # Get available roles
+            available_roles = UserRole.objects.all()
+            logger.info(f"TeamManagementView: Found {available_roles.count()} available roles")
+            
+            # Serialize data
+            members_data = ClubMembershipSerializer(members, many=True).data
+            roles_data = UserRoleSerializer(available_roles, many=True).data
+            
+            data = {
+                'members': members_data,
+                'available_roles': roles_data,
+                'can_manage_members': can_manage,
+                'can_manage_billing': can_manage_billing(request.user, club),
+            }
+            
+            logger.info(f"TeamManagementView: Successfully prepared data for club {club.name}")
+            return Response(TeamManagementSerializer(data).data)
+            
+        except Exception as e:
+            logger.error(f"TeamManagementView error: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while fetching team management data"}, 
+                status=500
+            )
     
     def post(self, request):
         """Invite a new team member"""

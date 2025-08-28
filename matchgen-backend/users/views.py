@@ -1040,8 +1040,8 @@ class StripeCheckoutView(APIView):
                     'quantity': 1,
                 }],
                 mode='subscription',
-                success_url=f"{request.build_absolute_uri('/')}subscription?success=true&session_id={{CHECKOUT_SESSION_ID}}",
-                cancel_url=f"{request.build_absolute_uri('/')}subscription?canceled=true",
+                success_url="https://matchgen-frontend.vercel.app/subscription?success=true&session_id={CHECKOUT_SESSION_ID}",
+                cancel_url="https://matchgen-frontend.vercel.app/subscription?canceled=true",
                 metadata={
                     'club_id': str(club_id),
                     'user_id': str(request.user.id),

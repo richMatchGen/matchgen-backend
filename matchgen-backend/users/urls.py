@@ -34,7 +34,10 @@ from .views import (
     PendingInvitesView,
     StripeCheckoutView,
     StripeBillingPortalView,
-    StripeWebhookView
+    StripeWebhookView,
+    EmailVerificationView,
+    ResendVerificationView,
+    EnhancedClubCreationView
 )
 
 
@@ -52,6 +55,8 @@ urlpatterns = [
     
     # Authentication
     path("register/", RegisterView.as_view(), name="register"),
+    path("verify-email/", EmailVerificationView.as_view(), name="verify_email"),
+    path("resend-verification/", ResendVerificationView.as_view(), name="resend_verification"),
     path("login/", LoginView.as_view(), name="login"),
     path("token/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
@@ -63,6 +68,7 @@ urlpatterns = [
     
     # Club management
     path("club/", CreateClubView.as_view(), name="club-create"),
+    path("club/enhanced/", EnhancedClubCreationView.as_view(), name="enhanced-club-create"),
     path("club/<int:id>/", ClubDetailView.as_view(), name="club-detail"),
     path("club/upload-logo/", UploadLogoView.as_view(), name="upload-logo"),
     path("my-club/", MyClubView.as_view(), name="my-club"),

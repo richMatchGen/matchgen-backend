@@ -59,8 +59,130 @@ class RateLimitMixin:
         return True
 
 
+class EmailVerificationView(APIView):
+    """Verify user email with token."""
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        try:
+            token = request.data.get('token')
+            if not token:
+                return Response(
+                    {"error": "Verification token is required."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Find user with this token
+            try:
+                user = User.objects.get(email_verification_token=token)
+            except User.DoesNotExist:
+                return Response(
+                    {"error": "Invalid verification token."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check if token is expired (24 hours)
+            if user.email_verification_sent_at:
+                from datetime import timedelta
+                if timezone.now() - user.email_verification_sent_at > timedelta(hours=24):
+                    return Response(
+                        {"error": "Verification token has expired. Please request a new one."}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            # Verify email
+            user.email_verified = True
+            user.email_verification_token = None
+            user.save()
+            
+            logger.info(f"Email verified for user: {user.email}")
+            
+            return Response(
+                {"message": "Email verified successfully!"}, 
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            logger.error(f"Email verification error: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred during email verification."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class ResendVerificationView(APIView):
+    """Resend email verification."""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        try:
+            user = request.user
+            
+            if user.email_verified:
+                return Response(
+                    {"error": "Email is already verified."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Generate new token
+            import secrets
+            verification_token = secrets.token_urlsafe(32)
+            
+            user.email_verification_token = verification_token
+            user.email_verification_sent_at = timezone.now()
+            user.save()
+            
+            # Send verification email
+            self._send_verification_email(user, verification_token)
+            
+            logger.info(f"Verification email resent to: {user.email}")
+            
+            return Response(
+                {"message": "Verification email sent successfully!"}, 
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            logger.error(f"Resend verification error: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while sending verification email."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+    
+    def _send_verification_email(self, user, token):
+        """Send verification email to user."""
+        try:
+            verification_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
+            
+            subject = "Verify your MatchGen account"
+            message = f"""
+            Welcome to MatchGen!
+            
+            Please verify your email address by clicking the link below:
+            {verification_url}
+            
+            This link will expire in 24 hours.
+            
+            If you didn't create this account, please ignore this email.
+            
+            Best regards,
+            The MatchGen Team
+            """
+            
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
+            
+            logger.info(f"Verification email sent to {user.email}")
+        except Exception as e:
+            logger.error(f"Failed to send verification email to {user.email}: {str(e)}")
+            # Don't fail if email fails
+
+
 class RegisterView(APIView):
-    """User registration endpoint."""
+    """Enhanced user registration endpoint with email verification."""
     permission_classes = [AllowAny]
     
     def post(self, request):
@@ -90,11 +212,28 @@ class RegisterView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            user = User.objects.create_user(email=email, password=password)
+            # Create user with email verification
+            import secrets
+            verification_token = secrets.token_urlsafe(32)
+            
+            user = User.objects.create_user(
+                email=email, 
+                password=password,
+                email_verification_token=verification_token,
+                email_verification_sent_at=timezone.now()
+            )
+            
+            # Send verification email
+            self._send_verification_email(user, verification_token)
+            
             logger.info(f"User created successfully: {user.email}")
             
             return Response(
-                {"message": "User created successfully!", "user_id": user.id}, 
+                {
+                    "message": "Account created successfully! Please check your email to verify your account.",
+                    "user_id": user.id,
+                    "email_verification_sent": True
+                }, 
                 status=status.HTTP_201_CREATED
             )
         except Exception as e:
@@ -103,6 +242,39 @@ class RegisterView(APIView):
                 {"error": "An error occurred during registration."}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+    
+    def _send_verification_email(self, user, token):
+        """Send verification email to user."""
+        try:
+            verification_url = f"{settings.FRONTEND_URL}/verify-email?token={token}"
+            
+            subject = "Verify your MatchGen account"
+            message = f"""
+            Welcome to MatchGen!
+            
+            Please verify your email address by clicking the link below:
+            {verification_url}
+            
+            This link will expire in 24 hours.
+            
+            If you didn't create this account, please ignore this email.
+            
+            Best regards,
+            The MatchGen Team
+            """
+            
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                fail_silently=False,
+            )
+            
+            logger.info(f"Verification email sent to {user.email}")
+        except Exception as e:
+            logger.error(f"Failed to send verification email to {user.email}: {str(e)}")
+            # Don't fail registration if email fails
 
 
 class LoginView(generics.GenericAPIView):
@@ -204,15 +376,119 @@ class ClubDetailView(generics.RetrieveUpdateDestroyAPIView):
         logger.info(f"Club deleted: {club_name}")
 
 
+class EnhancedClubCreationView(APIView):
+    """Enhanced club creation with graphic pack selection."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            # Check if user's email is verified
+            if not request.user.email_verified:
+                return Response(
+                    {"error": "Please verify your email address before creating a club."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check if user already has a club
+            if Club.objects.filter(user=request.user).exists():
+                return Response(
+                    {"error": "User already has a club."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Extract data
+            club_data = {
+                'name': request.data.get('name'),
+                'sport': request.data.get('sport'),
+                'venue_name': request.data.get('venue_name', ''),
+                'location': request.data.get('location', ''),
+                'primary_color': request.data.get('primary_color', ''),
+                'secondary_color': request.data.get('secondary_color', ''),
+                'bio': request.data.get('bio', ''),
+            }
+            
+            # Validate required fields
+            if not club_data['name'] or not club_data['sport']:
+                return Response(
+                    {"error": "Club name and sport are required."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Handle graphic pack selection
+            graphic_pack_id = request.data.get('graphic_pack_id')
+            if graphic_pack_id:
+                try:
+                    from graphicpack.models import GraphicPack
+                    graphic_pack = GraphicPack.objects.get(id=graphic_pack_id)
+                    club_data['selected_pack'] = graphic_pack
+                except GraphicPack.DoesNotExist:
+                    return Response(
+                        {"error": "Selected graphic pack not found."}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            
+            # Create club
+            club = Club.objects.create(user=request.user, **club_data)
+            
+            # Create Owner role membership
+            owner_role = UserRole.objects.get(name='owner')
+            ClubMembership.objects.create(
+                user=request.user,
+                club=club,
+                role=owner_role,
+                status='active',
+                accepted_at=timezone.now()
+            )
+            
+            logger.info(f"Enhanced club created: {club.name} for user: {request.user.email}")
+            
+            return Response({
+                "message": "Club created successfully!",
+                "club": ClubSerializer(club).data
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            logger.error(f"Enhanced club creation error: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while creating the club."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
 class CreateClubView(APIView):
     """Create a new club."""
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         try:
+            # Check if user's email is verified
+            if not request.user.email_verified:
+                return Response(
+                    {"error": "Please verify your email address before creating a club."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Check if user already has a club
+            if Club.objects.filter(user=request.user).exists():
+                return Response(
+                    {"error": "User already has a club."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
             serializer = ClubSerializer(data=request.data)
             if serializer.is_valid():
                 club = serializer.save(user=request.user)
+                
+                # Create Owner role membership
+                owner_role = UserRole.objects.get(name='owner')
+                ClubMembership.objects.create(
+                    user=request.user,
+                    club=club,
+                    role=owner_role,
+                    status='active',
+                    accepted_at=timezone.now()
+                )
+                
                 logger.info(f"Club created: {club.name} for user: {request.user.email}")
                 return Response(serializer.data, status=status.HTTP_201_CREATED)
             return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)

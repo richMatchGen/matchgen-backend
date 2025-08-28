@@ -40,7 +40,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             # Try to get user with only basic fields
             from django.db import connection
             with connection.cursor() as cursor:
-                cursor.execute("SELECT id, email, username, profile_picture, is_active FROM users_user WHERE email = %s", [email])
+                cursor.execute("SELECT id, email, username, profile_picture, is_active, password FROM users_user WHERE email = %s", [email])
                 row = cursor.fetchone()
                 if row:
                     user = User()
@@ -49,25 +49,37 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
                     user.username = row[2]
                     user.profile_picture = row[3]
                     user.is_active = row[4]
+                    user.password = row[5]  # Store password for manual checking
                 else:
                     user = None
         
-        if user and user.check_password(password):
-            if not user.is_active:
-                raise serializers.ValidationError("User account is disabled.")
+        if user:
+            # Check password - handle both Django ORM and manual user objects
+            if hasattr(user, 'check_password'):
+                password_valid = user.check_password(password)
+            else:
+                # Manual password checking for raw SQL user objects
+                from django.contrib.auth.hashers import check_password
+                password_valid = check_password(password, user.password)
             
-            refresh = self.get_token(user)
-            data = {
-                'refresh': str(refresh),
-                'access': str(refresh.access_token),
-                'user': {
-                    'id': user.id,
-                    'email': user.email,
-                    'username': user.username,
-                    'profile_picture': user.profile_picture
-                },
-            }
-            return data
+            if password_valid:
+                if not user.is_active:
+                    raise serializers.ValidationError("User account is disabled.")
+                
+                refresh = self.get_token(user)
+                data = {
+                    'refresh': str(refresh),
+                    'access': str(refresh.access_token),
+                    'user': {
+                        'id': user.id,
+                        'email': user.email,
+                        'username': user.username,
+                        'profile_picture': user.profile_picture
+                    },
+                }
+                return data
+            else:
+                raise serializers.ValidationError("Invalid email or password.")
         else:
             raise serializers.ValidationError("Invalid email or password.")
 
@@ -149,7 +161,7 @@ class LoginSerializer(serializers.Serializer):
             # Try to get user with only basic fields
             from django.db import connection
             with connection.cursor() as cursor:
-                cursor.execute("SELECT id, email, username, profile_picture, is_active FROM users_user WHERE email = %s", [data["email"]])
+                cursor.execute("SELECT id, email, username, profile_picture, is_active, password FROM users_user WHERE email = %s", [data["email"]])
                 row = cursor.fetchone()
                 if row:
                     user = User()
@@ -158,20 +170,33 @@ class LoginSerializer(serializers.Serializer):
                     user.username = row[2]
                     user.profile_picture = row[3]
                     user.is_active = row[4]
+                    user.password = row[5]  # Store password for manual checking
                 else:
                     user = None
         
-        if user and user.check_password(data["password"]):
-            if not user.is_active:
-                raise serializers.ValidationError("User account is disabled.")
+        if user:
+            # Check password - handle both Django ORM and manual user objects
+            if hasattr(user, 'check_password'):
+                password_valid = user.check_password(data["password"])
+            else:
+                # Manual password checking for raw SQL user objects
+                from django.contrib.auth.hashers import check_password
+                password_valid = check_password(data["password"], user.password)
             
-            refresh = RefreshToken.for_user(user)
-            return {
-                "refresh": str(refresh),
-                "access": str(refresh.access_token),
-                "user": UserSerializer(user).data,
-            }
-        raise serializers.ValidationError("Invalid email or password.")
+            if password_valid:
+                if not user.is_active:
+                    raise serializers.ValidationError("User account is disabled.")
+                
+                refresh = RefreshToken.for_user(user)
+                return {
+                    "refresh": str(refresh),
+                    "access": str(refresh.access_token),
+                    "user": UserSerializer(user).data,
+                }
+            else:
+                raise serializers.ValidationError("Invalid email or password.")
+        else:
+            raise serializers.ValidationError("Invalid email or password.")
 
 
 class ClubSerializer(serializers.ModelSerializer):

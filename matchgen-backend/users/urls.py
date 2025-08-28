@@ -27,6 +27,8 @@ from .views import (
     RemoveMemberView,
     FeatureAccessView,
     FeaturesView,
+    UpdateSubscriptionTierView,
+    FeatureCatalogView,
     AuditLogView,
     AcceptInviteView,
     PendingInvitesView
@@ -80,6 +82,8 @@ urlpatterns = [
     # Feature Access
     path('feature-access/', FeatureAccessView.as_view(), name='feature_access'),
     path('features/', FeaturesView.as_view(), name='features'),
+    path('feature-catalog/', FeatureCatalogView.as_view(), name='feature_catalog'),
+    path('update-subscription/', UpdateSubscriptionTierView.as_view(), name='update_subscription'),
     
     # Audit Logs
     path('audit-logs/', AuditLogView.as_view(), name='audit_logs'),

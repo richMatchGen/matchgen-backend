@@ -633,11 +633,26 @@ class FeatureAccessView(APIView):
         for feature in all_features:
             feature_access[feature.code] = FeaturePermission.has_feature_access(request.user, club, feature.code)
         
+        # Get detailed feature information
+        feature_details = []
+        for feature in all_features:
+            feature_details.append({
+                'code': feature.code,
+                'name': feature.name,
+                'description': feature.description,
+                'has_access': feature_access[feature.code],
+                'available_in_tiers': list(SubscriptionTierFeature.objects.filter(
+                    feature=feature
+                ).values_list('subscription_tier', flat=True))
+            })
+        
         data = {
             'available_features': available_features,
             'subscription_tier': club.subscription_tier,
             'subscription_active': club.subscription_active,
-            'feature_access': feature_access
+            'feature_access': feature_access,
+            'feature_details': feature_details,
+            'club_name': club.name
         }
         
         return Response(data)
@@ -651,6 +666,124 @@ class FeaturesView(APIView):
         """Get all available features"""
         features = Feature.objects.filter(is_active=True)
         return Response(FeatureSerializer(features, many=True).data)
+
+
+class UpdateSubscriptionTierView(APIView):
+    """View for updating subscription tier"""
+    permission_classes = [HasRolePermission]
+    
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.permission_classes = [HasRolePermission(required_roles=['owner', 'admin'])]
+    
+    def post(self, request):
+        """Update subscription tier for a club"""
+        club_id = request.data.get('club_id')
+        new_tier = request.data.get('subscription_tier')
+        
+        if not club_id or not new_tier:
+            return Response({"error": "Club ID and subscription tier are required"}, status=400)
+        
+        if new_tier not in ['basic', 'semipro', 'prem']:
+            return Response({"error": "Invalid subscription tier"}, status=400)
+        
+        try:
+            club = Club.objects.get(id=club_id)
+        except Club.DoesNotExist:
+            return Response({"error": "Club not found"}, status=404)
+        
+        # Update subscription tier
+        old_tier = club.subscription_tier
+        club.subscription_tier = new_tier
+        club.subscription_active = True
+        club.subscription_start_date = timezone.now()
+        club.save()
+        
+        # Log audit event
+        AuditLogger.log_event(
+            user=request.user,
+            club=club,
+            action='subscription_changed',
+            details={
+                'old_tier': old_tier,
+                'new_tier': new_tier,
+                'changed_by': request.user.email
+            }
+        )
+        
+        # Get updated feature access
+        available_features = FeaturePermission.get_available_features(club)
+        
+        return Response({
+            "message": f"Subscription tier updated to {new_tier}",
+            "subscription_tier": new_tier,
+            "subscription_active": True,
+            "available_features": available_features
+        })
+
+
+class FeatureCatalogView(APIView):
+    """View for getting complete feature catalog with tier mappings"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        """Get complete feature catalog with tier mappings"""
+        # Get all features
+        features = Feature.objects.filter(is_active=True)
+        
+        # Get tier mappings
+        tier_mappings = {}
+        for tier in ['basic', 'semipro', 'prem']:
+            tier_features = SubscriptionTierFeature.objects.filter(
+                subscription_tier=tier
+            ).select_related('feature')
+            tier_mappings[tier] = [
+                {
+                    'code': mapping.feature.code,
+                    'name': mapping.feature.name,
+                    'description': mapping.feature.description
+                }
+                for mapping in tier_features
+            ]
+        
+        # Get feature details
+        feature_details = []
+        for feature in features:
+            available_in_tiers = list(SubscriptionTierFeature.objects.filter(
+                feature=feature
+            ).values_list('subscription_tier', flat=True))
+            
+            feature_details.append({
+                'code': feature.code,
+                'name': feature.name,
+                'description': feature.description,
+                'available_in_tiers': available_in_tiers
+            })
+        
+        return Response({
+            'features': feature_details,
+            'tier_mappings': tier_mappings,
+            'tier_info': {
+                'basic': {
+                    'name': 'Basic Gen',
+                    'price': '£9.99',
+                    'period': 'month',
+                    'description': 'Perfect for small clubs getting started'
+                },
+                'semipro': {
+                    'name': 'SemiPro Gen',
+                    'price': '£14.99',
+                    'period': 'month',
+                    'description': 'Ideal for growing clubs with more content needs'
+                },
+                'prem': {
+                    'name': 'Prem Gen',
+                    'price': '£24.99',
+                    'period': 'month',
+                    'description': 'Complete solution for professional clubs'
+                }
+            }
+        })
 
 
 class AuditLogView(APIView):

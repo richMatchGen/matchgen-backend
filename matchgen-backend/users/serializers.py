@@ -1,9 +1,12 @@
+import logging
 from django.contrib.auth import get_user_model
 from rest_framework import serializers
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from django.contrib.auth import authenticate
 from django.contrib.auth.password_validation import validate_password
+
+logger = logging.getLogger(__name__)
 from .models import (
     User, Club, UserRole, ClubMembership, Feature, 
     SubscriptionTierFeature, AuditLog
@@ -29,7 +32,26 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         if '@' not in email:
             raise serializers.ValidationError("Please provide a valid email address.")
         
-        user = User.objects.filter(email=email).first()
+        try:
+            user = User.objects.filter(email=email).first()
+        except Exception as e:
+            # Handle case where email verification fields don't exist
+            logger.warning(f"Database fields not available: {str(e)}")
+            # Try to get user with only basic fields
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT id, email, username, profile_picture, is_active FROM users_user WHERE email = %s", [email])
+                row = cursor.fetchone()
+                if row:
+                    user = User()
+                    user.id = row[0]
+                    user.email = row[1]
+                    user.username = row[2]
+                    user.profile_picture = row[3]
+                    user.is_active = row[4]
+                else:
+                    user = None
+        
         if user and user.check_password(password):
             if not user.is_active:
                 raise serializers.ValidationError("User account is disabled.")
@@ -119,7 +141,26 @@ class LoginSerializer(serializers.Serializer):
 
     def validate(self, data):
         """Validate login credentials."""
-        user = User.objects.filter(email=data["email"]).first()
+        try:
+            user = User.objects.filter(email=data["email"]).first()
+        except Exception as e:
+            # Handle case where email verification fields don't exist
+            logger.warning(f"Database fields not available: {str(e)}")
+            # Try to get user with only basic fields
+            from django.db import connection
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT id, email, username, profile_picture, is_active FROM users_user WHERE email = %s", [data["email"]])
+                row = cursor.fetchone()
+                if row:
+                    user = User()
+                    user.id = row[0]
+                    user.email = row[1]
+                    user.username = row[2]
+                    user.profile_picture = row[3]
+                    user.is_active = row[4]
+                else:
+                    user = None
+        
         if user and user.check_password(data["password"]):
             if not user.is_active:
                 raise serializers.ValidationError("User account is disabled.")

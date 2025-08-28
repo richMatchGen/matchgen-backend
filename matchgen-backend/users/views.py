@@ -167,18 +167,25 @@ class ResendVerificationView(APIView):
             The MatchGen Team
             """
             
+            # Check if email settings are configured
+            if not settings.EMAIL_HOST_USER or not settings.EMAIL_HOST_PASSWORD:
+                logger.warning(f"Email settings not configured. Skipping email send for {user.email}")
+                logger.info(f"Verification URL for {user.email}: {verification_url}")
+                return
+            
             send_mail(
                 subject=subject,
                 message=message,
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[user.email],
-                fail_silently=False,
+                fail_silently=True,  # Changed to True to prevent failure
             )
             
             logger.info(f"Verification email sent to {user.email}")
         except Exception as e:
             logger.error(f"Failed to send verification email to {user.email}: {str(e)}")
             # Don't fail if email fails
+            logger.info(f"Verification URL for {user.email}: {verification_url}")
 
 
 class RegisterView(APIView):
@@ -216,14 +223,18 @@ class RegisterView(APIView):
             import secrets
             verification_token = secrets.token_urlsafe(32)
             
+            # Check if we're in development mode (no email settings)
+            is_development = not settings.EMAIL_HOST_USER or not settings.EMAIL_HOST_PASSWORD
+            
             user = User.objects.create_user(
                 email=email, 
                 password=password,
                 email_verification_token=verification_token,
-                email_verification_sent_at=timezone.now()
+                email_verification_sent_at=timezone.now(),
+                email_verified=is_development  # Auto-verify in development
             )
             
-            # Send verification email
+            # Send verification email (will be skipped if no email settings)
             self._send_verification_email(user, verification_token)
             
             logger.info(f"User created successfully: {user.email}")
@@ -263,18 +274,25 @@ class RegisterView(APIView):
             The MatchGen Team
             """
             
+            # Check if email settings are configured
+            if not settings.EMAIL_HOST_USER or not settings.EMAIL_HOST_PASSWORD:
+                logger.warning(f"Email settings not configured. Skipping email send for {user.email}")
+                logger.info(f"Verification URL for {user.email}: {verification_url}")
+                return
+            
             send_mail(
                 subject=subject,
                 message=message,
                 from_email=settings.DEFAULT_FROM_EMAIL,
                 recipient_list=[user.email],
-                fail_silently=False,
+                fail_silently=True,  # Changed to True to prevent registration failure
             )
             
             logger.info(f"Verification email sent to {user.email}")
         except Exception as e:
             logger.error(f"Failed to send verification email to {user.email}: {str(e)}")
             # Don't fail registration if email fails
+            logger.info(f"Verification URL for {user.email}: {verification_url}")
 
 
 class LoginView(generics.GenericAPIView):

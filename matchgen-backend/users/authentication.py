@@ -17,7 +17,7 @@ class CustomJWTAuthentication(JWTAuthentication):
         Handles missing email verification fields gracefully.
         """
         try:
-            user_id = validated_token[self.user_id_claim]
+            user_id = validated_token[api_settings.USER_ID_CLAIM]
             user = User.objects.get(**{api_settings.USER_ID_FIELD: user_id})
             return user
         except Exception as e:
@@ -25,6 +25,9 @@ class CustomJWTAuthentication(JWTAuthentication):
             logger.warning(f"Database fields not available during JWT auth: {str(e)}")
             
             try:
+                # Get user_id from token
+                user_id = validated_token[api_settings.USER_ID_CLAIM]
+                
                 # Try to get user with raw SQL
                 with connection.cursor() as cursor:
                     cursor.execute(

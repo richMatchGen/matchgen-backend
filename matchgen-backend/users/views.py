@@ -2,6 +2,7 @@ import logging
 import base64
 import requests
 import stripe
+import time
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.utils import timezone
@@ -463,6 +464,9 @@ class EnhancedClubCreationView(APIView):
                 'primary_color': request.data.get('primary_color', ''),
                 'secondary_color': request.data.get('secondary_color', ''),
                 'bio': request.data.get('bio', ''),
+                'league': request.data.get('league', ''),
+                'website': request.data.get('website', ''),
+                'founded_year': request.data.get('founded_year'),
             }
             
             # Validate required fields
@@ -471,6 +475,31 @@ class EnhancedClubCreationView(APIView):
                     {"error": "Club name and sport are required."}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
+            
+            # Handle logo upload
+            logo_file = request.FILES.get('logo')
+            if logo_file:
+                try:
+                    import cloudinary
+                    import cloudinary.uploader
+                    from django.conf import settings
+                    
+                    # Upload to Cloudinary
+                    upload_result = cloudinary.uploader.upload(
+                        logo_file,
+                        folder="club_logos",
+                        public_id=f"club_{request.user.id}_{int(time.time())}",
+                        overwrite=True,
+                        resource_type="image"
+                    )
+                    club_data['logo'] = upload_result['secure_url']
+                    logger.info(f"Logo uploaded to Cloudinary: {club_data['logo']}")
+                except Exception as e:
+                    logger.error(f"Logo upload failed: {str(e)}")
+                    return Response(
+                        {"error": "Failed to upload logo. Please try again."}, 
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                    )
             
             # Handle graphic pack selection
             graphic_pack_id = request.data.get('graphic_pack_id')
@@ -504,6 +533,49 @@ class EnhancedClubCreationView(APIView):
                 "message": "Club created successfully!",
                 "club": ClubSerializer(club).data
             }, status=status.HTTP_201_CREATED)
+    
+    def patch(self, request):
+        """Update club with graphic pack selection."""
+        try:
+            # Get user's club
+            try:
+                club = Club.objects.get(user=request.user)
+            except Club.DoesNotExist:
+                return Response(
+                    {"error": "Club not found."}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Handle graphic pack selection
+            graphic_pack_id = request.data.get('graphic_pack_id')
+            if graphic_pack_id:
+                try:
+                    from graphicpack.models import GraphicPack
+                    graphic_pack = GraphicPack.objects.get(id=graphic_pack_id)
+                    club.selected_pack = graphic_pack
+                except GraphicPack.DoesNotExist:
+                    return Response(
+                        {"error": "Selected graphic pack not found."}, 
+                        status=status.HTTP_400_BAD_REQUEST
+                    )
+            else:
+                club.selected_pack = None
+            
+            club.save()
+            
+            logger.info(f"Club updated with graphic pack: {club.name} for user: {request.user.email}")
+            
+            return Response({
+                "message": "Club updated successfully!",
+                "club": ClubSerializer(club).data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Club update error: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while updating the club."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
             
         except Exception as e:
             logger.error(f"Enhanced club creation error: {str(e)}", exc_info=True)

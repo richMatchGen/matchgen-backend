@@ -533,6 +533,13 @@ class EnhancedClubCreationView(APIView):
                 "message": "Club created successfully!",
                 "club": ClubSerializer(club).data
             }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            logger.error(f"Enhanced club creation error: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while creating the club."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     def patch(self, request):
         """Update club with graphic pack selection."""

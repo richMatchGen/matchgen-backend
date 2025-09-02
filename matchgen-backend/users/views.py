@@ -576,13 +576,6 @@ class EnhancedClubCreationView(APIView):
                 {"error": "An error occurred while updating the club."}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-            
-        except Exception as e:
-            logger.error(f"Enhanced club creation error: {str(e)}", exc_info=True)
-            return Response(
-                {"error": "An error occurred while creating the club."}, 
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
-            )
 
 
 class CreateClubView(APIView):

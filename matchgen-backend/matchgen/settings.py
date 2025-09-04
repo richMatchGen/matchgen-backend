@@ -119,6 +119,7 @@ INSTALLED_APPS = [
     "users",
     "content",
     "graphicpack",
+    "psd_processor",
 ]
 
 MIDDLEWARE = [

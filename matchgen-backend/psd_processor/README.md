@@ -160,3 +160,5 @@ Navigate to `/psd-processor` in your application to access the PSD processing in
 - `Pillow`: Image processing support
 - `Django REST Framework`: API functionality
 - `Django`: Web framework
+
+

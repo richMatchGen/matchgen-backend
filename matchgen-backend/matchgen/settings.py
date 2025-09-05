@@ -219,6 +219,11 @@ LOGGING = {
             "level": "INFO",
             "propagate": False,
         },
+        "psd_processor": {
+            "handlers": ["console", "file"],
+            "level": "INFO",
+            "propagate": False,
+        },
     },
 }
 
@@ -274,6 +279,10 @@ USE_TZ = True
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 STATIC_URL = "static/"
 STATIC_FONT_DIR = os.path.join(BASE_DIR, "staticfiles", "fonts")
+
+# Media files (user uploads)
+MEDIA_ROOT = os.path.join(BASE_DIR, "media")
+MEDIA_URL = "/media/"
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

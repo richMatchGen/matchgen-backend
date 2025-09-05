@@ -10,3 +10,5 @@ urlpatterns = [
     path('documents/<int:document_id>/layers/', views.PSDLayerListView.as_view(), name='psd_layer_list'),
     path('documents/<int:document_id>/delete/', views.delete_psd_document, name='psd_document_delete'),
 ]
+
+

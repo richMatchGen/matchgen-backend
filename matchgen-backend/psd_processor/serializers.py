@@ -30,4 +30,12 @@ class PSDUploadSerializer(serializers.Serializer):
         """Validate that the uploaded file is a PSD file."""
         if not value.name.lower().endswith('.psd'):
             raise serializers.ValidationError("Only PSD files are allowed.")
+        
+        # Check file size (limit to 50MB)
+        max_size = 50 * 1024 * 1024  # 50MB
+        if value.size > max_size:
+            raise serializers.ValidationError(f"File size too large. Maximum allowed size is {max_size // (1024*1024)}MB.")
+        
         return value
+
+

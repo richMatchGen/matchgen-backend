@@ -46,6 +46,23 @@ class PSDUploadView(APIView):
             try:
                 psd = PSDImage.open(temp_file_path)
                 logger.info(f"PSD file opened successfully. Dimensions: {psd.width}x{psd.height}")
+                
+                # Log PSD structure for debugging
+                logger.info(f"PSD object type: {type(psd)}")
+                logger.info(f"PSD attributes: {[attr for attr in dir(psd) if not attr.startswith('_')]}")
+                
+                # Check for layers attribute
+                if hasattr(psd, 'layers'):
+                    logger.info(f"PSD has layers attribute: {psd.layers}")
+                    if psd.layers:
+                        logger.info(f"Number of layers: {len(psd.layers)}")
+                        for i, layer in enumerate(psd.layers):
+                            logger.info(f"Layer {i}: {getattr(layer, 'name', 'unnamed')} - {type(layer)}")
+                    else:
+                        logger.warning("PSD layers attribute is empty")
+                else:
+                    logger.warning("PSD object does not have layers attribute")
+                    
             except Exception as e:
                 error_msg = str(e)
                 logger.error(f"Failed to open PSD file: {error_msg}")
@@ -127,20 +144,48 @@ class PSDUploadView(APIView):
         def process_layer(layer, parent_name=""):
             """Recursively process layers and groups."""
             try:
+                layer_name = getattr(layer, 'name', 'unnamed')
+                logger.debug(f"Processing layer: {layer_name}, type: {type(layer)}")
+                
+                # Log all available attributes for debugging
+                if logger.isEnabledFor(logging.DEBUG):
+                    attrs = [attr for attr in dir(layer) if not attr.startswith('_')]
+                    logger.debug(f"Layer {layer_name} attributes: {attrs}")
+                
                 if hasattr(layer, 'layers') and layer.layers:
                     # This is a group
+                    logger.debug(f"Layer {layer_name} is a group with {len(layer.layers)} sub-layers")
                     for sub_layer in layer.layers:
-                        process_layer(sub_layer, f"{parent_name}{layer.name}/" if parent_name else f"{layer.name}/")
+                        process_layer(sub_layer, f"{parent_name}{layer_name}/" if parent_name else f"{layer_name}/")
                 else:
                     # This is a regular layer
-                    layer_name = f"{parent_name}{layer.name}" if parent_name else layer.name
+                    full_layer_name = f"{parent_name}{layer_name}" if parent_name else layer_name
+                    logger.debug(f"Processing regular layer: {full_layer_name}")
                     
-                    # Get bounding box safely
+                    # Get bounding box safely - try multiple methods
                     bbox = None
+                    bbox_method = None
+                    
+                    # Method 1: Standard bbox attribute
                     if hasattr(layer, 'bbox') and layer.bbox:
                         bbox = layer.bbox
+                        bbox_method = "bbox"
+                    # Method 2: Individual coordinate attributes
                     elif hasattr(layer, 'left') and hasattr(layer, 'top') and hasattr(layer, 'right') and hasattr(layer, 'bottom'):
                         bbox = (layer.left, layer.top, layer.right, layer.bottom)
+                        bbox_method = "individual_coords"
+                    # Method 3: Try to get coordinates from different attributes
+                    elif hasattr(layer, 'x') and hasattr(layer, 'y') and hasattr(layer, 'width') and hasattr(layer, 'height'):
+                        bbox = (layer.x, layer.y, layer.x + layer.width, layer.y + layer.height)
+                        bbox_method = "x_y_width_height"
+                    # Method 4: Try to access through layer record
+                    elif hasattr(layer, 'layer_record'):
+                        layer_record = layer.layer_record
+                        if hasattr(layer_record, 'left') and hasattr(layer_record, 'top') and hasattr(layer_record, 'right') and hasattr(layer_record, 'bottom'):
+                            bbox = (layer_record.left, layer_record.top, layer_record.right, layer_record.bottom)
+                            bbox_method = "layer_record"
+                    
+                    logger.debug(f"Bounding box method: {bbox_method}, bbox: {bbox}")
                     
                     if bbox and len(bbox) >= 4:
                         # Calculate dimensions
@@ -156,7 +201,7 @@ class PSDUploadView(APIView):
                             opacity = opacity * 100
                         
                         layer_data = {
-                            'name': layer_name,
+                            'name': full_layer_name,
                             'x': x,
                             'y': y,
                             'width': width,
@@ -166,20 +211,70 @@ class PSDUploadView(APIView):
                             'layer_type': 'group' if hasattr(layer, 'layers') and layer.layers else 'layer'
                         }
                         layers_data.append(layer_data)
-                        logger.debug(f"Extracted layer: {layer_name} at ({x}, {y}) - {width}x{height}")
+                        logger.info(f"Successfully extracted layer: {full_layer_name} at ({x}, {y}) - {width}x{height}")
                     else:
-                        logger.warning(f"Could not extract bounding box for layer: {layer_name}")
+                        logger.warning(f"Could not extract bounding box for layer: {full_layer_name}. Available attributes: {[attr for attr in dir(layer) if not attr.startswith('_')]}")
+                        
+                        # Create a basic layer entry even without bounding box
+                        layer_data = {
+                            'name': full_layer_name,
+                            'x': 0,
+                            'y': 0,
+                            'width': 0,
+                            'height': 0,
+                            'visible': getattr(layer, 'visible', True),
+                            'opacity': float(getattr(layer, 'opacity', 1.0)) * 100 if getattr(layer, 'opacity', 1.0) <= 1.0 else float(getattr(layer, 'opacity', 100.0)),
+                            'layer_type': 'layer'
+                        }
+                        layers_data.append(layer_data)
+                        logger.info(f"Created basic layer entry for: {full_layer_name}")
                         
             except Exception as e:
-                logger.error(f"Error processing layer {getattr(layer, 'name', 'unknown')}: {str(e)}")
+                logger.error(f"Error processing layer {getattr(layer, 'name', 'unknown')}: {str(e)}", exc_info=True)
         
         try:
             # Process all top-level layers
             if hasattr(psd, 'layers') and psd.layers:
-                for layer in psd.layers:
+                logger.info(f"Found {len(psd.layers)} top-level layers")
+                for i, layer in enumerate(psd.layers):
+                    logger.debug(f"Processing layer {i}: {getattr(layer, 'name', 'unnamed')}")
                     process_layer(layer)
             else:
-                logger.warning("PSD file has no layers")
+                logger.warning("PSD file has no layers attribute or empty layers")
+                
+            # Try alternative layer access methods
+            if not layers_data:
+                logger.info("No layers found with standard method, trying alternative approaches...")
+                
+                # Try accessing layers through different attributes
+                for attr_name in ['_layers', 'layer_and_mask', 'layers_and_masks']:
+                    if hasattr(psd, attr_name):
+                        attr_value = getattr(psd, attr_name)
+                        logger.info(f"Found attribute {attr_name}: {type(attr_value)}")
+                        
+                        if hasattr(attr_value, 'layers') and attr_value.layers:
+                            logger.info(f"Found {len(attr_value.layers)} layers in {attr_name}")
+                            for i, layer in enumerate(attr_value.layers):
+                                logger.debug(f"Processing layer {i} from {attr_name}: {getattr(layer, 'name', 'unnamed')}")
+                                process_layer(layer)
+                            break
+                
+                # Try to access layer information directly from the PSD structure
+                if not layers_data and hasattr(psd, '_psd'):
+                    logger.info("Trying to access layers through _psd attribute...")
+                    try:
+                        psd_obj = psd._psd
+                        if hasattr(psd_obj, 'layer_and_mask_information'):
+                            layer_info = psd_obj.layer_and_mask_information
+                            if hasattr(layer_info, 'layer_info') and hasattr(layer_info.layer_info, 'layers'):
+                                layers = layer_info.layer_info.layers
+                                logger.info(f"Found {len(layers)} layers in layer_info")
+                                for i, layer in enumerate(layers):
+                                    logger.debug(f"Processing layer {i} from layer_info: {getattr(layer, 'name', 'unnamed')}")
+                                    process_layer(layer)
+                    except Exception as e:
+                        logger.error(f"Error accessing layers through _psd: {str(e)}")
+                        
         except Exception as e:
             logger.error(f"Error processing PSD layers: {str(e)}")
         

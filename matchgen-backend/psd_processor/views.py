@@ -99,7 +99,7 @@ class PSDUploadView(APIView):
             
             # Extract layer information
             try:
-            layers_data = self._extract_layers(psd)
+                layers_data = self._extract_layers(psd)
                 logger.info(f"Extracted {len(layers_data)} layers from PSD file")
             except Exception as e:
                 logger.error(f"Failed to extract layers: {str(e)}")
@@ -109,10 +109,10 @@ class PSDUploadView(APIView):
             # Create layer records
             for layer_data in layers_data:
                 try:
-                PSDLayer.objects.create(
-                    document=psd_doc,
-                    **layer_data
-                )
+                    PSDLayer.objects.create(
+                        document=psd_doc,
+                        **layer_data
+                    )
                 except Exception as e:
                     logger.error(f"Failed to create layer {layer_data.get('name', 'unknown')}: {str(e)}")
                     # Continue with other layers

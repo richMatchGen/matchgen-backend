@@ -99,7 +99,7 @@ class PSDUploadView(APIView):
             
             # Extract layer information
             try:
-                layers_data = self._extract_layers(psd)
+            layers_data = self._extract_layers(psd)
                 logger.info(f"Extracted {len(layers_data)} layers from PSD file")
             except Exception as e:
                 logger.error(f"Failed to extract layers: {str(e)}")
@@ -109,10 +109,10 @@ class PSDUploadView(APIView):
             # Create layer records
             for layer_data in layers_data:
                 try:
-                    PSDLayer.objects.create(
-                        document=psd_doc,
-                        **layer_data
-                    )
+                PSDLayer.objects.create(
+                    document=psd_doc,
+                    **layer_data
+                )
                 except Exception as e:
                     logger.error(f"Failed to create layer {layer_data.get('name', 'unknown')}: {str(e)}")
                     # Continue with other layers
@@ -153,12 +153,12 @@ class PSDUploadView(APIView):
                     logger.debug(f"Layer {layer_name} attributes: {attrs}")
                 
                 if hasattr(layer, 'layers') and layer.layers:
-                    # This is a group
+                # This is a group
                     logger.debug(f"Layer {layer_name} is a group with {len(layer.layers)} sub-layers")
-                    for sub_layer in layer.layers:
+                for sub_layer in layer.layers:
                         process_layer(sub_layer, f"{parent_name}{layer_name}/" if parent_name else f"{layer_name}/")
-                else:
-                    # This is a regular layer
+            else:
+                # This is a regular layer
                     full_layer_name = f"{parent_name}{layer_name}" if parent_name else layer_name
                     logger.debug(f"Processing regular layer: {full_layer_name}")
                     
@@ -167,8 +167,8 @@ class PSDUploadView(APIView):
                     bbox_method = None
                     
                     # Method 1: Standard bbox attribute
-                    if hasattr(layer, 'bbox') and layer.bbox:
-                        bbox = layer.bbox
+                if hasattr(layer, 'bbox') and layer.bbox:
+                    bbox = layer.bbox
                         bbox_method = "bbox"
                     # Method 2: Individual coordinate attributes
                     elif hasattr(layer, 'left') and hasattr(layer, 'top') and hasattr(layer, 'right') and hasattr(layer, 'bottom'):
@@ -216,7 +216,7 @@ class PSDUploadView(APIView):
                         logger.warning(f"Could not extract bounding box for layer: {full_layer_name}. Available attributes: {[attr for attr in dir(layer) if not attr.startswith('_')]}")
                         
                         # Create a basic layer entry even without bounding box
-                        layer_data = {
+                    layer_data = {
                             'name': full_layer_name,
                             'x': 0,
                             'y': 0,
@@ -225,15 +225,15 @@ class PSDUploadView(APIView):
                             'visible': getattr(layer, 'visible', True),
                             'opacity': float(getattr(layer, 'opacity', 1.0)) * 100 if getattr(layer, 'opacity', 1.0) <= 1.0 else float(getattr(layer, 'opacity', 100.0)),
                             'layer_type': 'layer'
-                        }
-                        layers_data.append(layer_data)
+                    }
+                    layers_data.append(layer_data)
                         logger.info(f"Created basic layer entry for: {full_layer_name}")
                         
             except Exception as e:
                 logger.error(f"Error processing layer {getattr(layer, 'name', 'unknown')}: {str(e)}", exc_info=True)
         
         try:
-            # Process all top-level layers
+        # Process all top-level layers
             if hasattr(psd, 'layers') and psd.layers:
                 logger.info(f"Found {len(psd.layers)} top-level layers")
                 for i, layer in enumerate(psd.layers):
@@ -252,7 +252,16 @@ class PSDUploadView(APIView):
                         attr_value = getattr(psd, attr_name)
                         logger.info(f"Found attribute {attr_name}: {type(attr_value)}")
                         
-                        if hasattr(attr_value, 'layers') and attr_value.layers:
+                        # Handle direct list of layers
+                        if isinstance(attr_value, list):
+                            logger.info(f"Found {len(attr_value)} layers in {attr_name} (list)")
+                            for i, layer in enumerate(attr_value):
+                                logger.debug(f"Processing layer {i} from {attr_name}: {getattr(layer, 'name', 'unnamed')}")
+                                process_layer(layer)
+                            if attr_value:  # If we found layers, break
+                                break
+                        # Handle object with layers attribute
+                        elif hasattr(attr_value, 'layers') and attr_value.layers:
                             logger.info(f"Found {len(attr_value.layers)} layers in {attr_name}")
                             for i, layer in enumerate(attr_value.layers):
                                 logger.debug(f"Processing layer {i} from {attr_name}: {getattr(layer, 'name', 'unnamed')}")
@@ -264,16 +273,61 @@ class PSDUploadView(APIView):
                     logger.info("Trying to access layers through _psd attribute...")
                     try:
                         psd_obj = psd._psd
+                        logger.info(f"_psd object type: {type(psd_obj)}")
+                        logger.info(f"_psd attributes: {[attr for attr in dir(psd_obj) if not attr.startswith('_')]}")
+                        
                         if hasattr(psd_obj, 'layer_and_mask_information'):
                             layer_info = psd_obj.layer_and_mask_information
+                            logger.info(f"layer_and_mask_information type: {type(layer_info)}")
+                            logger.info(f"layer_and_mask_information attributes: {[attr for attr in dir(layer_info) if not attr.startswith('_')]}")
+                            
                             if hasattr(layer_info, 'layer_info') and hasattr(layer_info.layer_info, 'layers'):
                                 layers = layer_info.layer_info.layers
                                 logger.info(f"Found {len(layers)} layers in layer_info")
                                 for i, layer in enumerate(layers):
                                     logger.debug(f"Processing layer {i} from layer_info: {getattr(layer, 'name', 'unnamed')}")
                                     process_layer(layer)
+                            else:
+                                logger.warning("No layer_info.layers found")
+                        else:
+                            logger.warning("No layer_and_mask_information found")
                     except Exception as e:
                         logger.error(f"Error accessing layers through _psd: {str(e)}")
+                
+                # Try alternative methods to find layers
+                if not layers_data:
+                    logger.info("Trying additional layer detection methods...")
+                    
+                    # Try to iterate through the PSD object itself
+                    try:
+                        logger.info("Attempting to iterate through PSD object...")
+                        for i, item in enumerate(psd):
+                            logger.info(f"PSD item {i}: {type(item)} - {getattr(item, 'name', 'unnamed')}")
+                            process_layer(item)
+                    except Exception as e:
+                        logger.debug(f"Could not iterate through PSD object: {str(e)}")
+                    
+                    # Try to access through descendants
+                    if hasattr(psd, 'descendants'):
+                        try:
+                            descendants = psd.descendants
+                            logger.info(f"Found {len(descendants)} descendants")
+                            for i, descendant in enumerate(descendants):
+                                logger.info(f"Descendant {i}: {type(descendant)} - {getattr(descendant, 'name', 'unnamed')}")
+                                process_layer(descendant)
+                        except Exception as e:
+                            logger.error(f"Error accessing descendants: {str(e)}")
+                    
+                    # Try to find layers using the find method
+                    if hasattr(psd, 'findall'):
+                        try:
+                            found_layers = psd.findall()
+                            logger.info(f"Found {len(found_layers)} items using findall")
+                            for i, layer in enumerate(found_layers):
+                                logger.info(f"Found item {i}: {type(layer)} - {getattr(layer, 'name', 'unnamed')}")
+            process_layer(layer)
+                        except Exception as e:
+                            logger.error(f"Error using findall: {str(e)}")
                         
         except Exception as e:
             logger.error(f"Error processing PSD layers: {str(e)}")

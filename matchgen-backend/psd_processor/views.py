@@ -47,9 +47,21 @@ class PSDUploadView(APIView):
                 psd = PSDImage.open(temp_file_path)
                 logger.info(f"PSD file opened successfully. Dimensions: {psd.width}x{psd.height}")
             except Exception as e:
-                logger.error(f"Failed to open PSD file: {str(e)}")
+                error_msg = str(e)
+                logger.error(f"Failed to open PSD file: {error_msg}")
+                
+                # Provide user-friendly error messages for common issues
+                if "Invalid version 8" in error_msg:
+                    user_error = "This PSD file uses a newer format (version 8) that is not yet supported. Please save your PSD file in an older format (version 7 or earlier) or export it as a different format."
+                elif "Invalid version" in error_msg:
+                    user_error = f"This PSD file uses an unsupported version. {error_msg}"
+                elif "not a PSD file" in error_msg.lower():
+                    user_error = "The uploaded file does not appear to be a valid PSD file."
+                else:
+                    user_error = f"Unable to process PSD file: {error_msg}"
+                
                 return Response(
-                    {'error': f'Invalid PSD file: {str(e)}'}, 
+                    {'error': user_error}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
             

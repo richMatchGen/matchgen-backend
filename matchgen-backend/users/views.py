@@ -703,9 +703,11 @@ class CustomTokenObtainPairView(TokenObtainPairView):
     def post(self, request, *args, **kwargs):
         try:
             logger.info(f"Token request for email: {request.data.get('email')}")
+            logger.info(f"Request headers: {dict(request.headers)}")
+            logger.info(f"Request data: {request.data}")
             
             # Validate content type
-            if request.content_type != 'application/json':
+            if request.content_type and 'application/json' not in request.content_type:
                 logger.warning(f"Invalid content type: {request.content_type}")
                 return Response(
                     {"error": "Content-Type must be application/json"}, 

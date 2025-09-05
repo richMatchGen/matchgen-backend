@@ -33,25 +33,28 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             raise serializers.ValidationError("Please provide a valid email address.")
         
         try:
+            # Try to get user using Django ORM first
             user = User.objects.filter(email=email).first()
+            if not user:
+                # Fallback: try to get user with raw SQL if ORM fails
+                logger.warning(f"User not found via ORM for email: {email}")
+                from django.db import connection
+                with connection.cursor() as cursor:
+                    cursor.execute("SELECT id, email, username, profile_picture, is_active, password FROM users_user WHERE email = %s", [email])
+                    row = cursor.fetchone()
+                    if row:
+                        user = User()
+                        user.id = row[0]
+                        user.email = row[1]
+                        user.username = row[2]
+                        user.profile_picture = row[3]
+                        user.is_active = row[4]
+                        user.password = row[5]  # Store password for manual checking
+                    else:
+                        user = None
         except Exception as e:
-            # Handle case where email verification fields don't exist
-            logger.warning(f"Database fields not available: {str(e)}")
-            # Try to get user with only basic fields
-            from django.db import connection
-            with connection.cursor() as cursor:
-                cursor.execute("SELECT id, email, username, profile_picture, is_active, password FROM users_user WHERE email = %s", [email])
-                row = cursor.fetchone()
-                if row:
-                    user = User()
-                    user.id = row[0]
-                    user.email = row[1]
-                    user.username = row[2]
-                    user.profile_picture = row[3]
-                    user.is_active = row[4]
-                    user.password = row[5]  # Store password for manual checking
-                else:
-                    user = None
+            logger.error(f"Database error during user lookup: {str(e)}", exc_info=True)
+            raise serializers.ValidationError("Database error occurred. Please try again.")
         
         if user:
             # Check password - handle both Django ORM and manual user objects

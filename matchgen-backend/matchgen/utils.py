@@ -32,6 +32,15 @@ def custom_exception_handler(exc, context):
             error_data['fields'] = response.data
         
         response.data = error_data
+        
+        # Ensure CORS headers are included
+        if hasattr(context, 'request'):
+            request = context['request']
+            if hasattr(request, 'META') and 'HTTP_ORIGIN' in request.META:
+                response['Access-Control-Allow-Origin'] = request.META['HTTP_ORIGIN']
+                response['Access-Control-Allow-Credentials'] = 'true'
+                response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+        
         return response
     
     # Handle Django-specific exceptions
@@ -42,27 +51,35 @@ def custom_exception_handler(exc, context):
             'code': status.HTTP_400_BAD_REQUEST,
             'fields': exc.message_dict if hasattr(exc, 'message_dict') else {'detail': str(exc)}
         }
-        return Response(error_data, status=status.HTTP_400_BAD_REQUEST)
-    
-    if isinstance(exc, Http404):
+        response = Response(error_data, status=status.HTTP_400_BAD_REQUEST)
+    elif isinstance(exc, Http404):
         error_data = {
             'error': True,
             'message': 'Resource not found',
             'code': status.HTTP_404_NOT_FOUND,
         }
-        return Response(error_data, status=status.HTTP_404_NOT_FOUND)
+        response = Response(error_data, status=status.HTTP_404_NOT_FOUND)
+    else:
+        # Log unexpected exceptions
+        logger.error(f"Unexpected error: {exc}", exc_info=True)
+        
+        # Return a generic error response for unexpected exceptions
+        error_data = {
+            'error': True,
+            'message': 'An unexpected error occurred',
+            'code': status.HTTP_500_INTERNAL_SERVER_ERROR,
+        }
+        response = Response(error_data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     
-    # Log unexpected exceptions
-    logger.error(f"Unexpected error: {exc}", exc_info=True)
+    # Ensure CORS headers are included for all responses
+    if hasattr(context, 'request'):
+        request = context['request']
+        if hasattr(request, 'META') and 'HTTP_ORIGIN' in request.META:
+            response['Access-Control-Allow-Origin'] = request.META['HTTP_ORIGIN']
+            response['Access-Control-Allow-Credentials'] = 'true'
+            response['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
     
-    # Return a generic error response for unexpected exceptions
-    error_data = {
-        'error': True,
-        'message': 'An unexpected error occurred',
-        'code': status.HTTP_500_INTERNAL_SERVER_ERROR,
-    }
-    
-    return Response(error_data, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    return response
 
 
 def validate_email(email):

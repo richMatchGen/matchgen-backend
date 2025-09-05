@@ -167,8 +167,8 @@ class PSDUploadView(APIView):
                     bbox_method = None
                     
                     # Method 1: Standard bbox attribute
-                if hasattr(layer, 'bbox') and layer.bbox:
-                    bbox = layer.bbox
+                    if hasattr(layer, 'bbox') and layer.bbox:
+                        bbox = layer.bbox
                         bbox_method = "bbox"
                     # Method 2: Individual coordinate attributes
                     elif hasattr(layer, 'left') and hasattr(layer, 'top') and hasattr(layer, 'right') and hasattr(layer, 'bottom'):

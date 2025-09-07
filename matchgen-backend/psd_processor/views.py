@@ -99,7 +99,7 @@ class PSDUploadView(APIView):
             
             # Extract layer information
             try:
-            layers_data = self._extract_layers(psd)
+                layers_data = self._extract_layers(psd)
                 logger.info(f"Extracted {len(layers_data)} layers from PSD file")
             except Exception as e:
                 logger.error(f"Failed to extract layers: {str(e)}")
@@ -109,10 +109,10 @@ class PSDUploadView(APIView):
             # Create layer records
             for layer_data in layers_data:
                 try:
-                PSDLayer.objects.create(
-                    document=psd_doc,
-                    **layer_data
-                )
+                    PSDLayer.objects.create(
+                        document=psd_doc,
+                        **layer_data
+                    )
                 except Exception as e:
                     logger.error(f"Failed to create layer {layer_data.get('name', 'unknown')}: {str(e)}")
                     # Continue with other layers
@@ -153,12 +153,12 @@ class PSDUploadView(APIView):
                     logger.debug(f"Layer {layer_name} attributes: {attrs}")
                 
                 if hasattr(layer, 'layers') and layer.layers:
-                # This is a group
+                    # This is a group
                     logger.debug(f"Layer {layer_name} is a group with {len(layer.layers)} sub-layers")
-                for sub_layer in layer.layers:
+                    for sub_layer in layer.layers:
                         process_layer(sub_layer, f"{parent_name}{layer_name}/" if parent_name else f"{layer_name}/")
-            else:
-                # This is a regular layer
+                else:
+                    # This is a regular layer
                     full_layer_name = f"{parent_name}{layer_name}" if parent_name else layer_name
                     logger.debug(f"Processing regular layer: {full_layer_name}")
                     
@@ -167,8 +167,8 @@ class PSDUploadView(APIView):
                     bbox_method = None
                     
                     # Method 1: Standard bbox attribute
-                if hasattr(layer, 'bbox') and layer.bbox:
-                    bbox = layer.bbox
+                    if hasattr(layer, 'bbox') and layer.bbox:
+                        bbox = layer.bbox
                         bbox_method = "bbox"
                     # Method 2: Individual coordinate attributes
                     elif hasattr(layer, 'left') and hasattr(layer, 'top') and hasattr(layer, 'right') and hasattr(layer, 'bottom'):
@@ -233,7 +233,7 @@ class PSDUploadView(APIView):
                 logger.error(f"Error processing layer {getattr(layer, 'name', 'unknown')}: {str(e)}", exc_info=True)
         
         try:
-        # Process all top-level layers
+            # Process all top-level layers
             if hasattr(psd, 'layers') and psd.layers:
                 logger.info(f"Found {len(psd.layers)} top-level layers")
                 for i, layer in enumerate(psd.layers):

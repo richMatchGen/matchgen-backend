@@ -227,7 +227,7 @@ class PSDUploadView(APIView):
                             'layer_type': 'layer'
                     }
                     layers_data.append(layer_data)
-                        logger.info(f"Created basic layer entry for: {full_layer_name}")
+                    logger.info(f"Created basic layer entry for: {full_layer_name}")
                         
             except Exception as e:
                 logger.error(f"Error processing layer {getattr(layer, 'name', 'unknown')}: {str(e)}", exc_info=True)

@@ -190,6 +190,9 @@ class ResendVerificationView(APIView):
                 logger.warning(f"Email settings not configured. Skipping email send for {user.email}")
                 logger.info(f"Verification URL for {user.email}: {verification_url}")
                 logger.warning("To enable email verification, configure EMAIL_HOST_USER and EMAIL_HOST_PASSWORD environment variables")
+                print(f"\n🔗 VERIFICATION LINK FOR {user.email}:")
+                print(f"{verification_url}")
+                print(f"Copy this link and paste it in your browser to verify the account.\n")
                 return
             
             send_mail(

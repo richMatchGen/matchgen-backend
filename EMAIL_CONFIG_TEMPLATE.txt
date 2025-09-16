@@ -1,0 +1,24 @@
+# Copy this content to a file named .env in the matchgen-backend directory
+# Then replace the placeholder values with your actual email settings
+
+EMAIL_HOST=smtp.gmail.com
+EMAIL_PORT=587
+EMAIL_USE_TLS=True
+EMAIL_HOST_USER=your-email@gmail.com
+EMAIL_HOST_PASSWORD=your-gmail-app-password
+DEFAULT_FROM_EMAIL=noreply@matchgen.com
+FRONTEND_URL=https://matchgen-frontend.vercel.app
+
+# Instructions:
+# 1. Create a file called .env in the matchgen-backend directory
+# 2. Copy the above content into the .env file
+# 3. Replace "your-email@gmail.com" with your actual Gmail address
+# 4. Replace "your-gmail-app-password" with your Gmail App Password
+# 5. Save the file and restart your Django server
+
+# To get Gmail App Password:
+# 1. Go to Google Account settings
+# 2. Enable 2-Factor Authentication
+# 3. Go to Security → App passwords
+# 4. Generate password for "Mail"
+# 5. Use that 16-character password above

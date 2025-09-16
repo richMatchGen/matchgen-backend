@@ -119,12 +119,75 @@ class EmailVerificationView(APIView):
 
 
 class ResendVerificationView(APIView):
-    """Resend email verification."""
+    """Resend email verification for authenticated users."""
     permission_classes = [IsAuthenticated]
     
     def post(self, request):
         try:
             user = request.user
+            
+            # Check if email verification fields exist
+            if not hasattr(user, 'email_verified'):
+                return Response(
+                    {"error": "Email verification not available."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if user.email_verified:
+                return Response(
+                    {"error": "Email is already verified."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Generate new token
+            import secrets
+            verification_token = secrets.token_urlsafe(32)
+            
+            if hasattr(user, 'email_verification_token'):
+                user.email_verification_token = verification_token
+            if hasattr(user, 'email_verification_sent_at'):
+                user.email_verification_sent_at = timezone.now()
+            user.save()
+            
+            # Send verification email
+            self._send_verification_email(user, verification_token)
+            
+            logger.info(f"Verification email resent to: {user.email}")
+            
+            return Response(
+                {"message": "Verification email sent successfully!"}, 
+                status=status.HTTP_200_OK
+            )
+        except Exception as e:
+            logger.error(f"Resend verification error: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while sending verification email."}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
+
+
+class ResendVerificationSignupView(APIView):
+    """Resend email verification during signup (no authentication required)."""
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        try:
+            email = request.data.get('email')
+            
+            if not email:
+                return Response(
+                    {"error": "Email is required."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Find user by email
+            try:
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
+                return Response(
+                    {"error": "User with this email does not exist."}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
             
             # Check if email verification fields exist
             if not hasattr(user, 'email_verified'):
@@ -194,6 +257,20 @@ class ResendVerificationView(APIView):
                 print(f"{verification_url}")
                 print(f"Copy this link and paste it in your browser to verify the account.\n")
                 return
+            
+            send_mail(
+                subject=subject,
+                message=message,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[user.email],
+                fail_silently=True,
+            )
+            
+            logger.info(f"Verification email sent to {user.email}")
+        except Exception as e:
+            logger.error(f"Failed to send verification email to {user.email}: {str(e)}")
+            # Don't fail if email fails
+            logger.info(f"Verification URL for {user.email}: {verification_url}")
             
             send_mail(
                 subject=subject,

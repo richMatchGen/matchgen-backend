@@ -37,6 +37,7 @@ from .views import (
     StripeWebhookView,
     EmailVerificationView,
     ResendVerificationView,
+    ResendVerificationSignupView,
     EnhancedClubCreationView
 )
 
@@ -57,6 +58,7 @@ urlpatterns = [
     path("register/", RegisterView.as_view(), name="register"),
     path("verify-email/", EmailVerificationView.as_view(), name="verify_email"),
     path("resend-verification/", ResendVerificationView.as_view(), name="resend_verification"),
+    path("resend-verification-signup/", ResendVerificationSignupView.as_view(), name="resend_verification_signup"),
     path("login/", LoginView.as_view(), name="login"),
     path("token/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),

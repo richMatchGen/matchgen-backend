@@ -189,6 +189,7 @@ class ResendVerificationView(APIView):
             if not settings.EMAIL_HOST_USER or not settings.EMAIL_HOST_PASSWORD:
                 logger.warning(f"Email settings not configured. Skipping email send for {user.email}")
                 logger.info(f"Verification URL for {user.email}: {verification_url}")
+                logger.warning("To enable email verification, configure EMAIL_HOST_USER and EMAIL_HOST_PASSWORD environment variables")
                 return
             
             send_mail(
@@ -241,8 +242,8 @@ class RegisterView(APIView):
             import secrets
             verification_token = secrets.token_urlsafe(32)
             
-            # Check if we're in development mode (no email settings)
-            is_development = not settings.EMAIL_HOST_USER or not settings.EMAIL_HOST_PASSWORD
+            # Always require email verification for security
+            # is_development = not settings.EMAIL_HOST_USER or not settings.EMAIL_HOST_PASSWORD
             
             try:
                 # Try to create user with email verification fields
@@ -251,7 +252,7 @@ class RegisterView(APIView):
                     password=password,
                     email_verification_token=verification_token,
                     email_verification_sent_at=timezone.now(),
-                    email_verified=is_development  # Auto-verify in development
+                    email_verified=False  # Always require verification
                 )
             except Exception as e:
                 # If email verification fields don't exist, create user with raw SQL

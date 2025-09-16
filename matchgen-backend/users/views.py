@@ -249,7 +249,12 @@ class ResendVerificationSignupView(APIView):
             """
             
             # Check if email settings are configured
-            if not settings.EMAIL_HOST_USER or not settings.EMAIL_HOST_PASSWORD:
+            email_user = getattr(settings, 'EMAIL_HOST_USER', None)
+            email_password = getattr(settings, 'EMAIL_HOST_PASSWORD', None)
+            
+            logger.info(f"Email settings check - USER: {'SET' if email_user else 'NOT SET'}, PASSWORD: {'SET' if email_password else 'NOT SET'}")
+            
+            if not email_user or not email_password:
                 logger.warning(f"Email settings not configured. Skipping email send for {user.email}")
                 logger.info(f"Verification URL for {user.email}: {verification_url}")
                 logger.warning("To enable email verification, configure EMAIL_HOST_USER and EMAIL_HOST_PASSWORD environment variables")

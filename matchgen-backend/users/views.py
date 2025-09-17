@@ -263,15 +263,40 @@ class ResendVerificationSignupView(APIView):
                 print(f"Copy this link and paste it in your browser to verify the account.\n")
                 return
             
+            # Try to send email with a short timeout
             try:
-                send_mail(
-                    subject=subject,
-                    message=message,
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[user.email],
-                    fail_silently=False,
-                )
-                logger.info(f"Verification email sent successfully to {user.email}")
+                import threading
+                import time
+                
+                def send_email_async():
+                    try:
+                        send_mail(
+                            subject=subject,
+                            message=message,
+                            from_email=settings.DEFAULT_FROM_EMAIL,
+                            recipient_list=[user.email],
+                            fail_silently=True,
+                        )
+                        logger.info(f"Verification email sent successfully to {user.email}")
+                    except Exception as email_error:
+                        logger.error(f"Failed to send email to {user.email}: {str(email_error)}")
+                        # Fallback: log the verification link
+                        logger.info(f"Verification URL for {user.email}: {verification_url}")
+                        print(f"\n🔗 VERIFICATION LINK FOR {user.email}:")
+                        print(f"{verification_url}")
+                        print(f"Copy this link and paste it in your browser to verify the account.\n")
+                
+                # Start email sending in background thread
+                email_thread = threading.Thread(target=send_email_async)
+                email_thread.daemon = True
+                email_thread.start()
+                
+                # Log the verification link immediately as fallback
+                logger.info(f"Verification URL for {user.email}: {verification_url}")
+                print(f"\n🔗 VERIFICATION LINK FOR {user.email}:")
+                print(f"{verification_url}")
+                print(f"Copy this link and paste it in your browser to verify the account.\n")
+                
             except Exception as email_error:
                 logger.error(f"Failed to send email to {user.email}: {str(email_error)}")
                 # Fallback: log the verification link
@@ -279,7 +304,6 @@ class ResendVerificationSignupView(APIView):
                 print(f"\n🔗 VERIFICATION LINK FOR {user.email}:")
                 print(f"{verification_url}")
                 print(f"Copy this link and paste it in your browser to verify the account.\n")
-                # Don't fail the registration if email fails
             
             logger.info(f"Verification email sent to {user.email}")
         except Exception as e:

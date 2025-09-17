@@ -263,13 +263,23 @@ class ResendVerificationSignupView(APIView):
                 print(f"Copy this link and paste it in your browser to verify the account.\n")
                 return
             
-            send_mail(
-                subject=subject,
-                message=message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[user.email],
-                fail_silently=True,
-            )
+            try:
+                send_mail(
+                    subject=subject,
+                    message=message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[user.email],
+                    fail_silently=False,
+                )
+                logger.info(f"Verification email sent successfully to {user.email}")
+            except Exception as email_error:
+                logger.error(f"Failed to send email to {user.email}: {str(email_error)}")
+                # Fallback: log the verification link
+                logger.info(f"Verification URL for {user.email}: {verification_url}")
+                print(f"\n🔗 VERIFICATION LINK FOR {user.email}:")
+                print(f"{verification_url}")
+                print(f"Copy this link and paste it in your browser to verify the account.\n")
+                # Don't fail the registration if email fails
             
             logger.info(f"Verification email sent to {user.email}")
         except Exception as e:

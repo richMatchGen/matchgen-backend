@@ -348,6 +348,10 @@ EMAIL_HOST_USER = os.getenv('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = os.getenv('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'noreply@matchgen.com')
 
+# SMTP timeout settings for Railway
+EMAIL_TIMEOUT = 10  # 10 seconds timeout
+EMAIL_USE_SSL = False  # Use TLS instead of SSL
+
 # Frontend URL for email verification
 FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://matchgen-frontend.vercel.app')
 

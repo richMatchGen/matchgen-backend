@@ -270,16 +270,44 @@ class ResendVerificationSignupView(APIView):
                 print(f"Copy this link and paste it in your browser to verify the account.\n")
                 return
             
-            # Try to send email with SendGrid
+            # Try to send email with SendGrid API (more reliable than SMTP)
             try:
-                send_mail(
-                    subject=subject,
-                    message=message,
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[user.email],
-                    fail_silently=False,
-                )
-                logger.info(f"✅ Verification email sent successfully to {user.email}")
+                import requests
+                
+                # SendGrid API endpoint
+                sendgrid_url = "https://api.sendgrid.com/v3/mail/send"
+                
+                # Prepare email data
+                email_data = {
+                    "personalizations": [
+                        {
+                            "to": [{"email": user.email}],
+                            "subject": subject
+                        }
+                    ],
+                    "from": {"email": settings.DEFAULT_FROM_EMAIL},
+                    "content": [
+                        {
+                            "type": "text/plain",
+                            "value": message
+                        }
+                    ]
+                }
+                
+                # Send via SendGrid API
+                headers = {
+                    "Authorization": f"Bearer {settings.EMAIL_HOST_PASSWORD}",
+                    "Content-Type": "application/json"
+                }
+                
+                response = requests.post(sendgrid_url, json=email_data, headers=headers, timeout=10)
+                
+                if response.status_code == 202:
+                    logger.info(f"✅ Verification email sent successfully to {user.email}")
+                else:
+                    logger.error(f"❌ SendGrid API error: {response.status_code} - {response.text}")
+                    raise Exception(f"SendGrid API error: {response.status_code}")
+                    
             except Exception as email_error:
                 logger.error(f"❌ Failed to send email to {user.email}: {str(email_error)}")
                 # Fallback: log the verification link
@@ -424,16 +452,44 @@ class RegisterView(APIView):
                 print(f"Copy this link and paste it in your browser to verify the account.\n")
                 return
             
-            # Try to send email with SendGrid
+            # Try to send email with SendGrid API (more reliable than SMTP)
             try:
-                send_mail(
-                    subject=subject,
-                    message=message,
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[user.email],
-                    fail_silently=False,
-                )
-                logger.info(f"✅ Verification email sent successfully to {user.email}")
+                import requests
+                
+                # SendGrid API endpoint
+                sendgrid_url = "https://api.sendgrid.com/v3/mail/send"
+                
+                # Prepare email data
+                email_data = {
+                    "personalizations": [
+                        {
+                            "to": [{"email": user.email}],
+                            "subject": subject
+                        }
+                    ],
+                    "from": {"email": settings.DEFAULT_FROM_EMAIL},
+                    "content": [
+                        {
+                            "type": "text/plain",
+                            "value": message
+                        }
+                    ]
+                }
+                
+                # Send via SendGrid API
+                headers = {
+                    "Authorization": f"Bearer {settings.EMAIL_HOST_PASSWORD}",
+                    "Content-Type": "application/json"
+                }
+                
+                response = requests.post(sendgrid_url, json=email_data, headers=headers, timeout=10)
+                
+                if response.status_code == 202:
+                    logger.info(f"✅ Verification email sent successfully to {user.email}")
+                else:
+                    logger.error(f"❌ SendGrid API error: {response.status_code} - {response.text}")
+                    raise Exception(f"SendGrid API error: {response.status_code}")
+                    
             except Exception as email_error:
                 logger.error(f"❌ Failed to send email to {user.email}: {str(email_error)}")
                 # Fallback: log the verification link

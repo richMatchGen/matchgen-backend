@@ -1226,7 +1226,7 @@ class RemoveMemberView(APIView):
 
 class FeatureAccessView(APIView):
     """View for checking feature access"""
-    permission_classes = [IsClubMember]
+    permission_classes = [IsAuthenticated]
     
     def get(self, request):
         """Get feature access information for a club"""
@@ -1238,6 +1238,24 @@ class FeatureAccessView(APIView):
             club = Club.objects.get(id=club_id)
         except Club.DoesNotExist:
             return Response({"error": "Club not found"}, status=404)
+        
+        # Check if user has access to this club (either as owner or member)
+        has_access = False
+        
+        # Check direct ownership (legacy)
+        if club.user == request.user:
+            has_access = True
+        
+        # Check membership (RBAC)
+        if not has_access:
+            has_access = ClubMembership.objects.filter(
+                user=request.user,
+                club=club,
+                status='active'
+            ).exists()
+        
+        if not has_access:
+            return Response({"error": "You don't have access to this club"}, status=403)
         
         available_features = FeaturePermission.get_available_features(club)
         

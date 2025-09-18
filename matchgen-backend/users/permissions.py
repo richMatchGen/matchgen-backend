@@ -138,11 +138,20 @@ class IsClubMember(permissions.BasePermission):
         if not club_id:
             return False
         
-        return ClubMembership.objects.filter(
+        # Check for active membership first
+        if ClubMembership.objects.filter(
             user=request.user,
             club_id=club_id,
             status='active'
-        ).exists()
+        ).exists():
+            return True
+        
+        # Fallback: Check for direct club ownership (legacy system)
+        try:
+            club = Club.objects.get(id=club_id, user=request.user)
+            return True
+        except Club.DoesNotExist:
+            return False
 
 
 class HasRolePermission(permissions.BasePermission):

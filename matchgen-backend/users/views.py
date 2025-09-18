@@ -248,22 +248,29 @@ class ResendVerificationSignupView(APIView):
             The MatchGen Team
             """
             
+            # Debug: Check each email setting individually
+            logger.info("=== EMAIL CONFIGURATION DEBUG ===")
+            logger.info(f"EMAIL_HOST: {getattr(settings, 'EMAIL_HOST', 'NOT SET')}")
+            logger.info(f"EMAIL_PORT: {getattr(settings, 'EMAIL_PORT', 'NOT SET')}")
+            logger.info(f"EMAIL_USE_TLS: {getattr(settings, 'EMAIL_USE_TLS', 'NOT SET')}")
+            logger.info(f"EMAIL_HOST_USER: {getattr(settings, 'EMAIL_HOST_USER', 'NOT SET')}")
+            logger.info(f"EMAIL_HOST_PASSWORD: {'SET' if getattr(settings, 'EMAIL_HOST_PASSWORD', None) else 'NOT SET'}")
+            logger.info(f"DEFAULT_FROM_EMAIL: {getattr(settings, 'DEFAULT_FROM_EMAIL', 'NOT SET')}")
+            logger.info("=== END EMAIL DEBUG ===")
+            
             # Check if email settings are configured
             email_user = getattr(settings, 'EMAIL_HOST_USER', None)
             email_password = getattr(settings, 'EMAIL_HOST_PASSWORD', None)
             
-            logger.info(f"Email settings check - USER: {'SET' if email_user else 'NOT SET'}, PASSWORD: {'SET' if email_password else 'NOT SET'}")
-            
             if not email_user or not email_password:
                 logger.warning(f"Email settings not configured. Skipping email send for {user.email}")
                 logger.info(f"Verification URL for {user.email}: {verification_url}")
-                logger.warning("To enable email verification, configure EMAIL_HOST_USER and EMAIL_HOST_PASSWORD environment variables")
                 print(f"\n🔗 VERIFICATION LINK FOR {user.email}:")
                 print(f"{verification_url}")
                 print(f"Copy this link and paste it in your browser to verify the account.\n")
                 return
             
-            # Send verification email using SendGrid
+            # Try to send email with SendGrid
             try:
                 send_mail(
                     subject=subject,
@@ -272,30 +279,14 @@ class ResendVerificationSignupView(APIView):
                     recipient_list=[user.email],
                     fail_silently=False,
                 )
-                logger.info(f"Verification email sent successfully to {user.email}")
+                logger.info(f"✅ Verification email sent successfully to {user.email}")
             except Exception as email_error:
-                logger.error(f"Failed to send email to {user.email}: {str(email_error)}")
+                logger.error(f"❌ Failed to send email to {user.email}: {str(email_error)}")
                 # Fallback: log the verification link
                 logger.info(f"Verification URL for {user.email}: {verification_url}")
                 print(f"\n🔗 VERIFICATION LINK FOR {user.email}:")
                 print(f"{verification_url}")
                 print(f"Copy this link and paste it in your browser to verify the account.\n")
-            
-            logger.info(f"Verification email sent to {user.email}")
-        except Exception as e:
-            logger.error(f"Failed to send verification email to {user.email}: {str(e)}")
-            # Don't fail if email fails
-            logger.info(f"Verification URL for {user.email}: {verification_url}")
-            
-            send_mail(
-                subject=subject,
-                message=message,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[user.email],
-                fail_silently=True,  # Changed to True to prevent failure
-            )
-            
-            logger.info(f"Verification email sent to {user.email}")
         except Exception as e:
             logger.error(f"Failed to send verification email to {user.email}: {str(e)}")
             # Don't fail if email fails
@@ -411,13 +402,29 @@ class RegisterView(APIView):
             The MatchGen Team
             """
             
+            # Debug: Check each email setting individually
+            logger.info("=== EMAIL CONFIGURATION DEBUG ===")
+            logger.info(f"EMAIL_HOST: {getattr(settings, 'EMAIL_HOST', 'NOT SET')}")
+            logger.info(f"EMAIL_PORT: {getattr(settings, 'EMAIL_PORT', 'NOT SET')}")
+            logger.info(f"EMAIL_USE_TLS: {getattr(settings, 'EMAIL_USE_TLS', 'NOT SET')}")
+            logger.info(f"EMAIL_HOST_USER: {getattr(settings, 'EMAIL_HOST_USER', 'NOT SET')}")
+            logger.info(f"EMAIL_HOST_PASSWORD: {'SET' if getattr(settings, 'EMAIL_HOST_PASSWORD', None) else 'NOT SET'}")
+            logger.info(f"DEFAULT_FROM_EMAIL: {getattr(settings, 'DEFAULT_FROM_EMAIL', 'NOT SET')}")
+            logger.info("=== END EMAIL DEBUG ===")
+            
             # Check if email settings are configured
-            if not settings.EMAIL_HOST_USER or not settings.EMAIL_HOST_PASSWORD:
+            email_user = getattr(settings, 'EMAIL_HOST_USER', None)
+            email_password = getattr(settings, 'EMAIL_HOST_PASSWORD', None)
+            
+            if not email_user or not email_password:
                 logger.warning(f"Email settings not configured. Skipping email send for {user.email}")
                 logger.info(f"Verification URL for {user.email}: {verification_url}")
+                print(f"\n🔗 VERIFICATION LINK FOR {user.email}:")
+                print(f"{verification_url}")
+                print(f"Copy this link and paste it in your browser to verify the account.\n")
                 return
             
-            # Send verification email using SendGrid
+            # Try to send email with SendGrid
             try:
                 send_mail(
                     subject=subject,
@@ -426,9 +433,9 @@ class RegisterView(APIView):
                     recipient_list=[user.email],
                     fail_silently=False,
                 )
-                logger.info(f"Verification email sent successfully to {user.email}")
+                logger.info(f"✅ Verification email sent successfully to {user.email}")
             except Exception as email_error:
-                logger.error(f"Failed to send email to {user.email}: {str(email_error)}")
+                logger.error(f"❌ Failed to send email to {user.email}: {str(email_error)}")
                 # Fallback: log the verification link
                 logger.info(f"Verification URL for {user.email}: {verification_url}")
                 print(f"\n🔗 VERIFICATION LINK FOR {user.email}:")

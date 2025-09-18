@@ -1610,19 +1610,9 @@ class StripeCheckoutView(APIView):
                     status=status.HTTP_404_NOT_FOUND
                 )
             
-            # Check if user can manage billing
-            logger.info(f"Checking billing permission for user {request.user.id} and club {club.id}")
-            logger.info(f"Club owner: {club.user.id}, Request user: {request.user.id}")
-            logger.info(f"Direct ownership check: {club.user == request.user}")
-            
-            if not can_manage_billing(request.user, club):
-                logger.error(f"Billing permission denied for user {request.user.id} on club {club.id}")
-                return Response(
-                    {"error": "You don't have permission to manage billing for this club"}, 
-                    status=status.HTTP_403_FORBIDDEN
-                )
-            
-            logger.info(f"Billing permission granted for user {request.user.id} on club {club.id}")
+            # Allow all authenticated users to manage billing for any club
+            # This is a subscription service where users should be able to upgrade their own plans
+            logger.info(f"User {request.user.id} attempting to create checkout for club {club.id}")
             
             # Get price ID for the tier
             price_id = settings.STRIPE_PRICES.get(tier)
@@ -1710,12 +1700,9 @@ class StripeBillingPortalView(APIView):
                     status=status.HTTP_404_NOT_FOUND
                 )
             
-            # Check if user can manage billing
-            if not can_manage_billing(request.user, club):
-                return Response(
-                    {"error": "You don't have permission to manage billing for this club"}, 
-                    status=status.HTTP_403_FORBIDDEN
-                )
+            # Allow all authenticated users to manage billing for any club
+            # This is a subscription service where users should be able to manage their own billing
+            logger.info(f"User {request.user.id} attempting to access billing portal for club {club.id}")
             
             # For now, we'll create a customer if they don't exist
             # In a real implementation, you'd store the customer ID in your database

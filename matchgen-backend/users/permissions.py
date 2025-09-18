@@ -219,23 +219,43 @@ def get_user_role_in_club(user, club):
 
 def can_manage_team_members(user, club):
     """Check if user can manage team members (Owner or Admin)"""
+    # Check direct ownership (legacy system)
+    if club.user == user:
+        return True
+    
+    # Check RBAC membership
     role = get_user_role_in_club(user, club)
     return role in ['owner', 'admin']
 
 
 def can_manage_billing(user, club):
     """Check if user can manage billing (Owner only)"""
+    # Check direct ownership (legacy system)
+    if club.user == user:
+        return True
+    
+    # Check RBAC membership
     role = get_user_role_in_club(user, club)
     return role == 'owner'
 
 
 def can_create_posts(user, club):
     """Check if user can create posts (Owner, Admin, Editor)"""
+    # Check direct ownership (legacy system)
+    if club.user == user:
+        return True
+    
+    # Check RBAC membership
     role = get_user_role_in_club(user, club)
     return role in ['owner', 'admin', 'editor']
 
 
 def can_view_only(user, club):
     """Check if user can only view (Viewer)"""
+    # Check direct ownership (legacy system) - owners can do more than just view
+    if club.user == user:
+        return False
+    
+    # Check RBAC membership
     role = get_user_role_in_club(user, club)
     return role == 'viewer'

@@ -232,10 +232,12 @@ def can_manage_billing(user, club):
     """Check if user can manage billing (Owner only)"""
     # Check direct ownership (legacy system)
     if club.user == user:
+        print(f"✅ Direct ownership check passed: user {user.id} owns club {club.id}")
         return True
     
     # Check RBAC membership
     role = get_user_role_in_club(user, club)
+    print(f"🔍 RBAC check: user {user.id} has role '{role}' in club {club.id}")
     return role == 'owner'
 
 

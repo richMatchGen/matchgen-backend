@@ -1611,11 +1611,18 @@ class StripeCheckoutView(APIView):
                 )
             
             # Check if user can manage billing
+            logger.info(f"Checking billing permission for user {request.user.id} and club {club.id}")
+            logger.info(f"Club owner: {club.user.id}, Request user: {request.user.id}")
+            logger.info(f"Direct ownership check: {club.user == request.user}")
+            
             if not can_manage_billing(request.user, club):
+                logger.error(f"Billing permission denied for user {request.user.id} on club {club.id}")
                 return Response(
                     {"error": "You don't have permission to manage billing for this club"}, 
                     status=status.HTTP_403_FORBIDDEN
                 )
+            
+            logger.info(f"Billing permission granted for user {request.user.id} on club {club.id}")
             
             # Get price ID for the tier
             price_id = settings.STRIPE_PRICES.get(tier)

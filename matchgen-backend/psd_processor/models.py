@@ -19,10 +19,12 @@ class PSDLayer(models.Model):
     """Model to store individual layer information from PSD files."""
     document = models.ForeignKey(PSDDocument, on_delete=models.CASCADE, related_name='layers')
     name = models.CharField(max_length=255)
-    x = models.IntegerField(help_text="X coordinate of layer")
-    y = models.IntegerField(help_text="Y coordinate of layer")
+    x = models.IntegerField(help_text="X coordinate of layer (top-left corner)")
+    y = models.IntegerField(help_text="Y coordinate of layer (top-left corner)")
     width = models.IntegerField(help_text="Width of layer")
     height = models.IntegerField(help_text="Height of layer")
+    center_x = models.FloatField(help_text="Center X coordinate of layer")
+    center_y = models.FloatField(help_text="Center Y coordinate of layer")
     visible = models.BooleanField(default=True)
     opacity = models.FloatField(default=100.0)
     layer_type = models.CharField(max_length=50, default='layer')
@@ -37,3 +39,8 @@ class PSDLayer(models.Model):
     def bounding_box(self):
         """Return bounding box as a formatted string."""
         return f"x={self.x}, y={self.y}, w={self.width}, h={self.height}"
+    
+    @property
+    def center_point(self):
+        """Return center point as a formatted string."""
+        return f"center=({self.center_x:.1f}, {self.center_y:.1f})"

@@ -5,10 +5,11 @@ from .models import PSDDocument, PSDLayer
 class PSDLayerSerializer(serializers.ModelSerializer):
     """Serializer for PSD layer information."""
     bounding_box = serializers.ReadOnlyField()
+    center_point = serializers.ReadOnlyField()
     
     class Meta:
         model = PSDLayer
-        fields = ['id', 'name', 'x', 'y', 'width', 'height', 'visible', 'opacity', 'layer_type', 'bounding_box']
+        fields = ['id', 'name', 'x', 'y', 'width', 'height', 'center_x', 'center_y', 'visible', 'opacity', 'layer_type', 'bounding_box', 'center_point']
 
 
 class PSDDocumentSerializer(serializers.ModelSerializer):

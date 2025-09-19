@@ -194,6 +194,10 @@ class PSDUploadView(APIView):
                         width = int(bbox[2] - bbox[0]) if bbox[2] is not None and bbox[0] is not None else 0
                         height = int(bbox[3] - bbox[1]) if bbox[3] is not None and bbox[1] is not None else 0
                         
+                        # Calculate center points
+                        center_x = x + (width / 2.0)
+                        center_y = y + (height / 2.0)
+                        
                         # Get visibility and opacity safely
                         visible = getattr(layer, 'visible', True)
                         opacity = getattr(layer, 'opacity', 1.0)
@@ -206,12 +210,14 @@ class PSDUploadView(APIView):
                             'y': y,
                             'width': width,
                             'height': height,
+                            'center_x': center_x,
+                            'center_y': center_y,
                             'visible': bool(visible),
                             'opacity': float(opacity),
                             'layer_type': 'group' if hasattr(layer, 'layers') and layer.layers else 'layer'
                         }
                         layers_data.append(layer_data)
-                        logger.info(f"Successfully extracted layer: {full_layer_name} at ({x}, {y}) - {width}x{height}")
+                        logger.info(f"Successfully extracted layer: {full_layer_name} at ({x}, {y}) - {width}x{height}, center=({center_x:.1f}, {center_y:.1f})")
                     else:
                         logger.warning(f"Could not extract bounding box for layer: {full_layer_name}. Available attributes: {[attr for attr in dir(layer) if not attr.startswith('_')]}")
                         
@@ -222,6 +228,8 @@ class PSDUploadView(APIView):
                             'y': 0,
                             'width': 0,
                             'height': 0,
+                            'center_x': 0.0,
+                            'center_y': 0.0,
                             'visible': getattr(layer, 'visible', True),
                             'opacity': float(getattr(layer, 'opacity', 1.0)) * 100 if getattr(layer, 'opacity', 1.0) <= 1.0 else float(getattr(layer, 'opacity', 100.0)),
                             'layer_type': 'layer'

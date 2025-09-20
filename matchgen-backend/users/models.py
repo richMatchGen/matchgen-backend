@@ -76,10 +76,11 @@ class Club(models.Model):
     subscription_tier = models.CharField(
         max_length=20, 
         choices=SUBSCRIPTION_TIERS, 
-        default='basic'
+        null=True,
+        blank=True
     )
-    subscription_active = models.BooleanField(default=True)
-    subscription_start_date = models.DateTimeField(default=timezone.now)
+    subscription_active = models.BooleanField(default=False)
+    subscription_start_date = models.DateTimeField(null=True, blank=True)
     subscription_end_date = models.DateTimeField(blank=True, null=True)
 
     def __str__(self):

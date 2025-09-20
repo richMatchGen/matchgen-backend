@@ -390,8 +390,8 @@ class RegisterView(APIView):
                 user.is_staff = False
                 user.is_superuser = False
             
-            # Send verification email (will be skipped if no email settings)
-            self._send_verification_email(user, verification_token)
+            # Send verification code automatically
+            self._send_verification_code_after_registration(user)
             
             logger.info(f"User created successfully: {user.email}")
             
@@ -501,6 +501,97 @@ class RegisterView(APIView):
             logger.error(f"Failed to send verification email to {user.email}: {str(e)}")
             # Don't fail registration if email fails
             logger.info(f"Verification URL for {user.email}: {verification_url}")
+
+    def _send_verification_code_after_registration(self, user):
+        """Send verification code after user registration."""
+        try:
+            # Generate a 6-digit verification code
+            import random
+            verification_code = str(random.randint(100000, 999999))
+            
+            # Store the code in cache with 10-minute expiry
+            cache_key = f"verification_code_{user.email}"
+            cache.set(cache_key, verification_code, 600)  # 10 minutes
+            
+            # Send the code via email
+            self._send_verification_code_email(user, verification_code)
+            
+            logger.info(f"Verification code sent to {user.email}")
+            
+        except Exception as e:
+            logger.error(f"Error sending verification code after registration: {str(e)}")
+            print(f"\n🔐 VERIFICATION CODE FOR {user.email}:")
+            print(f"Use this code to verify the account.\n")
+
+    def _send_verification_code_email(self, user, code):
+        """Send verification code email to user."""
+        try:
+            subject = "Your MatchGen Verification Code"
+            message = f"""
+            Your verification code is: {code}
+            
+            This code will expire in 10 minutes.
+            
+            If you didn't request this code, please ignore this email.
+            
+            Best regards,
+            The MatchGen Team
+            """
+            
+            # Check if email settings are configured
+            email_user = getattr(settings, 'EMAIL_HOST_USER', None)
+            email_password = getattr(settings, 'EMAIL_HOST_PASSWORD', None)
+            
+            if not email_user or not email_password:
+                logger.warning(f"Email settings not configured. Skipping email send for {user.email}")
+                logger.info(f"Verification code for {user.email}: {code}")
+                print(f"\n🔐 VERIFICATION CODE FOR {user.email}:")
+                print(f"{code}")
+                print(f"Use this code to verify the account.\n")
+                return
+            
+            # Try to send email with SendGrid API
+            try:
+                import requests
+                
+                sendgrid_url = "https://api.sendgrid.com/v3/mail/send"
+                headers = {
+                    "Authorization": f"Bearer {email_password}",
+                    "Content-Type": "application/json"
+                }
+                
+                data = {
+                    "personalizations": [{
+                        "to": [{"email": user.email}],
+                        "subject": subject
+                    }],
+                    "from": {"email": settings.DEFAULT_FROM_EMAIL},
+                    "content": [{
+                        "type": "text/plain",
+                        "value": message
+                    }]
+                }
+                
+                response = requests.post(sendgrid_url, headers=headers, json=data)
+                
+                if response.status_code == 202:
+                    logger.info(f"Verification code email sent successfully to {user.email}")
+                else:
+                    logger.error(f"SendGrid API error: {response.status_code} - {response.text}")
+                    print(f"\n🔐 VERIFICATION CODE FOR {user.email}:")
+                    print(f"{code}")
+                    print(f"Use this code to verify the account.\n")
+            except Exception as e:
+                logger.error(f"Error sending email via SendGrid: {str(e)}")
+                print(f"\n🔐 VERIFICATION CODE FOR {user.email}:")
+                print(f"{code}")
+                print(f"Use this code to verify the account.\n")
+                
+        except Exception as e:
+            logger.error(f"Error in _send_verification_code_email: {str(e)}")
+            print(f"\n🔐 VERIFICATION CODE FOR {user.email}:")
+            print(f"{code}")
+            print(f"Use this code to verify the account.\n")
 
 
 class LoginView(generics.GenericAPIView):
@@ -1931,3 +2022,162 @@ class StripeWebhookView(APIView):
                     
         except Exception as e:
             logger.error(f"Error handling payment failure: {str(e)}", exc_info=True)
+
+
+class SendVerificationCodeView(APIView):
+    """Send verification code to user's email."""
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        """Send a 6-digit verification code to the user's email."""
+        email = request.data.get('email')
+        
+        if not email:
+            return Response({'error': 'Email is required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            user = User.objects.get(email=email)
+            
+            # Generate a 6-digit verification code
+            import random
+            verification_code = str(random.randint(100000, 999999))
+            
+            # Store the code in cache with 10-minute expiry
+            cache_key = f"verification_code_{email}"
+            cache.set(cache_key, verification_code, 600)  # 10 minutes
+            
+            # Send the code via email
+            self._send_verification_code_email(user, verification_code)
+            
+            logger.info(f"Verification code sent to {email}")
+            return Response({
+                'message': 'Verification code sent successfully',
+                'email': email
+            }, status=status.HTTP_200_OK)
+            
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Error sending verification code: {str(e)}")
+            return Response({'error': 'Failed to send verification code'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+    def _send_verification_code_email(self, user, code):
+        """Send verification code email to user."""
+        try:
+            subject = "Your MatchGen Verification Code"
+            message = f"""
+            Your verification code is: {code}
+            
+            This code will expire in 10 minutes.
+            
+            If you didn't request this code, please ignore this email.
+            
+            Best regards,
+            The MatchGen Team
+            """
+            
+            # Check if email settings are configured
+            email_user = getattr(settings, 'EMAIL_HOST_USER', None)
+            email_password = getattr(settings, 'EMAIL_HOST_PASSWORD', None)
+            
+            if not email_user or not email_password:
+                logger.warning(f"Email settings not configured. Skipping email send for {user.email}")
+                logger.info(f"Verification code for {user.email}: {code}")
+                print(f"\n🔐 VERIFICATION CODE FOR {user.email}:")
+                print(f"{code}")
+                print(f"Use this code to verify the account.\n")
+                return
+            
+            # Try to send email with SendGrid API
+            try:
+                import requests
+                
+                sendgrid_url = "https://api.sendgrid.com/v3/mail/send"
+                headers = {
+                    "Authorization": f"Bearer {email_password}",
+                    "Content-Type": "application/json"
+                }
+                
+                data = {
+                    "personalizations": [{
+                        "to": [{"email": user.email}],
+                        "subject": subject
+                    }],
+                    "from": {"email": settings.DEFAULT_FROM_EMAIL},
+                    "content": [{
+                        "type": "text/plain",
+                        "value": message
+                    }]
+                }
+                
+                response = requests.post(sendgrid_url, headers=headers, json=data)
+                
+                if response.status_code == 202:
+                    logger.info(f"Verification code email sent successfully to {user.email}")
+                else:
+                    logger.error(f"SendGrid API error: {response.status_code} - {response.text}")
+                    print(f"\n🔐 VERIFICATION CODE FOR {user.email}:")
+                    print(f"{code}")
+                    print(f"Use this code to verify the account.\n")
+            except Exception as e:
+                logger.error(f"Error sending email via SendGrid: {str(e)}")
+                print(f"\n🔐 VERIFICATION CODE FOR {user.email}:")
+                print(f"{code}")
+                print(f"Use this code to verify the account.\n")
+                
+        except Exception as e:
+            logger.error(f"Error in _send_verification_code_email: {str(e)}")
+            print(f"\n🔐 VERIFICATION CODE FOR {user.email}:")
+            print(f"{code}")
+            print(f"Use this code to verify the account.\n")
+
+
+class VerifyEmailCodeView(APIView):
+    """Verify user email with code."""
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        """Verify email with the provided code."""
+        email = request.data.get('email')
+        code = request.data.get('code')
+        
+        if not email or not code:
+            return Response({'error': 'Email and code are required'}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            user = User.objects.get(email=email)
+            
+            # Check if code matches
+            cache_key = f"verification_code_{email}"
+            stored_code = cache.get(cache_key)
+            
+            if not stored_code:
+                return Response({'error': 'Verification code has expired or not found'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            if stored_code != code:
+                return Response({'error': 'Invalid verification code'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Mark email as verified
+            user.email_verified = True
+            user.save()
+            
+            # Clear the verification code from cache
+            cache.delete(cache_key)
+            
+            # Generate tokens for immediate login
+            refresh = RefreshToken.for_user(user)
+            access_token = str(refresh.access_token)
+            refresh_token = str(refresh)
+            
+            logger.info(f"Email verified successfully for {email}")
+            return Response({
+                'message': 'Email verified successfully',
+                'access': access_token,
+                'refresh': refresh_token
+            }, status=status.HTTP_200_OK)
+            
+        except User.DoesNotExist:
+            return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.error(f"Error verifying email code: {str(e)}")
+            return Response({'error': 'Failed to verify email'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

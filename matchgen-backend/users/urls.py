@@ -38,7 +38,9 @@ from .views import (
     EmailVerificationView,
     ResendVerificationView,
     ResendVerificationSignupView,
-    EnhancedClubCreationView
+    EnhancedClubCreationView,
+    SendVerificationCodeView,
+    VerifyEmailCodeView
 )
 
 
@@ -59,6 +61,8 @@ urlpatterns = [
     path("verify-email/", EmailVerificationView.as_view(), name="verify_email"),
     path("resend-verification/", ResendVerificationView.as_view(), name="resend_verification"),
     path("resend-verification-signup/", ResendVerificationSignupView.as_view(), name="resend_verification_signup"),
+    path("send-verification-code/", SendVerificationCodeView.as_view(), name="send_verification_code"),
+    path("verify-email-code/", VerifyEmailCodeView.as_view(), name="verify_email_code"),
     path("login/", LoginView.as_view(), name="login"),
     path("token/", CustomTokenObtainPairView.as_view(), name="token_obtain_pair"),
     path("token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),

@@ -10,15 +10,17 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AlterField(
-            model_name='club',
-            name='subscription_active',
-            field=models.BooleanField(default=False),
-        ),
+        # First, make subscription_start_date nullable
         migrations.AlterField(
             model_name='club',
             name='subscription_start_date',
             field=models.DateTimeField(blank=True, null=True),
+        ),
+        # Then update the other fields
+        migrations.AlterField(
+            model_name='club',
+            name='subscription_active',
+            field=models.BooleanField(default=False),
         ),
         migrations.AlterField(
             model_name='club',

@@ -714,6 +714,16 @@ class EnhancedClubCreationView(APIView):
                 )
             
             # Extract data
+            founded_year = request.data.get('founded_year')
+            # Convert empty string to None for founded_year field
+            if founded_year == '' or founded_year is None:
+                founded_year = None
+            else:
+                try:
+                    founded_year = int(founded_year)
+                except (ValueError, TypeError):
+                    founded_year = None
+            
             club_data = {
                 'name': request.data.get('name'),
                 'sport': request.data.get('sport'),
@@ -724,7 +734,7 @@ class EnhancedClubCreationView(APIView):
                 'bio': request.data.get('bio', ''),
                 'league': request.data.get('league', ''),
                 'website': request.data.get('website', ''),
-                'founded_year': request.data.get('founded_year'),
+                'founded_year': founded_year,
             }
             
             # Validate required fields

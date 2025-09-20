@@ -363,6 +363,7 @@ class PSDDocumentDetailView(APIView):
         try:
             document = PSDDocument.objects.get(id=document_id, user=request.user)
             serializer = PSDDocumentSerializer(document)
+            
             return Response(serializer.data)
         except PSDDocument.DoesNotExist:
             return Response(

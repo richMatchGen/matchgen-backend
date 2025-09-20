@@ -783,9 +783,16 @@ class EnhancedClubCreationView(APIView):
                     )
             
             # Create club
-            # Temporary workaround: provide default subscription_start_date until migration is applied
+            # Temporary workaround: provide default values until migration is applied
             if 'subscription_start_date' not in club_data or club_data['subscription_start_date'] is None:
                 club_data['subscription_start_date'] = timezone.now()
+            
+            # Temporary workaround: provide default subscription_tier until migration is applied
+            if 'subscription_tier' not in club_data or club_data['subscription_tier'] is None:
+                club_data['subscription_tier'] = 'basic'  # Temporary default
+            
+            # Ensure subscription is inactive (no free access)
+            club_data['subscription_active'] = False
             
             club = Club.objects.create(user=request.user, **club_data)
             
@@ -877,10 +884,17 @@ class CreateClubView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            # Temporary workaround: add subscription_start_date to request data
+            # Temporary workaround: add default values to request data
             request_data = request.data.copy()
             if 'subscription_start_date' not in request_data or request_data['subscription_start_date'] is None:
                 request_data['subscription_start_date'] = timezone.now()
+            
+            # Temporary workaround: provide default subscription_tier until migration is applied
+            if 'subscription_tier' not in request_data or request_data['subscription_tier'] is None:
+                request_data['subscription_tier'] = 'basic'  # Temporary default
+            
+            # Ensure subscription is inactive (no free access)
+            request_data['subscription_active'] = False
             
             serializer = ClubSerializer(data=request_data)
             if serializer.is_valid():

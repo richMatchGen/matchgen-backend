@@ -783,6 +783,10 @@ class EnhancedClubCreationView(APIView):
                     )
             
             # Create club
+            # Temporary workaround: provide default subscription_start_date until migration is applied
+            if 'subscription_start_date' not in club_data or club_data['subscription_start_date'] is None:
+                club_data['subscription_start_date'] = timezone.now()
+            
             club = Club.objects.create(user=request.user, **club_data)
             
             # Create Owner role membership
@@ -873,7 +877,12 @@ class CreateClubView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
-            serializer = ClubSerializer(data=request.data)
+            # Temporary workaround: add subscription_start_date to request data
+            request_data = request.data.copy()
+            if 'subscription_start_date' not in request_data or request_data['subscription_start_date'] is None:
+                request_data['subscription_start_date'] = timezone.now()
+            
+            serializer = ClubSerializer(data=request_data)
             if serializer.is_valid():
                 club = serializer.save(user=request.user)
                 

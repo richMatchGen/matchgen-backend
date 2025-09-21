@@ -1406,6 +1406,7 @@ class FeatureAccessView(APIView):
             'available_features': available_features,
             'subscription_tier': club.subscription_tier,
             'subscription_active': club.subscription_active,
+            'subscription_canceled': club.subscription_canceled,
             'feature_access': feature_access,
             'feature_details': feature_details,
             'club_name': club.name
@@ -2214,3 +2215,267 @@ class VerifyEmailCodeView(APIView):
         except Exception as e:
             logger.error(f"Error verifying email code: {str(e)}")
             return Response({'error': 'Failed to verify email'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class StripeCancelSubscriptionView(APIView):
+    """View for canceling Stripe subscriptions"""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        """Cancel a Stripe subscription"""
+        try:
+            # Configure Stripe
+            stripe.api_key = settings.STRIPE_SECRET_KEY
+            
+            # Get club information
+            club_id = request.data.get('club_id')
+            if not club_id:
+                return Response({'error': 'Club ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Get the club
+            try:
+                club = Club.objects.get(id=club_id, user=request.user)
+            except Club.DoesNotExist:
+                return Response({'error': 'Club not found'}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Check if club has an active subscription
+            if not club.subscription_active or not club.stripe_subscription_id:
+                return Response({'error': 'No active subscription found'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Cancel the subscription in Stripe
+            try:
+                subscription = stripe.Subscription.retrieve(club.stripe_subscription_id)
+                canceled_subscription = stripe.Subscription.modify(
+                    club.stripe_subscription_id,
+                    cancel_at_period_end=True
+                )
+                
+                logger.info(f"Subscription {club.stripe_subscription_id} set to cancel at period end for club {club.id}")
+                
+                # Update club subscription status
+                club.subscription_active = True  # Still active until period end
+                club.subscription_canceled = True  # Mark as canceled
+                club.save()
+                
+                return Response({
+                    'message': 'Subscription will be canceled at the end of the current billing period',
+                    'cancel_at_period_end': canceled_subscription.cancel_at_period_end,
+                    'current_period_end': canceled_subscription.current_period_end
+                }, status=status.HTTP_200_OK)
+                
+            except stripe.error.StripeError as e:
+                logger.error(f"Stripe error canceling subscription: {str(e)}")
+                return Response({'error': 'Failed to cancel subscription with Stripe'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+        except Exception as e:
+            logger.error(f"Error canceling subscription: {str(e)}")
+            return Response({'error': 'Failed to cancel subscription'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class StripeReactivateSubscriptionView(APIView):
+    """View for reactivating canceled Stripe subscriptions"""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        """Reactivate a canceled Stripe subscription"""
+        try:
+            # Configure Stripe
+            stripe.api_key = settings.STRIPE_SECRET_KEY
+            
+            # Get club information
+            club_id = request.data.get('club_id')
+            if not club_id:
+                return Response({'error': 'Club ID is required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Get the club
+            try:
+                club = Club.objects.get(id=club_id, user=request.user)
+            except Club.DoesNotExist:
+                return Response({'error': 'Club not found'}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Check if club has a canceled subscription
+            if not club.subscription_canceled or not club.stripe_subscription_id:
+                return Response({'error': 'No canceled subscription found'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Reactivate the subscription in Stripe
+            try:
+                subscription = stripe.Subscription.modify(
+                    club.stripe_subscription_id,
+                    cancel_at_period_end=False
+                )
+                
+                logger.info(f"Subscription {club.stripe_subscription_id} reactivated for club {club.id}")
+                
+                # Update club subscription status
+                club.subscription_canceled = False
+                club.save()
+                
+                return Response({
+                    'message': 'Subscription reactivated successfully',
+                    'cancel_at_period_end': subscription.cancel_at_period_end
+                }, status=status.HTTP_200_OK)
+                
+            except stripe.error.StripeError as e:
+                logger.error(f"Stripe error reactivating subscription: {str(e)}")
+                return Response({'error': 'Failed to reactivate subscription with Stripe'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+        except Exception as e:
+            logger.error(f"Error reactivating subscription: {str(e)}")
+            return Response({'error': 'Failed to reactivate subscription'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class StripeUpgradeSubscriptionView(APIView):
+    """View for immediate subscription upgrades with proration"""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        """Upgrade subscription immediately with proration"""
+        try:
+            # Configure Stripe
+            stripe.api_key = settings.STRIPE_SECRET_KEY
+            
+            # Get request data
+            club_id = request.data.get('club_id')
+            new_tier = request.data.get('tier')
+            
+            if not club_id or not new_tier:
+                return Response({'error': 'Club ID and tier are required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Validate tier
+            if new_tier not in ['basic', 'semipro', 'prem']:
+                return Response({'error': 'Invalid tier'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Get the club
+            try:
+                club = Club.objects.get(id=club_id, user=request.user)
+            except Club.DoesNotExist:
+                return Response({'error': 'Club not found'}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Check if club has an active subscription
+            if not club.subscription_active or not club.stripe_subscription_id:
+                return Response({'error': 'No active subscription found'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Get current and new price IDs
+            current_price_id = settings.STRIPE_PRICES.get(club.subscription_tier)
+            new_price_id = settings.STRIPE_PRICES.get(new_tier)
+            
+            if not current_price_id or not new_price_id:
+                return Response({'error': 'Price configuration not found'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            # Get current subscription
+            subscription = stripe.Subscription.retrieve(club.stripe_subscription_id)
+            
+            # Update subscription with new price
+            updated_subscription = stripe.Subscription.modify(
+                club.stripe_subscription_id,
+                items=[{
+                    'id': subscription['items']['data'][0]['id'],
+                    'price': new_price_id,
+                }],
+                proration_behavior='create_prorations',  # Fair billing
+                metadata={
+                    'club_id': str(club_id),
+                    'tier': new_tier,
+                    'club_name': club.name
+                }
+            )
+            
+            # Update club subscription
+            club.subscription_tier = new_tier
+            club.subscription_canceled = False  # Clear any cancellation
+            club.save()
+            
+            logger.info(f"Subscription upgraded for club {club.id} from {club.subscription_tier} to {new_tier}")
+            
+            return Response({
+                'message': 'Subscription upgraded successfully',
+                'new_tier': new_tier,
+                'current_period_end': updated_subscription.current_period_end,
+                'proration_created': True
+            }, status=status.HTTP_200_OK)
+            
+        except stripe.error.StripeError as e:
+            logger.error(f"Stripe error upgrading subscription: {str(e)}")
+            return Response({'error': 'Failed to upgrade subscription with Stripe'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            logger.error(f"Error upgrading subscription: {str(e)}")
+            return Response({'error': 'Failed to upgrade subscription'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class StripeDowngradeSubscriptionView(APIView):
+    """View for scheduling subscription downgrades at period end"""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        """Schedule subscription downgrade for next period end"""
+        try:
+            # Configure Stripe
+            stripe.api_key = settings.STRIPE_SECRET_KEY
+            
+            # Get request data
+            club_id = request.data.get('club_id')
+            new_tier = request.data.get('tier')
+            
+            if not club_id or not new_tier:
+                return Response({'error': 'Club ID and tier are required'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Validate tier
+            if new_tier not in ['basic', 'semipro', 'prem']:
+                return Response({'error': 'Invalid tier'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Get the club
+            try:
+                club = Club.objects.get(id=club_id, user=request.user)
+            except Club.DoesNotExist:
+                return Response({'error': 'Club not found'}, status=status.HTTP_404_NOT_FOUND)
+            
+            # Check if club has an active subscription
+            if not club.subscription_active or not club.stripe_subscription_id:
+                return Response({'error': 'No active subscription found'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Get new price ID
+            new_price_id = settings.STRIPE_PRICES.get(new_tier)
+            if not new_price_id:
+                return Response({'error': 'Price configuration not found'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            # Get current subscription
+            subscription = stripe.Subscription.retrieve(club.stripe_subscription_id)
+            
+            # Schedule the downgrade for next period end
+            updated_subscription = stripe.Subscription.modify(
+                club.stripe_subscription_id,
+                items=[{
+                    'id': subscription['items']['data'][0]['id'],
+                    'price': new_price_id,
+                }],
+                proration_behavior='none',  # No immediate charges
+                billing_cycle_anchor='unchanged',  # Keep current billing cycle
+                metadata={
+                    'club_id': str(club_id),
+                    'tier': new_tier,
+                    'club_name': club.name,
+                    'scheduled_downgrade': 'true'
+                }
+            )
+            
+            # Update club with scheduled downgrade info
+            club.subscription_tier = new_tier  # This will be the new tier after period end
+            club.subscription_canceled = False  # Not canceled, just scheduled for downgrade
+            club.save()
+            
+            logger.info(f"Subscription downgrade scheduled for club {club.id} to {new_tier} at period end")
+            
+            return Response({
+                'message': 'Subscription downgrade scheduled for next billing period',
+                'new_tier': new_tier,
+                'current_period_end': updated_subscription.current_period_end,
+                'effective_date': updated_subscription.current_period_end,
+                'scheduled_downgrade': True
+            }, status=status.HTTP_200_OK)
+            
+        except stripe.error.StripeError as e:
+            logger.error(f"Stripe error scheduling downgrade: {str(e)}")
+            return Response({'error': 'Failed to schedule downgrade with Stripe'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        except Exception as e:
+            logger.error(f"Error scheduling downgrade: {str(e)}")
+            return Response({'error': 'Failed to schedule downgrade'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

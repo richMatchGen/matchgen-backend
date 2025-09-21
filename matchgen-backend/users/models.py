@@ -82,6 +82,8 @@ class Club(models.Model):
     subscription_active = models.BooleanField(default=False)
     subscription_start_date = models.DateTimeField(null=True, blank=True)
     subscription_end_date = models.DateTimeField(blank=True, null=True)
+    subscription_canceled = models.BooleanField(default=False)
+    stripe_subscription_id = models.CharField(max_length=100, blank=True, null=True)
 
     def __str__(self):
         return self.name

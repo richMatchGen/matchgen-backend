@@ -40,7 +40,11 @@ from .views import (
     ResendVerificationSignupView,
     EnhancedClubCreationView,
     SendVerificationCodeView,
-    VerifyEmailCodeView
+    VerifyEmailCodeView,
+    StripeCancelSubscriptionView,
+    StripeReactivateSubscriptionView,
+    StripeUpgradeSubscriptionView,
+    StripeDowngradeSubscriptionView
 )
 
 
@@ -111,4 +115,8 @@ urlpatterns = [
     path('stripe/checkout/', StripeCheckoutView.as_view(), name='stripe_checkout'),
     path('stripe/billing-portal/', StripeBillingPortalView.as_view(), name='stripe_billing_portal'),
     path('stripe/webhook/', StripeWebhookView.as_view(), name='stripe_webhook'),
+    path('stripe/cancel-subscription/', StripeCancelSubscriptionView.as_view(), name='stripe_cancel_subscription'),
+    path('stripe/reactivate-subscription/', StripeReactivateSubscriptionView.as_view(), name='stripe_reactivate_subscription'),
+    path('stripe/upgrade-subscription/', StripeUpgradeSubscriptionView.as_view(), name='stripe_upgrade_subscription'),
+    path('stripe/downgrade-subscription/', StripeDowngradeSubscriptionView.as_view(), name='stripe_downgrade_subscription'),
 ] + router.urls

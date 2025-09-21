@@ -1,6 +1,7 @@
 import csv
 import io
 import logging
+import time
 
 from django.utils import timezone
 from django.core.cache import cache
@@ -460,5 +461,56 @@ class SubstitutionPlayersView(APIView):
             logger.error(f"Error fetching players for substitution: {str(e)}", exc_info=True)
             return Response(
                 {"error": "An error occurred while fetching players."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class OpponentLogoUploadView(APIView):
+    """Upload opponent logo for matches."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser]
+
+    def post(self, request):
+        try:
+            logo_file = request.FILES.get('logo')
+            if not logo_file:
+                return Response(
+                    {"error": "No logo file provided."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Upload to Cloudinary
+            try:
+                import cloudinary
+                import cloudinary.uploader
+                from django.conf import settings
+                
+                upload_result = cloudinary.uploader.upload(
+                    logo_file,
+                    folder="opponent_logos",
+                    public_id=f"opponent_{request.user.id}_{int(time.time())}",
+                    overwrite=True,
+                    resource_type="image"
+                )
+                
+                logo_url = upload_result['secure_url']
+                logger.info(f"Opponent logo uploaded to Cloudinary: {logo_url}")
+                
+                return Response({
+                    "logo_url": logo_url,
+                    "message": "Opponent logo uploaded successfully"
+                }, status=status.HTTP_200_OK)
+                
+            except Exception as e:
+                logger.error(f"Opponent logo upload failed: {str(e)}")
+                return Response(
+                    {"error": "Failed to upload opponent logo. Please try again."}, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+                
+        except Exception as e:
+            logger.error(f"Error in opponent logo upload: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while uploading the logo."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )

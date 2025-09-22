@@ -1402,11 +1402,16 @@ class FeatureAccessView(APIView):
                 ).values_list('subscription_tier', flat=True))
             })
         
+        # Handle missing fields gracefully until migration is applied
+        subscription_canceled = getattr(club, 'subscription_canceled', False)
+        stripe_subscription_id = getattr(club, 'stripe_subscription_id', None)
+        
         data = {
             'available_features': available_features,
             'subscription_tier': club.subscription_tier,
             'subscription_active': club.subscription_active,
-            'subscription_canceled': club.subscription_canceled,
+            'subscription_canceled': subscription_canceled,
+            'stripe_subscription_id': stripe_subscription_id,
             'feature_access': feature_access,
             'feature_details': feature_details,
             'club_name': club.name
@@ -2239,22 +2244,24 @@ class StripeCancelSubscriptionView(APIView):
                 return Response({'error': 'Club not found'}, status=status.HTTP_404_NOT_FOUND)
             
             # Check if club has an active subscription
-            if not club.subscription_active or not club.stripe_subscription_id:
+            stripe_subscription_id = getattr(club, 'stripe_subscription_id', None)
+            if not club.subscription_active or not stripe_subscription_id:
                 return Response({'error': 'No active subscription found'}, status=status.HTTP_400_BAD_REQUEST)
             
             # Cancel the subscription in Stripe
             try:
-                subscription = stripe.Subscription.retrieve(club.stripe_subscription_id)
+                subscription = stripe.Subscription.retrieve(stripe_subscription_id)
                 canceled_subscription = stripe.Subscription.modify(
-                    club.stripe_subscription_id,
+                    stripe_subscription_id,
                     cancel_at_period_end=True
                 )
                 
-                logger.info(f"Subscription {club.stripe_subscription_id} set to cancel at period end for club {club.id}")
+                logger.info(f"Subscription {stripe_subscription_id} set to cancel at period end for club {club.id}")
                 
                 # Update club subscription status
                 club.subscription_active = True  # Still active until period end
-                club.subscription_canceled = True  # Mark as canceled
+                if hasattr(club, 'subscription_canceled'):
+                    club.subscription_canceled = True  # Mark as canceled
                 club.save()
                 
                 return Response({

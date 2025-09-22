@@ -22,3 +22,5 @@ FRONTEND_URL=https://matchgen-frontend.vercel.app
 # 3. Go to Security → App passwords
 # 4. Generate password for "Mail"
 # 5. Use that 16-character password above
+
+

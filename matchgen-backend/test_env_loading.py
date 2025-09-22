@@ -65,3 +65,5 @@ print("💡 If the condition is TRUE, the issue is:")
 print("   - Either EMAIL_HOST_USER is empty/None")
 print("   - Or EMAIL_HOST_PASSWORD is empty/None")
 print("   - Or both")
+
+

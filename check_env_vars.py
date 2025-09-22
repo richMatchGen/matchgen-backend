@@ -52,3 +52,5 @@ else:
     print(f"❌ .env file NOT found at: {env_path}")
 
 print("\n💡 If any variables show 'NOT SET', check your .env file!")
+
+

@@ -144,3 +144,5 @@ if __name__ == "__main__":
         print("\n🎉 All systems are ready for email verification!")
     else:
         print("\n⚠️  Please fix the issues above before using email verification.")
+
+

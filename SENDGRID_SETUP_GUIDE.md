@@ -150,3 +150,5 @@ If you encounter issues:
 ---
 
 **Ready to set up SendGrid? Let's start with creating your account!**
+
+

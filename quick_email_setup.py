@@ -100,3 +100,5 @@ CORS_ALLOWED_ORIGINS={frontend_url}
 
 if __name__ == "__main__":
     create_env_file()
+
+

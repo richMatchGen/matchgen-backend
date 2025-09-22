@@ -2245,8 +2245,24 @@ class StripeCancelSubscriptionView(APIView):
             
             # Check if club has an active subscription
             stripe_subscription_id = getattr(club, 'stripe_subscription_id', None)
-            if not club.subscription_active or not stripe_subscription_id:
+            if not club.subscription_active:
                 return Response({'error': 'No active subscription found'}, status=status.HTTP_400_BAD_REQUEST)
+            
+            if not stripe_subscription_id:
+                # Handle test/development subscriptions that don't have Stripe IDs
+                logger.info(f"Canceling test subscription for club {club.id} (no Stripe subscription ID)")
+                
+                # Update club subscription status locally
+                club.subscription_active = False
+                if hasattr(club, 'subscription_canceled'):
+                    club.subscription_canceled = True
+                club.save()
+                
+                return Response({
+                    'message': 'Test subscription canceled successfully',
+                    'subscription_active': False,
+                    'subscription_canceled': True
+                }, status=status.HTTP_200_OK)
             
             # Cancel the subscription in Stripe
             try:

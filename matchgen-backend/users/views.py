@@ -2258,6 +2258,10 @@ class StripeCancelSubscriptionView(APIView):
         """Cancel a Stripe subscription"""
         try:
             # Configure Stripe
+            if not hasattr(settings, 'STRIPE_SECRET_KEY') or not settings.STRIPE_SECRET_KEY:
+                logger.error("STRIPE_SECRET_KEY is not configured")
+                return Response({'error': 'Payment system not configured'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
             stripe.api_key = settings.STRIPE_SECRET_KEY
             
             # Get club information
@@ -2273,6 +2277,8 @@ class StripeCancelSubscriptionView(APIView):
             
             # Check if club has an active subscription
             stripe_subscription_id = getattr(club, 'stripe_subscription_id', None)
+            logger.info(f"Cancel subscription request for club {club.id}: active={club.subscription_active}, stripe_id={stripe_subscription_id}")
+            
             if not club.subscription_active:
                 return Response({'error': 'No active subscription found'}, status=status.HTTP_400_BAD_REQUEST)
             
@@ -2282,8 +2288,7 @@ class StripeCancelSubscriptionView(APIView):
                 
                 # Update club subscription status locally
                 club.subscription_active = False
-                if hasattr(club, 'subscription_canceled'):
-                    club.subscription_canceled = True
+                club.subscription_canceled = True
                 club.save()
                 
                 return Response({
@@ -2294,7 +2299,10 @@ class StripeCancelSubscriptionView(APIView):
             
             # Cancel the subscription in Stripe
             try:
+                logger.info(f"Retrieving Stripe subscription {stripe_subscription_id}")
                 subscription = stripe.Subscription.retrieve(stripe_subscription_id)
+                logger.info(f"Retrieved subscription status: {subscription.status}")
+                
                 canceled_subscription = stripe.Subscription.modify(
                     stripe_subscription_id,
                     cancel_at_period_end=True
@@ -2304,8 +2312,7 @@ class StripeCancelSubscriptionView(APIView):
                 
                 # Update club subscription status
                 club.subscription_active = True  # Still active until period end
-                if hasattr(club, 'subscription_canceled'):
-                    club.subscription_canceled = True  # Mark as canceled
+                club.subscription_canceled = True  # Mark as canceled
                 club.save()
                 
                 return Response({
@@ -2315,8 +2322,8 @@ class StripeCancelSubscriptionView(APIView):
                 }, status=status.HTTP_200_OK)
                 
             except stripe.error.StripeError as e:
-                logger.error(f"Stripe error canceling subscription: {str(e)}")
-                return Response({'error': 'Failed to cancel subscription with Stripe'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                logger.error(f"Stripe error canceling subscription {stripe_subscription_id}: {str(e)}")
+                return Response({'error': f'Failed to cancel subscription with Stripe: {str(e)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
                 
         except Exception as e:
             logger.error(f"Error canceling subscription: {str(e)}")

@@ -84,6 +84,13 @@ class Club(models.Model):
     subscription_end_date = models.DateTimeField(blank=True, null=True)
     subscription_canceled = models.BooleanField(default=False)
     stripe_subscription_id = models.CharField(max_length=100, blank=True, null=True)
+    scheduled_tier = models.CharField(
+        max_length=20, 
+        choices=SUBSCRIPTION_TIERS, 
+        blank=True, 
+        null=True,
+        help_text='Tier scheduled to take effect at the end of current billing period'
+    )
 
     def __str__(self):
         return self.name

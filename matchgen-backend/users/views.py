@@ -2567,12 +2567,15 @@ class StripeDowngradeSubscriptionView(APIView):
                 
                 logger.info(f"Stripe subscription {club.stripe_subscription_id} scheduled for downgrade to {new_tier}")
                 
-                # Update club with scheduled downgrade info
+                # Update club with scheduled downgrade info (but keep current tier until period end)
                 try:
-                    club.subscription_tier = new_tier  # This will be the new tier after period end
+                    # Store the scheduled downgrade tier without changing current tier
+                    club.scheduled_tier = new_tier
+                    
+                    # Don't change the current subscription_tier - keep it active until period end
                     club.subscription_canceled = False  # Not canceled, just scheduled for downgrade
                     club.save()
-                    logger.info(f"Updated club {club.id} with scheduled downgrade to {new_tier}")
+                    logger.info(f"Club {club.id} scheduled for downgrade to {new_tier} at period end (current tier: {club.subscription_tier})")
                 except Exception as save_error:
                     logger.error(f"Error saving club subscription status: {str(save_error)}")
                     # Don't fail the entire operation if database save fails
@@ -2581,7 +2584,8 @@ class StripeDowngradeSubscriptionView(APIView):
                 try:
                     response_data = {
                         'message': 'Subscription downgrade scheduled for next billing period',
-                        'new_tier': new_tier,
+                        'current_tier': club.subscription_tier,  # Current active tier
+                        'scheduled_tier': new_tier,  # Tier that will take effect
                         'current_period_end': getattr(updated_subscription, 'current_period_end', None),
                         'effective_date': getattr(updated_subscription, 'current_period_end', None),
                         'scheduled_downgrade': True
@@ -2595,7 +2599,8 @@ class StripeDowngradeSubscriptionView(APIView):
                     # Return a simple success response if response data creation fails
                     return Response({
                         'message': 'Subscription downgrade scheduled for next billing period',
-                        'new_tier': new_tier,
+                        'current_tier': club.subscription_tier,
+                        'scheduled_tier': new_tier,
                         'scheduled_downgrade': True
                     }, status=status.HTTP_200_OK)
                     

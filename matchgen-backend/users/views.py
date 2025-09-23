@@ -1971,11 +1971,18 @@ class StripeWebhookView(APIView):
                 logger.error("Missing metadata in checkout session")
                 return
             
+            # Get the subscription ID from the session
+            subscription_id = session.get('subscription')
+            if not subscription_id:
+                logger.error("No subscription ID found in checkout session")
+                return
+            
             # Update club subscription
             club = Club.objects.get(id=club_id)
             club.subscription_tier = tier
             club.subscription_active = True
             club.subscription_start_date = timezone.now()
+            club.stripe_subscription_id = subscription_id  # Store the Stripe subscription ID
             club.save()
             
             # Log audit event
@@ -1987,11 +1994,12 @@ class StripeWebhookView(APIView):
                 details={
                     'new_tier': tier,
                     'stripe_session_id': session.get('id'),
+                    'stripe_subscription_id': subscription_id,
                     'payment_status': session.get('payment_status')
                 }
             )
             
-            logger.info(f"Subscription updated for club {club.name} to {tier} tier")
+            logger.info(f"Subscription updated for club {club.name} to {tier} tier with Stripe ID {subscription_id}")
             
         except Exception as e:
             logger.error(f"Error handling checkout completion: {str(e)}", exc_info=True)
@@ -2007,6 +2015,11 @@ class StripeWebhookView(APIView):
             
             club = Club.objects.get(id=club_id)
             
+            # Ensure subscription ID is stored
+            subscription_id = subscription.get('id')
+            if subscription_id:
+                club.stripe_subscription_id = subscription_id
+            
             # Update subscription status based on Stripe status
             if subscription.get('status') == 'active':
                 club.subscription_active = True
@@ -2015,7 +2028,7 @@ class StripeWebhookView(APIView):
             
             club.save()
             
-            logger.info(f"Subscription status updated for club {club.name}: {subscription.get('status')}")
+            logger.info(f"Subscription status updated for club {club.name}: {subscription.get('status')} (ID: {subscription_id})")
             
         except Exception as e:
             logger.error(f"Error handling subscription update: {str(e)}", exc_info=True)
@@ -2031,6 +2044,7 @@ class StripeWebhookView(APIView):
             
             club = Club.objects.get(id=club_id)
             club.subscription_active = False
+            club.stripe_subscription_id = None  # Clear the subscription ID
             club.save()
             
             logger.info(f"Subscription deactivated for club {club.name}")

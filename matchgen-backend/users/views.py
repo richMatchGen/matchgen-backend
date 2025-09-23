@@ -787,15 +787,12 @@ class EnhancedClubCreationView(APIView):
             if 'subscription_start_date' not in club_data or club_data['subscription_start_date'] is None:
                 club_data['subscription_start_date'] = timezone.now()
             
-            # Use the selected subscription tier from the request
-            if 'subscription_tier' not in club_data or club_data['subscription_tier'] is None:
-                return Response(
-                    {"error": "Subscription tier is required"}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            # Allow NULL subscription tier during signup - user will choose later
+            if 'subscription_tier' not in club_data:
+                club_data['subscription_tier'] = None
             
-            # Validate the subscription tier
-            if club_data['subscription_tier'] not in ['basic', 'semipro', 'prem']:
+            # Validate the subscription tier if provided
+            if club_data['subscription_tier'] is not None and club_data['subscription_tier'] not in ['basic', 'semipro', 'prem']:
                 return Response(
                     {"error": "Invalid subscription tier"}, 
                     status=status.HTTP_400_BAD_REQUEST
@@ -899,15 +896,12 @@ class CreateClubView(APIView):
             if 'subscription_start_date' not in request_data or request_data['subscription_start_date'] is None:
                 request_data['subscription_start_date'] = timezone.now()
             
-            # Validate subscription tier is provided
-            if 'subscription_tier' not in request_data or request_data['subscription_tier'] is None:
-                return Response(
-                    {"error": "Subscription tier is required"}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            # Allow NULL subscription tier during signup - user will choose later
+            if 'subscription_tier' not in request_data:
+                request_data['subscription_tier'] = None
             
-            # Validate the subscription tier
-            if request_data['subscription_tier'] not in ['basic', 'semipro', 'prem']:
+            # Validate the subscription tier if provided
+            if request_data['subscription_tier'] is not None and request_data['subscription_tier'] not in ['basic', 'semipro', 'prem']:
                 return Response(
                     {"error": "Invalid subscription tier"}, 
                     status=status.HTTP_400_BAD_REQUEST

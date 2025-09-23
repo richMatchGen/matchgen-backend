@@ -787,9 +787,19 @@ class EnhancedClubCreationView(APIView):
             if 'subscription_start_date' not in club_data or club_data['subscription_start_date'] is None:
                 club_data['subscription_start_date'] = timezone.now()
             
-            # Temporary workaround: provide default subscription_tier until migration is applied
+            # Use the selected subscription tier from the request
             if 'subscription_tier' not in club_data or club_data['subscription_tier'] is None:
-                club_data['subscription_tier'] = 'basic'  # Temporary default
+                return Response(
+                    {"error": "Subscription tier is required"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Validate the subscription tier
+            if club_data['subscription_tier'] not in ['basic', 'semipro', 'prem']:
+                return Response(
+                    {"error": "Invalid subscription tier"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             
             # Ensure subscription is inactive (no free access)
             club_data['subscription_active'] = False
@@ -889,9 +899,19 @@ class CreateClubView(APIView):
             if 'subscription_start_date' not in request_data or request_data['subscription_start_date'] is None:
                 request_data['subscription_start_date'] = timezone.now()
             
-            # Temporary workaround: provide default subscription_tier until migration is applied
+            # Validate subscription tier is provided
             if 'subscription_tier' not in request_data or request_data['subscription_tier'] is None:
-                request_data['subscription_tier'] = 'basic'  # Temporary default
+                return Response(
+                    {"error": "Subscription tier is required"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Validate the subscription tier
+            if request_data['subscription_tier'] not in ['basic', 'semipro', 'prem']:
+                return Response(
+                    {"error": "Invalid subscription tier"}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
             
             # Ensure subscription is inactive (no free access)
             request_data['subscription_active'] = False

@@ -35,6 +35,11 @@ STRIPE_PUBLISHABLE_KEY=pk_test_your_stripe_publishable_key
 STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
 STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
 
+# Stripe Price IDs (get these from your Stripe dashboard)
+STRIPE_PRICE_BASIC=price_your_basic_price_id
+STRIPE_PRICE_SEMIPRO=price_your_semipro_price_id
+STRIPE_PRICE_PREM=price_your_prem_price_id
+
 # Railway Configuration (if deploying to Railway)
 RAILWAY_STATIC_URL=your-railway-static-url
 RAILWAY_PUBLIC_DOMAIN=your-railway-domain.railway.app
@@ -47,5 +52,6 @@ SECURE_SSL_REDIRECT=False
 SECURE_HSTS_SECONDS=0
 SECURE_HSTS_INCLUDE_SUBDOMAINS=False
 SECURE_HSTS_PRELOAD=False
+
 
 

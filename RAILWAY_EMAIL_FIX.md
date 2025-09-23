@@ -56,3 +56,4 @@ After updating the environment variables:
 The system now falls back to console logging if email fails, so verification links are still available in the logs.
 
 
+

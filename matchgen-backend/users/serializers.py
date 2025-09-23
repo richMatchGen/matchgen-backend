@@ -262,13 +262,13 @@ class ClubSerializer(serializers.ModelSerializer):
 
     def validate_primary_color(self, value):
         """Validate primary color hex format."""
-        if value and not value.startswith('#') or len(value) != 7:
+        if value and (not value.startswith('#') or len(value) != 7):
             raise serializers.ValidationError("Primary color must be a valid hex color (e.g., #FF0000)")
         return value
 
     def validate_secondary_color(self, value):
         """Validate secondary color hex format."""
-        if value and not value.startswith('#') or len(value) != 7:
+        if value and (not value.startswith('#') or len(value) != 7):
             raise serializers.ValidationError("Secondary color must be a valid hex color (e.g., #FF0000)")
         return value
 

@@ -2407,6 +2407,10 @@ class StripeUpgradeSubscriptionView(APIView):
         """Upgrade subscription immediately with proration"""
         try:
             # Configure Stripe
+            if not hasattr(settings, 'STRIPE_SECRET_KEY') or not settings.STRIPE_SECRET_KEY:
+                logger.error("STRIPE_SECRET_KEY is not configured")
+                return Response({'error': 'Payment system not configured'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
             stripe.api_key = settings.STRIPE_SECRET_KEY
             
             # Get request data
@@ -2441,33 +2445,56 @@ class StripeUpgradeSubscriptionView(APIView):
             subscription = stripe.Subscription.retrieve(club.stripe_subscription_id)
             
             # Update subscription with new price
-            updated_subscription = stripe.Subscription.modify(
-                club.stripe_subscription_id,
-                items=[{
-                    'id': subscription['items']['data'][0]['id'],
-                    'price': new_price_id,
-                }],
-                proration_behavior='create_prorations',  # Fair billing
-                metadata={
-                    'club_id': str(club_id),
-                    'tier': new_tier,
-                    'club_name': club.name
-                }
-            )
-            
-            # Update club subscription
-            club.subscription_tier = new_tier
-            club.subscription_canceled = False  # Clear any cancellation
-            club.save()
-            
-            logger.info(f"Subscription upgraded for club {club.id} from {club.subscription_tier} to {new_tier}")
-            
-            return Response({
-                'message': 'Subscription upgraded successfully',
-                'new_tier': new_tier,
-                'current_period_end': updated_subscription.current_period_end,
-                'proration_created': True
-            }, status=status.HTTP_200_OK)
+            try:
+                updated_subscription = stripe.Subscription.modify(
+                    club.stripe_subscription_id,
+                    items=[{
+                        'id': subscription['items']['data'][0]['id'],
+                        'price': new_price_id,
+                    }],
+                    proration_behavior='create_prorations',  # Fair billing
+                    metadata={
+                        'club_id': str(club_id),
+                        'tier': new_tier,
+                        'club_name': club.name
+                    }
+                )
+                
+                logger.info(f"Stripe subscription {club.stripe_subscription_id} upgraded to {new_tier}")
+                
+                # Update club subscription
+                try:
+                    club.subscription_tier = new_tier
+                    club.subscription_canceled = False  # Clear any cancellation
+                    club.save()
+                    logger.info(f"Updated club {club.id} subscription tier to {new_tier}")
+                except Exception as save_error:
+                    logger.error(f"Error saving club subscription status: {str(save_error)}")
+                    # Don't fail the entire operation if database save fails
+                
+                # Safely extract response data
+                try:
+                    response_data = {
+                        'message': 'Subscription upgraded successfully',
+                        'new_tier': new_tier,
+                        'current_period_end': getattr(updated_subscription, 'current_period_end', None),
+                        'proration_created': True
+                    }
+                    
+                    logger.info(f"Successfully upgraded subscription for club {club.id}")
+                    return Response(response_data, status=status.HTTP_200_OK)
+                    
+                except Exception as response_error:
+                    logger.error(f"Error creating response data: {str(response_error)}")
+                    # Return a simple success response if response data creation fails
+                    return Response({
+                        'message': 'Subscription upgraded successfully',
+                        'new_tier': new_tier
+                    }, status=status.HTTP_200_OK)
+                    
+            except stripe.error.StripeError as stripe_error:
+                logger.error(f"Stripe error during subscription upgrade: {str(stripe_error)}")
+                return Response({'error': f'Failed to upgrade subscription with Stripe: {str(stripe_error)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
         except stripe.error.StripeError as e:
             logger.error(f"Stripe error upgrading subscription: {str(e)}")
@@ -2485,6 +2512,10 @@ class StripeDowngradeSubscriptionView(APIView):
         """Schedule subscription downgrade for next period end"""
         try:
             # Configure Stripe
+            if not hasattr(settings, 'STRIPE_SECRET_KEY') or not settings.STRIPE_SECRET_KEY:
+                logger.error("STRIPE_SECRET_KEY is not configured")
+                return Response({'error': 'Payment system not configured'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
             stripe.api_key = settings.STRIPE_SECRET_KEY
             
             # Get request data
@@ -2517,36 +2548,60 @@ class StripeDowngradeSubscriptionView(APIView):
             subscription = stripe.Subscription.retrieve(club.stripe_subscription_id)
             
             # Schedule the downgrade for next period end
-            updated_subscription = stripe.Subscription.modify(
-                club.stripe_subscription_id,
-                items=[{
-                    'id': subscription['items']['data'][0]['id'],
-                    'price': new_price_id,
-                }],
-                proration_behavior='none',  # No immediate charges
-                billing_cycle_anchor='unchanged',  # Keep current billing cycle
-                metadata={
-                    'club_id': str(club_id),
-                    'tier': new_tier,
-                    'club_name': club.name,
-                    'scheduled_downgrade': 'true'
-                }
-            )
-            
-            # Update club with scheduled downgrade info
-            club.subscription_tier = new_tier  # This will be the new tier after period end
-            club.subscription_canceled = False  # Not canceled, just scheduled for downgrade
-            club.save()
-            
-            logger.info(f"Subscription downgrade scheduled for club {club.id} to {new_tier} at period end")
-            
-            return Response({
-                'message': 'Subscription downgrade scheduled for next billing period',
-                'new_tier': new_tier,
-                'current_period_end': updated_subscription.current_period_end,
-                'effective_date': updated_subscription.current_period_end,
-                'scheduled_downgrade': True
-            }, status=status.HTTP_200_OK)
+            try:
+                updated_subscription = stripe.Subscription.modify(
+                    club.stripe_subscription_id,
+                    items=[{
+                        'id': subscription['items']['data'][0]['id'],
+                        'price': new_price_id,
+                    }],
+                    proration_behavior='none',  # No immediate charges
+                    billing_cycle_anchor='unchanged',  # Keep current billing cycle
+                    metadata={
+                        'club_id': str(club_id),
+                        'tier': new_tier,
+                        'club_name': club.name,
+                        'scheduled_downgrade': 'true'
+                    }
+                )
+                
+                logger.info(f"Stripe subscription {club.stripe_subscription_id} scheduled for downgrade to {new_tier}")
+                
+                # Update club with scheduled downgrade info
+                try:
+                    club.subscription_tier = new_tier  # This will be the new tier after period end
+                    club.subscription_canceled = False  # Not canceled, just scheduled for downgrade
+                    club.save()
+                    logger.info(f"Updated club {club.id} with scheduled downgrade to {new_tier}")
+                except Exception as save_error:
+                    logger.error(f"Error saving club subscription status: {str(save_error)}")
+                    # Don't fail the entire operation if database save fails
+                
+                # Safely extract response data
+                try:
+                    response_data = {
+                        'message': 'Subscription downgrade scheduled for next billing period',
+                        'new_tier': new_tier,
+                        'current_period_end': getattr(updated_subscription, 'current_period_end', None),
+                        'effective_date': getattr(updated_subscription, 'current_period_end', None),
+                        'scheduled_downgrade': True
+                    }
+                    
+                    logger.info(f"Successfully scheduled downgrade for club {club.id}")
+                    return Response(response_data, status=status.HTTP_200_OK)
+                    
+                except Exception as response_error:
+                    logger.error(f"Error creating response data: {str(response_error)}")
+                    # Return a simple success response if response data creation fails
+                    return Response({
+                        'message': 'Subscription downgrade scheduled for next billing period',
+                        'new_tier': new_tier,
+                        'scheduled_downgrade': True
+                    }, status=status.HTTP_200_OK)
+                    
+            except stripe.error.StripeError as stripe_error:
+                logger.error(f"Stripe error during subscription downgrade: {str(stripe_error)}")
+                return Response({'error': f'Failed to schedule downgrade with Stripe: {str(stripe_error)}'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
             
         except stripe.error.StripeError as e:
             logger.error(f"Stripe error scheduling downgrade: {str(e)}")

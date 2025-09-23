@@ -160,6 +160,7 @@ class Command(BaseCommand):
                 'post.substitution',
                 'post.halftime',
                 'post.fulltime',
+                'post.goal',
                 'template.enhanced',
                 'support.email',
                 'analytics.basic'

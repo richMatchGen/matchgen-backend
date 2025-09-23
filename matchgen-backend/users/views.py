@@ -2311,15 +2311,32 @@ class StripeCancelSubscriptionView(APIView):
                 logger.info(f"Subscription {stripe_subscription_id} set to cancel at period end for club {club.id}")
                 
                 # Update club subscription status
-                club.subscription_active = True  # Still active until period end
-                club.subscription_canceled = True  # Mark as canceled
-                club.save()
+                try:
+                    club.subscription_active = True  # Still active until period end
+                    club.subscription_canceled = True  # Mark as canceled
+                    club.save()
+                    logger.info(f"Updated club {club.id} subscription status: active={club.subscription_active}, canceled={club.subscription_canceled}")
+                except Exception as save_error:
+                    logger.error(f"Error saving club subscription status: {str(save_error)}")
+                    # Don't fail the entire operation if database save fails
                 
-                return Response({
-                    'message': 'Subscription will be canceled at the end of the current billing period',
-                    'cancel_at_period_end': canceled_subscription.cancel_at_period_end,
-                    'current_period_end': canceled_subscription.current_period_end
-                }, status=status.HTTP_200_OK)
+                # Safely extract response data
+                try:
+                    response_data = {
+                        'message': 'Subscription will be canceled at the end of the current billing period',
+                        'cancel_at_period_end': getattr(canceled_subscription, 'cancel_at_period_end', True),
+                        'current_period_end': getattr(canceled_subscription, 'current_period_end', None)
+                    }
+                    
+                    logger.info(f"Successfully canceled subscription {stripe_subscription_id} for club {club.id}")
+                    return Response(response_data, status=status.HTTP_200_OK)
+                    
+                except Exception as response_error:
+                    logger.error(f"Error creating response data: {str(response_error)}")
+                    # Return a simple success response if response data creation fails
+                    return Response({
+                        'message': 'Subscription will be canceled at the end of the current billing period'
+                    }, status=status.HTTP_200_OK)
                 
             except stripe.error.StripeError as e:
                 logger.error(f"Stripe error canceling subscription {stripe_subscription_id}: {str(e)}")

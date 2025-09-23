@@ -44,7 +44,8 @@ from .views import (
     StripeCancelSubscriptionView,
     StripeReactivateSubscriptionView,
     StripeUpgradeSubscriptionView,
-    StripeDowngradeSubscriptionView
+    StripeDowngradeSubscriptionView,
+    DeleteAccountView
 )
 
 
@@ -75,6 +76,7 @@ urlpatterns = [
     # User management
     path("me/", UserDetailView.as_view(), name="user-detail"),
     path("all-users/", UserListView.as_view(), name="all-users"),
+    path("delete-account/", DeleteAccountView.as_view(), name="delete-account"),
     
     # Club management
     path("club/", CreateClubView.as_view(), name="club-create"),

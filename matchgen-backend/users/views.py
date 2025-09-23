@@ -2502,3 +2502,72 @@ class StripeDowngradeSubscriptionView(APIView):
         except Exception as e:
             logger.error(f"Error scheduling downgrade: {str(e)}")
             return Response({'error': 'Failed to schedule downgrade'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class DeleteAccountView(APIView):
+    """View for deleting user accounts"""
+    permission_classes = [IsAuthenticated]
+    
+    def delete(self, request):
+        """Delete user account and all associated data"""
+        try:
+            user = request.user
+            
+            # Log the deletion attempt
+            logger.info(f"User {user.id} ({user.email}) requesting account deletion")
+            
+            # Get user's clubs
+            user_clubs = Club.objects.filter(user=user)
+            
+            # Cancel any active Stripe subscriptions
+            if hasattr(settings, 'STRIPE_SECRET_KEY') and settings.STRIPE_SECRET_KEY:
+                try:
+                    stripe.api_key = settings.STRIPE_SECRET_KEY
+                    
+                    for club in user_clubs:
+                        if club.stripe_subscription_id:
+                            try:
+                                # Cancel the subscription immediately
+                                stripe.Subscription.delete(club.stripe_subscription_id)
+                                logger.info(f"Cancelled Stripe subscription {club.stripe_subscription_id} for club {club.id}")
+                            except stripe.error.StripeError as e:
+                                logger.warning(f"Failed to cancel Stripe subscription for club {club.id}: {str(e)}")
+                except Exception as e:
+                    logger.warning(f"Error cancelling Stripe subscriptions: {str(e)}")
+            
+            # Log audit event before deletion
+            try:
+                AuditLogger.log_event(
+                    user=user,
+                    club=None,
+                    action='account_deleted',
+                    details={
+                        'user_email': user.email,
+                        'clubs_deleted': [club.id for club in user_clubs],
+                        'deletion_timestamp': timezone.now().isoformat()
+                    }
+                )
+            except Exception as e:
+                logger.warning(f"Failed to log account deletion audit event: {str(e)}")
+            
+            # Delete all user's clubs (this will cascade delete related data)
+            for club in user_clubs:
+                club.delete()
+                logger.info(f"Deleted club {club.id} ({club.name})")
+            
+            # Delete the user account
+            user_email = user.email
+            user.delete()
+            
+            logger.info(f"Successfully deleted user account for {user_email}")
+            
+            return Response({
+                'message': 'Account deleted successfully',
+                'deleted_clubs': len(user_clubs)
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error deleting user account: {str(e)}")
+            return Response({
+                'error': 'Failed to delete account. Please contact support if this issue persists.'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -2220,3 +2220,60 @@ class DebugOpponentLogoView(APIView):
             return Response({
                 "error": f"Debug failed: {str(e)}"
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class TemplatesByPackView(APIView):
+    """Get all templates for a specific graphic pack."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pack_id):
+        try:
+            logger.info(f"TemplatesByPackView called for pack_id: {pack_id}")
+            
+            # Get the graphic pack
+            try:
+                pack = GraphicPack.objects.get(id=pack_id)
+                logger.info(f"Found pack: {pack.name}")
+            except GraphicPack.DoesNotExist:
+                logger.error(f"Graphic pack not found: {pack_id}")
+                return Response({
+                    "error": "Graphic pack not found."
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            # Get all templates for this pack
+            try:
+                templates = Template.objects.filter(graphic_pack=pack)
+                logger.info(f"Found {templates.count()} templates for pack {pack.name}")
+                
+                templates_data = []
+                for template in templates:
+                    templates_data.append({
+                        "id": template.id,
+                        "content_type": template.content_type,
+                        "image_url": template.image_url,
+                        "sport": template.sport,
+                        "template_config": template.template_config,
+                        "has_config": bool(template.template_config)
+                    })
+                
+                return Response({
+                    "pack": {
+                        "id": pack.id,
+                        "name": pack.name,
+                        "description": pack.description,
+                    },
+                    "templates": templates_data,
+                    "templates_count": templates.count()
+                }, status=status.HTTP_200_OK)
+                
+            except Exception as e:
+                logger.error(f"Error fetching templates: {str(e)}")
+                return Response({
+                    "error": f"Error fetching templates: {str(e)}"
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+        except Exception as e:
+            logger.error(f"Error in TemplatesByPackView: {str(e)}", exc_info=True)
+            return Response({
+                "error": "An error occurred while retrieving templates."
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

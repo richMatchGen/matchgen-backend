@@ -514,3 +514,54 @@ class OpponentLogoUploadView(APIView):
                 {"error": "An error occurred while uploading the logo."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class PlayerPhotoUploadView(APIView):
+    """Upload player photo."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser]
+
+    def post(self, request):
+        try:
+            photo_file = request.FILES.get('photo')
+            if not photo_file:
+                return Response(
+                    {"error": "No photo file provided."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Upload to Cloudinary
+            try:
+                import cloudinary
+                import cloudinary.uploader
+                from django.conf import settings
+                
+                upload_result = cloudinary.uploader.upload(
+                    photo_file,
+                    folder="player_photos",
+                    public_id=f"player_{request.user.id}_{int(time.time())}",
+                    overwrite=True,
+                    resource_type="image"
+                )
+                
+                photo_url = upload_result['secure_url']
+                logger.info(f"Player photo uploaded to Cloudinary: {photo_url}")
+                
+                return Response({
+                    "photo_url": photo_url,
+                    "message": "Player photo uploaded successfully"
+                }, status=status.HTTP_200_OK)
+                
+            except Exception as e:
+                logger.error(f"Player photo upload failed: {str(e)}")
+                return Response(
+                    {"error": "Failed to upload player photo. Please try again."}, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+                
+        except Exception as e:
+            logger.error(f"Error in player photo upload: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while uploading the photo."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

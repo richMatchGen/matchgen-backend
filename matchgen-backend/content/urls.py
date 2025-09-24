@@ -8,6 +8,7 @@ from .views import (
     MatchDetailView,
     OpponentLogoUploadView,
     PlayerListCreateView,
+    PlayerPhotoUploadView,
     SubstitutionPlayersView,
     UpcomingMatchView,
 )
@@ -22,4 +23,5 @@ urlpatterns = [
     path("fixtures/", MatchListView.as_view(), name="fixtures"),
     path("players/substitution/", SubstitutionPlayersView.as_view(), name="substitution-players"),
     path("matches/upload-opponent-logo/", OpponentLogoUploadView.as_view(), name="upload-opponent-logo"),
+    path("players/upload-photo/", PlayerPhotoUploadView.as_view(), name="upload-player-photo"),
 ]

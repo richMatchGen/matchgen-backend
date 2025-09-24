@@ -14,6 +14,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.exceptions import ValidationError
+from rest_framework.parsers import MultiPartParser
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.db import transaction
@@ -1089,52 +1090,44 @@ class TestTokenEndpointView(APIView):
 class UploadLogoView(APIView):
     """Upload logo for a club."""
     permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser]
 
     def post(self, request):
         try:
-            logo_data = request.data.get('logo')
-            if not logo_data:
+            logo_file = request.FILES.get('logo')
+            if not logo_file:
                 return Response(
-                    {"error": "Logo data is required."}, 
+                    {"error": "No logo file provided."}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
 
-            # Handle base64 data URL
-            if logo_data.startswith('data:image/'):
-                # Extract the base64 part
-                try:
-                    # Split on ',' and get the base64 part
-                    base64_data = logo_data.split(',')[1]
-                    # Decode base64
-                    image_data = base64.b64decode(base64_data)
-                    
-                    # For now, we'll just return the data URL as the logo URL
-                    # In production, you might want to upload this to Cloudinary or another service
-                    logger.info(f"Logo uploaded for user: {request.user.email}")
-                    
-                    return Response({
-                        "logo_url": logo_data,
-                        "message": "Logo uploaded successfully"
-                    }, status=status.HTTP_200_OK)
-                    
-                except Exception as e:
-                    logger.error(f"Error processing base64 logo: {str(e)}")
-                    return Response(
-                        {"error": "Invalid logo format."}, 
-                        status=status.HTTP_400_BAD_REQUEST
-                    )
-            
-            # Handle regular URL
-            elif logo_data.startswith(('http://', 'https://')):
+            # Upload to Cloudinary
+            try:
+                import cloudinary
+                import cloudinary.uploader
+                from django.conf import settings
+                
+                upload_result = cloudinary.uploader.upload(
+                    logo_file,
+                    folder="club_logos",
+                    public_id=f"club_{request.user.id}_{int(time.time())}",
+                    overwrite=True,
+                    resource_type="image"
+                )
+                
+                logo_url = upload_result['secure_url']
+                logger.info(f"Club logo uploaded to Cloudinary: {logo_url}")
+                
                 return Response({
-                    "logo_url": logo_data,
-                    "message": "Logo URL set successfully"
+                    "logo_url": logo_url,
+                    "message": "Club logo uploaded successfully"
                 }, status=status.HTTP_200_OK)
-            
-            else:
+                
+            except Exception as e:
+                logger.error(f"Club logo upload failed: {str(e)}")
                 return Response(
-                    {"error": "Logo must be a valid URL or base64 data URL."}, 
-                    status=status.HTTP_400_BAD_REQUEST
+                    {"error": "Failed to upload club logo. Please try again."}, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
                 )
                 
         except Exception as e:

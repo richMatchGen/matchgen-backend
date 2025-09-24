@@ -2229,6 +2229,8 @@ class TemplatesByPackView(APIView):
     def get(self, request, pack_id):
         try:
             logger.info(f"TemplatesByPackView called for pack_id: {pack_id}")
+            logger.info(f"User: {request.user.email if request.user.is_authenticated else 'Anonymous'}")
+            logger.info(f"Request headers: {dict(request.headers)}")
             
             # Get the graphic pack
             try:
@@ -2256,6 +2258,7 @@ class TemplatesByPackView(APIView):
                         "has_config": bool(template.template_config)
                     })
                 
+                logger.info(f"Returning {len(templates_data)} templates")
                 return Response({
                     "pack": {
                         "id": pack.id,

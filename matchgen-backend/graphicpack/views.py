@@ -2230,6 +2230,7 @@ class TemplateCreateView(APIView):
                 graphic_pack=graphic_pack,
                 content_type=content_type,
                 file_url=upload_result['secure_url'],
+                image_url=upload_result['secure_url'],  # Save to image_url as well
                 file_name=file.name,
                 file_size=file.size
             )

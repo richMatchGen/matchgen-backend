@@ -2049,6 +2049,69 @@ class TemplateDeleteView(APIView):
             )
 
 
+class GraphicPackUpdateView(APIView):
+    """Update a graphic pack."""
+    permission_classes = [IsAuthenticated]
+    
+    def put(self, request, pack_id):
+        try:
+            try:
+                graphic_pack = GraphicPack.objects.get(id=pack_id)
+            except GraphicPack.DoesNotExist:
+                return Response(
+                    {"error": "Graphic pack not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            
+            # Update fields
+            if 'name' in request.data:
+                graphic_pack.name = request.data['name']
+            if 'description' in request.data:
+                graphic_pack.description = request.data['description']
+            if 'primary_color' in request.data:
+                graphic_pack.primary_color = request.data['primary_color']
+            if 'tier' in request.data:
+                graphic_pack.tier = request.data['tier']
+            if 'assigned_club_id' in request.data:
+                club_id = request.data['assigned_club_id']
+                if club_id:
+                    try:
+                        from users.models import Club
+                        club = Club.objects.get(id=club_id)
+                        graphic_pack.assigned_club = club
+                    except Club.DoesNotExist:
+                        return Response(
+                            {"error": "Club not found."},
+                            status=status.HTTP_404_NOT_FOUND,
+                        )
+                else:
+                    graphic_pack.assigned_club = None
+            if 'is_active' in request.data:
+                graphic_pack.is_active = request.data['is_active']
+            
+            graphic_pack.save()
+            
+            return Response({
+                "message": "Graphic pack updated successfully.",
+                "graphic_pack": {
+                    "id": graphic_pack.id,
+                    "name": graphic_pack.name,
+                    "description": graphic_pack.description,
+                    "primary_color": graphic_pack.primary_color,
+                    "tier": graphic_pack.tier,
+                    "assigned_club_id": graphic_pack.assigned_club.id if graphic_pack.assigned_club else None,
+                    "is_active": graphic_pack.is_active
+                }
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error updating graphic pack: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while updating the graphic pack."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
 class TemplateCreateView(APIView):
     """Create a new template."""
     permission_classes = [IsAuthenticated]

@@ -33,10 +33,16 @@ class TemplateSerializer(serializers.ModelSerializer):
 
 class GraphicPackSerializer(serializers.ModelSerializer):
     templates = TemplateSerializer(many=True, read_only=True)
+    assigned_club_name = serializers.CharField(source='assigned_club.name', read_only=True)
     
     class Meta:
         model = GraphicPack
-        fields = '__all__'
+        fields = [
+            'id', 'name', 'description', 'preview_image_url', 'zip_file_url',
+            'primary_color', 'tier', 'assigned_club', 'assigned_club_name', 'is_active',
+            'created_at', 'updated_at', 'templates'
+        ]
+        read_only_fields = ['created_at', 'updated_at']
 
     def to_representation(self, instance):
         """Override to handle missing fields gracefully."""
@@ -52,6 +58,10 @@ class GraphicPackSerializer(serializers.ModelSerializer):
                 'name': instance.name,
                 'description': instance.description,
                 'preview_image_url': getattr(instance, 'preview_image_url', None),
+                'primary_color': getattr(instance, 'primary_color', '#000000'),
+                'tier': getattr(instance, 'tier', None),
+                'assigned_club': getattr(instance, 'assigned_club', None),
+                'is_active': getattr(instance, 'is_active', True),
                 'templates': []
             }
 

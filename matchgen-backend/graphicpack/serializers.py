@@ -40,7 +40,7 @@ class GraphicPackSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'description', 'preview_image_url', 'zip_file_url',
             'primary_color', 'tier', 'assigned_club', 'assigned_club_name', 'is_active',
-            'category', 'sport', 'created_at', 'updated_at', 'templates'
+            'sport', 'created_at', 'updated_at', 'templates'
         ]
         read_only_fields = ['created_at', 'updated_at']
 

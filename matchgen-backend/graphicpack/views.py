@@ -2059,8 +2059,10 @@ class GraphicPackCreateView(APIView):
             name = request.data.get('name')
             description = request.data.get('description', '')
             primary_color = request.data.get('primary_color', '#000000')
+            sport = request.data.get('sport')
             tier = request.data.get('tier')
             assigned_club_id = request.data.get('assigned_club_id')
+            preview_image_url = request.data.get('preview_image_url')
             is_active = request.data.get('is_active', True)
             
             if not name:
@@ -2086,8 +2088,10 @@ class GraphicPackCreateView(APIView):
                 name=name,
                 description=description,
                 primary_color=primary_color,
+                sport=sport,
                 tier=tier,
                 assigned_club=assigned_club,
+                preview_image_url=preview_image_url,
                 is_active=is_active
             )
             
@@ -2098,7 +2102,9 @@ class GraphicPackCreateView(APIView):
                     "name": graphic_pack.name,
                     "description": graphic_pack.description,
                     "primary_color": graphic_pack.primary_color,
+                    "sport": graphic_pack.sport,
                     "tier": graphic_pack.tier,
+                    "preview_image_url": graphic_pack.preview_image_url,
                     "assigned_club_id": graphic_pack.assigned_club.id if graphic_pack.assigned_club else None,
                     "is_active": graphic_pack.is_active
                 }
@@ -2133,8 +2139,12 @@ class GraphicPackUpdateView(APIView):
                 graphic_pack.description = request.data['description']
             if 'primary_color' in request.data:
                 graphic_pack.primary_color = request.data['primary_color']
+            if 'sport' in request.data:
+                graphic_pack.sport = request.data['sport']
             if 'tier' in request.data:
                 graphic_pack.tier = request.data['tier']
+            if 'preview_image_url' in request.data:
+                graphic_pack.preview_image_url = request.data['preview_image_url']
             if 'assigned_club_id' in request.data:
                 club_id = request.data['assigned_club_id']
                 if club_id:
@@ -2161,7 +2171,9 @@ class GraphicPackUpdateView(APIView):
                     "name": graphic_pack.name,
                     "description": graphic_pack.description,
                     "primary_color": graphic_pack.primary_color,
+                    "sport": graphic_pack.sport,
                     "tier": graphic_pack.tier,
+                    "preview_image_url": graphic_pack.preview_image_url,
                     "assigned_club_id": graphic_pack.assigned_club.id if graphic_pack.assigned_club else None,
                     "is_active": graphic_pack.is_active
                 }

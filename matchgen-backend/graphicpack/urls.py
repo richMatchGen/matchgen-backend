@@ -31,6 +31,7 @@ urlpatterns = [
     path("graphic-packs/", GraphicPackListView.as_view(), name="graphic-pack-list-legacy"),
     path("graphic-packs/<int:id>/", GraphicPackDetailView.as_view(), name="graphic-pack-detail"),
     path("packs/<int:pack_id>/delete/", GraphicPackDeleteView.as_view(), name="graphic-pack-delete"),
+    path("packs/<int:pack_id>/templates/", TemplatesByPackView.as_view(), name="templates-by-pack-new"),
     path("select/", SelectGraphicPackView.as_view(), name="select-graphic-pack"),
     path("select-pack/", SelectGraphicPackView.as_view(), name="select-graphic-pack-legacy"),
     

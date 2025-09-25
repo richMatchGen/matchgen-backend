@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     GraphicPackListView,
     GraphicPackDetailView,
+    GraphicPackCreateView,
     GraphicPackUpdateView,
     GraphicPackDeleteView,
     SelectGraphicPackView,
@@ -24,6 +25,7 @@ from .views import (
 urlpatterns = [
     # Basic graphic pack management
     path("packs/", GraphicPackListView.as_view(), name="graphic-pack-list"),
+    path("packs/create/", GraphicPackCreateView.as_view(), name="graphic-pack-create"),
     path("packs/<int:id>/", GraphicPackDetailView.as_view(), name="graphic-pack-detail-new"),
     path("packs/<int:pack_id>/update/", GraphicPackUpdateView.as_view(), name="graphic-pack-update"),
     path("graphic-packs/", GraphicPackListView.as_view(), name="graphic-pack-list-legacy"),

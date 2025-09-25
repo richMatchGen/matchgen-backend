@@ -20,6 +20,8 @@ class GraphicPack(models.Model):
     tier = models.CharField(max_length=20, choices=TIER_CHOICES, blank=True, null=True, help_text="Subscription tier required")
     assigned_club = models.ForeignKey('users.Club', on_delete=models.SET_NULL, null=True, blank=True, help_text="Specific club (null for all clubs)")
     is_active = models.BooleanField(default=True, help_text="Whether the pack is active")
+    category = models.CharField(max_length=50, blank=True, null=True, help_text="Category of the graphic pack")
+    sport = models.CharField(max_length=50, blank=True, null=True, help_text="Sport type for the graphic pack")
     
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)

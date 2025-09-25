@@ -1992,6 +1992,140 @@ class TextElementDeleteView(APIView):
             )
 
 
+class GraphicPackDeleteView(APIView):
+    """Delete a graphic pack and all its templates."""
+    permission_classes = [IsAuthenticated]
+    
+    def delete(self, request, pack_id):
+        try:
+            try:
+                graphic_pack = GraphicPack.objects.get(id=pack_id)
+            except GraphicPack.DoesNotExist:
+                return Response(
+                    {"error": "Graphic pack not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            
+            # Delete all templates associated with this pack
+            templates = Template.objects.filter(graphic_pack=graphic_pack)
+            templates_count = templates.count()
+            templates.delete()
+            
+            # Delete the graphic pack
+            graphic_pack.delete()
+            
+            return Response({
+                "message": f"Graphic pack and {templates_count} templates deleted successfully."
+            }, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(f"Error deleting graphic pack: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while deleting the graphic pack."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class TemplateDeleteView(APIView):
+    """Delete a template."""
+    permission_classes = [IsAuthenticated]
+    
+    def delete(self, request, template_id):
+        try:
+            try:
+                template = Template.objects.get(id=template_id)
+            except Template.DoesNotExist:
+                return Response(
+                    {"error": "Template not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            
+            template.delete()
+            return Response({"message": "Template deleted successfully."}, status=status.HTTP_200_OK)
+        except Exception as e:
+            logger.error(f"Error deleting template: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while deleting the template."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class TemplateCreateView(APIView):
+    """Create a new template."""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        try:
+            file = request.FILES.get('file')
+            content_type = request.data.get('content_type')
+            graphic_pack_id = request.data.get('graphic_pack_id')
+            
+            if not file:
+                return Response(
+                    {"error": "File is required."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            
+            if not content_type:
+                return Response(
+                    {"error": "Content type is required."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            
+            if not graphic_pack_id:
+                return Response(
+                    {"error": "Graphic pack ID is required."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            
+            try:
+                graphic_pack = GraphicPack.objects.get(id=graphic_pack_id)
+            except GraphicPack.DoesNotExist:
+                return Response(
+                    {"error": "Graphic pack not found."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            
+            # Upload file to Cloudinary
+            try:
+                upload_result = cloudinary.uploader.upload(
+                    file,
+                    folder=f"templates/{graphic_pack_id}",
+                    resource_type="auto"
+                )
+            except Exception as upload_error:
+                logger.error(f"Cloudinary upload failed: {str(upload_error)}")
+                return Response(
+                    {"error": "Failed to upload file."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+            
+            # Create template
+            template = Template.objects.create(
+                graphic_pack=graphic_pack,
+                content_type=content_type,
+                file_url=upload_result['secure_url'],
+                file_name=file.name,
+                file_size=file.size
+            )
+            
+            return Response({
+                "message": "Template created successfully.",
+                "template": {
+                    "id": template.id,
+                    "content_type": template.content_type,
+                    "file_url": template.file_url,
+                    "file_name": template.file_name
+                }
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            logger.error(f"Error creating template: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while creating the template."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
 class TextElementByGraphicPackView(ListAPIView):
     """Get text elements for a specific graphic pack and content type."""
     serializer_class = TextElementSerializer

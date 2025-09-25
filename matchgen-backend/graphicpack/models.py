@@ -4,10 +4,25 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 
 
 class GraphicPack(models.Model):
+    TIER_CHOICES = [
+        ('basic', 'Basic'),
+        ('semipro', 'SemiPro'),
+        ('pro', 'Pro'),
+    ]
+    
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
     preview_image_url = models.URLField(max_length=500, blank=True, null=True)
     zip_file_url = models.URLField(max_length=500, blank=True, null=True)
+    
+    # New fields for admin functionality
+    primary_color = models.CharField(max_length=7, default='#000000', help_text="Primary color for the pack")
+    tier = models.CharField(max_length=20, choices=TIER_CHOICES, blank=True, null=True, help_text="Subscription tier required")
+    assigned_club = models.ForeignKey('users.Club', on_delete=models.SET_NULL, null=True, blank=True, help_text="Specific club (null for all clubs)")
+    is_active = models.BooleanField(default=True, help_text="Whether the pack is active")
+    
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -45,8 +60,16 @@ class Template(models.Model):
     image_url = models.URLField(max_length=500)
     sport = models.CharField(max_length=50, blank=True)
     
+    # New fields for file management
+    file_url = models.URLField(max_length=500, blank=True, null=True, help_text="URL of the uploaded file")
+    file_name = models.CharField(max_length=255, blank=True, null=True, help_text="Original filename")
+    file_size = models.IntegerField(blank=True, null=True, help_text="File size in bytes")
+    
     # New JSON field to store template configuration
     template_config = models.JSONField(default=dict, blank=True)
+    
+    created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
+    updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)
     
     # Example template_config structure:
     # {

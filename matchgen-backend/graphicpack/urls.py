@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     GraphicPackListView,
     GraphicPackDetailView,
+    GraphicPackDeleteView,
     SelectGraphicPackView,
     MatchdayPostGenerator,
     SocialMediaPostGenerator,
@@ -15,7 +16,8 @@ from .views import (
     TemplateDebugView,
     TextElementListView, TextElementCreateView, TextElementUpdateView, 
     TextElementDeleteView, TextElementByGraphicPackView, AddOpponentLogoElementView,
-    AddClubLogoElementView, DebugOpponentLogoView, TemplatesByPackView
+    AddClubLogoElementView, DebugOpponentLogoView, TemplatesByPackView,
+    TemplateCreateView, TemplateDeleteView
 )
 
 urlpatterns = [
@@ -23,6 +25,7 @@ urlpatterns = [
     path("packs/", GraphicPackListView.as_view(), name="graphic-pack-list"),
     path("graphic-packs/", GraphicPackListView.as_view(), name="graphic-pack-list-legacy"),
     path("graphic-packs/<int:id>/", GraphicPackDetailView.as_view(), name="graphic-pack-detail"),
+    path("packs/<int:pack_id>/delete/", GraphicPackDeleteView.as_view(), name="graphic-pack-delete"),
     path("select/", SelectGraphicPackView.as_view(), name="select-graphic-pack"),
     path("select-pack/", SelectGraphicPackView.as_view(), name="select-graphic-pack-legacy"),
     
@@ -51,4 +54,8 @@ urlpatterns = [
     path('add-club-logo-element/', AddClubLogoElementView.as_view(), name='add-club-logo-element'),
     path('debug-opponent-logo/', DebugOpponentLogoView.as_view(), name='debug-opponent-logo'),
     path('templates/<int:pack_id>/', TemplatesByPackView.as_view(), name='templates-by-pack'),
+    
+    # Template Management
+    path('templates/create/', TemplateCreateView.as_view(), name='template-create'),
+    path('templates/<int:template_id>/delete/', TemplateDeleteView.as_view(), name='template-delete'),
 ]

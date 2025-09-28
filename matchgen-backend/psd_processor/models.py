@@ -1,5 +1,6 @@
 from django.db import models
 from django.conf import settings
+from graphicpack.models import GraphicPack
 
 
 class PSDDocument(models.Model):
@@ -28,6 +29,10 @@ class PSDLayer(models.Model):
     visible = models.BooleanField(default=True)
     opacity = models.FloatField(default=100.0)
     layer_type = models.CharField(max_length=50, default='layer')
+    
+    # New fields for integration with Graphic Packs
+    graphic_pack = models.ForeignKey(GraphicPack, on_delete=models.CASCADE, null=True, blank=True, help_text="Associated graphic pack")
+    content_type = models.CharField(max_length=50, blank=True, null=True, help_text="Content type (fulltime, halftime, matchday, etc.)")
     
     class Meta:
         ordering = ['y', 'x']  # Order by position for logical display

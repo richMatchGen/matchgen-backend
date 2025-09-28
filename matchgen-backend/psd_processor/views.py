@@ -12,6 +12,7 @@ from django.core.files.base import ContentFile
 from psd_tools import PSDImage
 from .models import PSDDocument, PSDLayer
 from .serializers import PSDDocumentSerializer, PSDUploadSerializer, PSDLayerSerializer
+from graphicpack.models import GraphicPack, TextElement
 
 logger = logging.getLogger(__name__)
 
@@ -410,3 +411,124 @@ def delete_psd_document(request, document_id):
             {'error': 'PSD document not found'}, 
             status=status.HTTP_404_NOT_FOUND
         )
+
+
+class PSDLayerProcessView(APIView):
+    """Process selected layers and save them to both PSDLayer and TextElement models."""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        """Process selected layers and create text elements."""
+        try:
+            document_id = request.data.get('document_id')
+            graphic_pack_id = request.data.get('graphic_pack_id')
+            content_type = request.data.get('content_type')
+            layer_names = request.data.get('layer_names', [])
+            
+            if not all([document_id, graphic_pack_id, content_type, layer_names]):
+                return Response(
+                    {'error': 'Missing required fields: document_id, graphic_pack_id, content_type, layer_names'}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Get the PSD document
+            try:
+                document = PSDDocument.objects.get(id=document_id, user=request.user)
+            except PSDDocument.DoesNotExist:
+                return Response(
+                    {'error': 'PSD document not found'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Get the graphic pack
+            try:
+                graphic_pack = GraphicPack.objects.get(id=graphic_pack_id)
+            except GraphicPack.DoesNotExist:
+                return Response(
+                    {'error': 'Graphic pack not found'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            # Get layers that match the selected names
+            matching_layers = document.layers.filter(name__in=layer_names)
+            
+            if not matching_layers.exists():
+                return Response(
+                    {'error': 'No layers found matching the selected names'}, 
+                    status=status.HTTP_404_NOT_FOUND
+                )
+            
+            created_text_elements = []
+            
+            for layer in matching_layers:
+                # Determine element type based on layer name
+                element_type = 'image' if layer.name in ['club_logo', 'opponent_logo', 'player_image', 'photo_image'] else 'text'
+                
+                # Determine alignment based on content type
+                alignment = 'left' if content_type == 'startingXI' else 'center'
+                
+                # Create TextElement
+                text_element_data = {
+                    'graphic_pack': graphic_pack,
+                    'content_type': content_type,
+                    'element_name': layer.name,
+                    'element_type': element_type,
+                    'position_x': layer.x,
+                    'position_y': layer.y,
+                    'font_size': 48,
+                    'font_family': 'Montserrat',
+                    'font_color': '#FFFFFF',
+                    'alignment': alignment,
+                    'font_weight': 'normal',
+                    'maintain_aspect_ratio': True,
+                    'image_color_tint': '#FFFFFF'
+                }
+                
+                # Set image dimensions for image elements
+                if element_type == 'image':
+                    text_element_data.update({
+                        'image_width': 200,
+                        'image_height': 200
+                    })
+                
+                # Set home/away positions for specific logos
+                if layer.name == 'club_logo':
+                    text_element_data.update({
+                        'home_position_x': layer.x,
+                        'home_position_y': layer.y
+                    })
+                elif layer.name == 'opponent_logo':
+                    text_element_data.update({
+                        'away_position_x': layer.x,
+                        'away_position_y': layer.y
+                    })
+                
+                # Create the TextElement
+                text_element = TextElement.objects.create(**text_element_data)
+                created_text_elements.append(text_element)
+                
+                # Update the PSDLayer with graphic pack and content type
+                layer.graphic_pack = graphic_pack
+                layer.content_type = content_type
+                layer.save()
+            
+            return Response({
+                'message': f'Successfully processed {len(created_text_elements)} layers',
+                'created_elements': len(created_text_elements),
+                'text_elements': [
+                    {
+                        'id': element.id,
+                        'element_name': element.element_name,
+                        'element_type': element.element_type,
+                        'position_x': element.position_x,
+                        'position_y': element.position_y
+                    } for element in created_text_elements
+                ]
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            logger.error(f"Error processing layers: {str(e)}", exc_info=True)
+            return Response(
+                {'error': f'Failed to process layers: {str(e)}'}, 
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )

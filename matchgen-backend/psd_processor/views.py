@@ -461,20 +461,23 @@ class PSDLayerProcessView(APIView):
             created_text_elements = []
             
             for layer in matching_layers:
+                # Log layer positioning information
+                logger.info(f"Processing layer {layer.name}: top-left=({layer.x}, {layer.y}), center=({layer.center_x:.1f}, {layer.center_y:.1f}), size={layer.width}x{layer.height}")
+                
                 # Determine element type based on layer name
                 element_type = 'image' if layer.name in ['club_logo', 'opponent_logo', 'player_image', 'photo_image'] else 'text'
                 
                 # Determine alignment based on content type
                 alignment = 'left' if content_type == 'startingXI' else 'center'
                 
-                # Create TextElement
+                # Create TextElement using center coordinates
                 text_element_data = {
                     'graphic_pack': graphic_pack,
                     'content_type': content_type,
                     'element_name': layer.name,
                     'element_type': element_type,
-                    'position_x': layer.x,
-                    'position_y': layer.y,
+                    'position_x': int(layer.center_x),  # Use center X coordinate
+                    'position_y': int(layer.center_y),  # Use center Y coordinate
                     'font_size': 48,
                     'font_family': 'Montserrat',
                     'font_color': '#FFFFFF',
@@ -491,16 +494,16 @@ class PSDLayerProcessView(APIView):
                         'image_height': 200
                     })
                 
-                # Set home/away positions for specific logos
+                # Set home/away positions for specific logos using center coordinates
                 if layer.name == 'club_logo':
                     text_element_data.update({
-                        'home_position_x': layer.x,
-                        'home_position_y': layer.y
+                        'home_position_x': int(layer.center_x),
+                        'home_position_y': int(layer.center_y)
                     })
                 elif layer.name == 'opponent_logo':
                     text_element_data.update({
-                        'away_position_x': layer.x,
-                        'away_position_y': layer.y
+                        'away_position_x': int(layer.center_x),
+                        'away_position_y': int(layer.center_y)
                     })
                 
                 # Create the TextElement (handle unique constraint)
@@ -517,9 +520,9 @@ class PSDLayerProcessView(APIView):
                             content_type=content_type,
                             element_name=layer.name
                         )
-                        logger.info(f"TextElement already exists for {layer.name}, updating position")
-                        existing_element.position_x = layer.x
-                        existing_element.position_y = layer.y
+                        logger.info(f"TextElement already exists for {layer.name}, updating position to center coordinates")
+                        existing_element.position_x = int(layer.center_x)
+                        existing_element.position_y = int(layer.center_y)
                         existing_element.save()
                         created_text_elements.append(existing_element)
                     except TextElement.DoesNotExist:

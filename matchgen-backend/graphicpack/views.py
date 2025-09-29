@@ -9,6 +9,7 @@ import requests
 from PIL import Image, ImageDraw, ImageFont, ImageEnhance, ImageOps
 import os
 from django.conf import settings
+from django.db.models import Q
 from rest_framework import status
 from rest_framework.generics import ListAPIView, RetrieveAPIView
 from rest_framework.permissions import IsAuthenticated, AllowAny
@@ -1910,10 +1911,40 @@ class DiagnosticView(APIView):
 
 
 class TextElementListView(ListAPIView):
-    """List all text elements."""
+    """List all text elements with filtering and pagination."""
     queryset = TextElement.objects.all()
     serializer_class = TextElementSerializer
     permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """Filter queryset based on query parameters."""
+        queryset = TextElement.objects.all()
+        
+        # Filter by content type
+        content_type = self.request.query_params.get('content_type')
+        if content_type:
+            queryset = queryset.filter(content_type=content_type)
+        
+        # Filter by graphic pack
+        graphic_pack = self.request.query_params.get('graphic_pack')
+        if graphic_pack:
+            queryset = queryset.filter(graphic_pack_id=graphic_pack)
+        
+        # Filter by element name
+        element_name = self.request.query_params.get('element_name')
+        if element_name:
+            queryset = queryset.filter(element_name=element_name)
+        
+        # Search filter (searches across multiple fields)
+        search = self.request.query_params.get('search')
+        if search:
+            queryset = queryset.filter(
+                Q(element_name__icontains=search) |
+                Q(content_type__icontains=search) |
+                Q(graphic_pack__name__icontains=search)
+            )
+        
+        return queryset.order_by('graphic_pack__name', 'content_type', 'element_name')
 
 
 class TextElementCreateView(APIView):

@@ -509,22 +509,22 @@ class PSDLayerProcessView(APIView):
                     })
                 
                 # Set home/away positions for specific logos using anchor-based coordinates
-                # Club logo uses opponent position for away games
-                # Opponent logo uses club position for home games
+                # Club logo: home position = club position, away position = opponent position
+                # Opponent logo: home position = opponent position, away position = club position
                 if layer.name == 'club_logo':
-                    # Club logo is an image element, use center-center positioning
+                    # Club logo: set home position to club's own position
                     text_element_data.update({
-                        'away_position_x': int(layer.center_x),  # Center X
-                        'away_position_y': int(layer.center_y)   # Center Y
+                        'home_position_x': int(layer.center_x),  # Club's own position for home games
+                        'home_position_y': int(layer.center_y)
                     })
-                    logger.info(f"Set club_logo away position to center-center ({int(layer.center_x)}, {int(layer.center_y)})")
+                    logger.info(f"Set club_logo home position to center-center ({int(layer.center_x)}, {int(layer.center_y)})")
                 elif layer.name == 'opponent_logo':
-                    # Opponent logo is an image element, use center-center positioning
+                    # Opponent logo: set away position to opponent's own position
                     text_element_data.update({
-                        'home_position_x': int(layer.center_x),  # Center X
-                        'home_position_y': int(layer.center_y)   # Center Y
+                        'away_position_x': int(layer.center_x),  # Opponent's own position for away games
+                        'away_position_y': int(layer.center_y)
                     })
-                    logger.info(f"Set opponent_logo home position to center-center ({int(layer.center_x)}, {int(layer.center_y)})")
+                    logger.info(f"Set opponent_logo away position to center-center ({int(layer.center_x)}, {int(layer.center_y)})")
                 
                 # Create the TextElement (handle unique constraint)
                 try:
@@ -556,13 +556,13 @@ class PSDLayerProcessView(APIView):
                         
                         # Update home/away positions for logos (always center-center for images)
                         if layer.name == 'club_logo':
-                            existing_element.away_position_x = int(layer.center_x)
-                            existing_element.away_position_y = int(layer.center_y)
-                            logger.info(f"Updated club_logo away position to center-center ({int(layer.center_x)}, {int(layer.center_y)})")
-                        elif layer.name == 'opponent_logo':
                             existing_element.home_position_x = int(layer.center_x)
                             existing_element.home_position_y = int(layer.center_y)
-                            logger.info(f"Updated opponent_logo home position to center-center ({int(layer.center_x)}, {int(layer.center_y)})")
+                            logger.info(f"Updated club_logo home position to center-center ({int(layer.center_x)}, {int(layer.center_y)})")
+                        elif layer.name == 'opponent_logo':
+                            existing_element.away_position_x = int(layer.center_x)
+                            existing_element.away_position_y = int(layer.center_y)
+                            logger.info(f"Updated opponent_logo away position to center-center ({int(layer.center_x)}, {int(layer.center_y)})")
                         
                         existing_element.save()
                         created_text_elements.append(existing_element)

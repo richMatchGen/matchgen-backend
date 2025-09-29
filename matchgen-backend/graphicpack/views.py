@@ -1003,11 +1003,18 @@ class SocialMediaPostGenerator(APIView):
                 logger.info(f"Element {element.element_name} doesn't need home/away positioning, using default position: ({x}, {y})")
         
         # Determine anchor based on alignment
-        anchor = 'mm'  # Default center
-        if alignment == 'left':
-            anchor = 'lm'
-        elif alignment == 'right':
-            anchor = 'rm'
+        # For text elements, use top-center positioning (mt = middle-top)
+        # For image elements, use center-center positioning (mm = middle-middle)
+        if element.element_type == 'text':
+            if alignment == 'left':
+                anchor = 'lt'  # left-top
+            elif alignment == 'right':
+                anchor = 'rt'  # right-top
+            else:
+                anchor = 'mt'  # middle-top (center horizontally, top vertically)
+        else:
+            # Image elements use center-center positioning
+            anchor = 'mm'  # middle-middle
         
         # Create drawing object
         draw = ImageDraw.Draw(base_image)

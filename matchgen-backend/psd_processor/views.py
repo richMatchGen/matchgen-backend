@@ -503,9 +503,30 @@ class PSDLayerProcessView(APIView):
                         'away_position_y': layer.y
                     })
                 
-                # Create the TextElement
-                text_element = TextElement.objects.create(**text_element_data)
-                created_text_elements.append(text_element)
+                # Create the TextElement (handle unique constraint)
+                try:
+                    text_element = TextElement.objects.create(**text_element_data)
+                    created_text_elements.append(text_element)
+                except Exception as e:
+                    logger.warning(f"Failed to create TextElement for layer {layer.name}: {str(e)}")
+                    # Try to get existing element or create with unique name
+                    try:
+                        # Check if element already exists
+                        existing_element = TextElement.objects.get(
+                            graphic_pack=graphic_pack,
+                            content_type=content_type,
+                            element_name=layer.name
+                        )
+                        logger.info(f"TextElement already exists for {layer.name}, updating position")
+                        existing_element.position_x = layer.x
+                        existing_element.position_y = layer.y
+                        existing_element.save()
+                        created_text_elements.append(existing_element)
+                    except TextElement.DoesNotExist:
+                        # Create with unique name by appending layer ID
+                        text_element_data['element_name'] = f"{layer.name}_{layer.id}"
+                        text_element = TextElement.objects.create(**text_element_data)
+                        created_text_elements.append(text_element)
                 
                 # Update the PSDLayer with graphic pack and content type
                 layer.graphic_pack = graphic_pack

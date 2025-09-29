@@ -1002,31 +1002,73 @@ class SocialMediaPostGenerator(APIView):
             else:
                 logger.info(f"Element {element.element_name} doesn't need home/away positioning, using default position: ({x}, {y})")
         
-        # Determine anchor based on alignment
-        # For text elements, use top-center positioning (mt = middle-top)
-        # For image elements, use center-center positioning (mm = middle-middle)
-        if element.element_type == 'text':
-            if alignment == 'left':
-                anchor = 'lt'  # left-top
-            elif alignment == 'right':
-                anchor = 'rt'  # right-top
-            else:
-                anchor = 'mt'  # middle-top (center horizontally, top vertically)
-        else:
-            # Image elements use center-center positioning
-            anchor = 'mm'  # middle-middle
-        
         # Create drawing object
         draw = ImageDraw.Draw(base_image)
         
-        # Render text
-        draw.text(
-            (x, y),
-            content,
-            font=font,
-            fill=font_color,
-            anchor=anchor
-        )
+        # Check if content is multiline
+        is_multiline = '\n' in content
+        
+        if is_multiline:
+            # For multiline text, we need to handle positioning manually
+            logger.info(f"Rendering multiline text: {element.element_name}")
+            
+            # Split content into lines
+            lines = content.split('\n')
+            
+            # Calculate line height (approximate)
+            line_height = font_size + 5  # Add some spacing between lines
+            
+            # Calculate starting Y position based on alignment
+            if alignment == 'left':
+                # Left-aligned multiline text
+                for i, line in enumerate(lines):
+                    if line.strip():  # Only render non-empty lines
+                        line_y = y + (i * line_height)
+                        draw.text((x, line_y), line, font=font, fill=font_color)
+                        logger.info(f"Rendered line {i+1}: '{line}' at ({x}, {line_y})")
+            elif alignment == 'right':
+                # Right-aligned multiline text
+                for i, line in enumerate(lines):
+                    if line.strip():  # Only render non-empty lines
+                        line_y = y + (i * line_height)
+                        # Get text width for right alignment
+                        bbox = draw.textbbox((0, 0), line, font=font)
+                        text_width = bbox[2] - bbox[0]
+                        line_x = x - text_width
+                        draw.text((line_x, line_y), line, font=font, fill=font_color)
+                        logger.info(f"Rendered line {i+1}: '{line}' at ({line_x}, {line_y})")
+            else:
+                # Center-aligned multiline text
+                for i, line in enumerate(lines):
+                    if line.strip():  # Only render non-empty lines
+                        line_y = y + (i * line_height)
+                        # Get text width for center alignment
+                        bbox = draw.textbbox((0, 0), line, font=font)
+                        text_width = bbox[2] - bbox[0]
+                        line_x = x - (text_width // 2)
+                        draw.text((line_x, line_y), line, font=font, fill=font_color)
+                        logger.info(f"Rendered line {i+1}: '{line}' at ({line_x}, {line_y})")
+        else:
+            # For single-line text, use anchor points
+            if element.element_type == 'text':
+                if alignment == 'left':
+                    anchor = 'lt'  # left-top
+                elif alignment == 'right':
+                    anchor = 'rt'  # right-top
+                else:
+                    anchor = 'mt'  # middle-top (center horizontally, top vertically)
+            else:
+                # Image elements use center-center positioning
+                anchor = 'mm'  # middle-middle
+            
+            # Render single-line text with anchor
+            draw.text(
+                (x, y),
+                content,
+                font=font,
+                fill=font_color,
+                anchor=anchor
+            )
         
         logger.info(f"Rendered '{content}' at ({x}, {y}) with color {font_color}, requested font size {font_size}, actual font: {font}")
     

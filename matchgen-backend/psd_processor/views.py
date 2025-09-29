@@ -470,14 +470,28 @@ class PSDLayerProcessView(APIView):
                 # Determine alignment based on content type
                 alignment = 'left' if content_type == 'startingXI' else 'center'
                 
-                # Create TextElement using center coordinates
+                # Calculate position based on anchor point
+                # Text elements: top-center anchor (position_y = top of layer)
+                # Image elements: center-center anchor (position = center of layer)
+                if element_type == 'text':
+                    # For text elements, use top-center positioning
+                    position_x = int(layer.center_x)  # Center X
+                    position_y = int(layer.y)  # Top Y (not center)
+                    logger.info(f"Text element {layer.name}: using top-center positioning ({position_x}, {position_y})")
+                else:
+                    # For image elements, use center-center positioning
+                    position_x = int(layer.center_x)  # Center X
+                    position_y = int(layer.center_y)  # Center Y
+                    logger.info(f"Image element {layer.name}: using center-center positioning ({position_x}, {position_y})")
+                
+                # Create TextElement with calculated positions
                 text_element_data = {
                     'graphic_pack': graphic_pack,
                     'content_type': content_type,
                     'element_name': layer.name,
                     'element_type': element_type,
-                    'position_x': int(layer.center_x),  # Use center X coordinate
-                    'position_y': int(layer.center_y),  # Use center Y coordinate
+                    'position_x': position_x,
+                    'position_y': position_y,
                     'font_size': 48,
                     'font_family': 'Montserrat',
                     'font_color': '#FFFFFF',
@@ -494,17 +508,23 @@ class PSDLayerProcessView(APIView):
                         'image_height': 200
                     })
                 
-                # Set home/away positions for specific logos using center coordinates
+                # Set home/away positions for specific logos using anchor-based coordinates
+                # Club logo uses opponent position for away games
+                # Opponent logo uses club position for home games
                 if layer.name == 'club_logo':
+                    # Club logo is an image element, use center-center positioning
                     text_element_data.update({
-                        'home_position_x': int(layer.center_x),
-                        'home_position_y': int(layer.center_y)
+                        'away_position_x': int(layer.center_x),  # Center X
+                        'away_position_y': int(layer.center_y)   # Center Y
                     })
+                    logger.info(f"Set club_logo away position to center-center ({int(layer.center_x)}, {int(layer.center_y)})")
                 elif layer.name == 'opponent_logo':
+                    # Opponent logo is an image element, use center-center positioning
                     text_element_data.update({
-                        'away_position_x': int(layer.center_x),
-                        'away_position_y': int(layer.center_y)
+                        'home_position_x': int(layer.center_x),  # Center X
+                        'home_position_y': int(layer.center_y)   # Center Y
                     })
+                    logger.info(f"Set opponent_logo home position to center-center ({int(layer.center_x)}, {int(layer.center_y)})")
                 
                 # Create the TextElement (handle unique constraint)
                 try:
@@ -520,9 +540,30 @@ class PSDLayerProcessView(APIView):
                             content_type=content_type,
                             element_name=layer.name
                         )
-                        logger.info(f"TextElement already exists for {layer.name}, updating position to center coordinates")
-                        existing_element.position_x = int(layer.center_x)
-                        existing_element.position_y = int(layer.center_y)
+                        logger.info(f"TextElement already exists for {layer.name}, updating position with anchor-based coordinates")
+                        
+                        # Update positions based on anchor point
+                        if element_type == 'text':
+                            # Text elements: top-center anchor
+                            existing_element.position_x = int(layer.center_x)  # Center X
+                            existing_element.position_y = int(layer.y)  # Top Y
+                            logger.info(f"Updated text element {layer.name} to top-center ({int(layer.center_x)}, {int(layer.y)})")
+                        else:
+                            # Image elements: center-center anchor
+                            existing_element.position_x = int(layer.center_x)  # Center X
+                            existing_element.position_y = int(layer.center_y)  # Center Y
+                            logger.info(f"Updated image element {layer.name} to center-center ({int(layer.center_x)}, {int(layer.center_y)})")
+                        
+                        # Update home/away positions for logos (always center-center for images)
+                        if layer.name == 'club_logo':
+                            existing_element.away_position_x = int(layer.center_x)
+                            existing_element.away_position_y = int(layer.center_y)
+                            logger.info(f"Updated club_logo away position to center-center ({int(layer.center_x)}, {int(layer.center_y)})")
+                        elif layer.name == 'opponent_logo':
+                            existing_element.home_position_x = int(layer.center_x)
+                            existing_element.home_position_y = int(layer.center_y)
+                            logger.info(f"Updated opponent_logo home position to center-center ({int(layer.center_x)}, {int(layer.center_y)})")
+                        
                         existing_element.save()
                         created_text_elements.append(existing_element)
                     except TextElement.DoesNotExist:

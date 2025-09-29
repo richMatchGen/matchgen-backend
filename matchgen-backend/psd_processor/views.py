@@ -460,6 +460,7 @@ class PSDLayerProcessView(APIView):
             
             created_text_elements = []
             
+            # First pass: create all elements with their own positions
             for layer in matching_layers:
                 # Log layer positioning information
                 logger.info(f"Processing layer {layer.name}: top-left=({layer.x}, {layer.y}), center=({layer.center_x:.1f}, {layer.center_y:.1f}), size={layer.width}x{layer.height}")
@@ -508,23 +509,23 @@ class PSDLayerProcessView(APIView):
                         'image_height': 200
                     })
                 
-                # Set home/away positions for specific logos using the same coordinates as position_x/position_y
-                # Club logo: home position = position_x/position_y
-                # Opponent logo: away position = position_x/position_y
+                # Set home/away positions for specific logos
+                # Club logo: home = club position, away = opponent position
+                # Opponent logo: home = opponent position, away = club position
                 if layer.name == 'club_logo':
-                    # Club logo: set home position to same as main position
+                    # Club logo: set home position to club's own position
                     text_element_data.update({
-                        'home_position_x': position_x,  # Same as position_x
-                        'home_position_y': position_y   # Same as position_y
+                        'home_position_x': position_x,  # Club's own position for home games
+                        'home_position_y': position_y
                     })
-                    logger.info(f"Set club_logo home position to same as main position ({position_x}, {position_y})")
+                    logger.info(f"Set club_logo home position to club's position ({position_x}, {position_y})")
                 elif layer.name == 'opponent_logo':
-                    # Opponent logo: set away position to same as main position
+                    # Opponent logo: set away position to opponent's own position
                     text_element_data.update({
-                        'away_position_x': position_x,  # Same as position_x
-                        'away_position_y': position_y   # Same as position_y
+                        'away_position_x': position_x,  # Opponent's own position for away games
+                        'away_position_y': position_y
                     })
-                    logger.info(f"Set opponent_logo away position to same as main position ({position_x}, {position_y})")
+                    logger.info(f"Set opponent_logo away position to opponent's position ({position_x}, {position_y})")
                 
                 # Create the TextElement (handle unique constraint)
                 try:
@@ -576,6 +577,33 @@ class PSDLayerProcessView(APIView):
                 layer.graphic_pack = graphic_pack
                 layer.content_type = content_type
                 layer.save()
+            
+            # Second pass: set opposite positions for logos
+            logger.info("=== SECOND PASS: Setting opposite positions for logos ===")
+            
+            # Get club and opponent logo elements
+            club_logo_element = None
+            opponent_logo_element = None
+            
+            for element in created_text_elements:
+                if element.element_name == 'club_logo':
+                    club_logo_element = element
+                elif element.element_name == 'opponent_logo':
+                    opponent_logo_element = element
+            
+            # Set opposite positions
+            if club_logo_element and opponent_logo_element:
+                # Club logo away position = opponent logo position
+                club_logo_element.away_position_x = opponent_logo_element.position_x
+                club_logo_element.away_position_y = opponent_logo_element.position_y
+                club_logo_element.save()
+                logger.info(f"Set club_logo away position to opponent position ({opponent_logo_element.position_x}, {opponent_logo_element.position_y})")
+                
+                # Opponent logo home position = club logo position
+                opponent_logo_element.home_position_x = club_logo_element.position_x
+                opponent_logo_element.home_position_y = club_logo_element.position_y
+                opponent_logo_element.save()
+                logger.info(f"Set opponent_logo home position to club position ({club_logo_element.position_x}, {club_logo_element.position_y})")
             
             return Response({
                 'message': f'Successfully processed {len(created_text_elements)} layers',

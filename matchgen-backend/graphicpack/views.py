@@ -533,8 +533,12 @@ class MatchdayPostGenerator(APIView):
                     x = text_element.position_x
                     y = text_element.position_y
                     
+                    # Only use home/away positioning for specific elements that need it
+                    # (like logos), not for general text elements like lineups
+                    should_use_home_away = text_element.element_name in ['club_logo', 'opponent_logo', 'player_image', 'photo_image']
+                    
                     # Use home/away specific positioning if available
-                    if hasattr(match, 'home_away') and match.home_away:
+                    if hasattr(match, 'home_away') and match.home_away and should_use_home_away:
                         if match.home_away == 'HOME' and text_element.home_position_x is not None and text_element.home_position_x != 0:
                             x = text_element.home_position_x
                             y = text_element.home_position_y
@@ -977,7 +981,11 @@ class SocialMediaPostGenerator(APIView):
         logger.info(f"Element away_position_x: {getattr(element, 'away_position_x', 'Not set')}")
         logger.info(f"Default position: ({x}, {y})")
         
-        if hasattr(match, 'home_away') and match.home_away:
+        # Only use home/away positioning for specific elements that need it
+        # (like logos), not for general text elements like lineups
+        should_use_home_away = element.element_name in ['club_logo', 'opponent_logo', 'player_image', 'photo_image']
+        
+        if hasattr(match, 'home_away') and match.home_away and should_use_home_away:
             if match.home_away == 'HOME' and element.home_position_x is not None and element.home_position_x != 0:
                 x = element.home_position_x
                 y = element.home_position_y
@@ -989,7 +997,10 @@ class SocialMediaPostGenerator(APIView):
             else:
                 logger.info(f"Home/away positions not set or are default values, using default position: ({x}, {y})")
         else:
-            logger.info(f"No home_away data, using default position: ({x}, {y})")
+            if should_use_home_away:
+                logger.info(f"No home_away data, using default position: ({x}, {y})")
+            else:
+                logger.info(f"Element {element.element_name} doesn't need home/away positioning, using default position: ({x}, {y})")
         
         # Determine anchor based on alignment
         anchor = 'mm'  # Default center
@@ -1073,7 +1084,11 @@ class SocialMediaPostGenerator(APIView):
             logger.info(f"Element away_position_x: {getattr(element, 'away_position_x', 'Not set')}")
             logger.info(f"Default position: ({x}, {y})")
             
-            if hasattr(match, 'home_away') and match.home_away:
+            # Only use home/away positioning for specific elements that need it
+            # (like logos), not for general text elements like lineups
+            should_use_home_away = element.element_name in ['club_logo', 'opponent_logo', 'player_image', 'photo_image']
+            
+            if hasattr(match, 'home_away') and match.home_away and should_use_home_away:
                 if match.home_away == 'HOME' and element.home_position_x is not None and element.home_position_x != 0:
                     x = element.home_position_x
                     y = element.home_position_y
@@ -1085,7 +1100,10 @@ class SocialMediaPostGenerator(APIView):
                 else:
                     logger.info(f"Home/away positions not set or are default values, using default position: ({x}, {y})")
             else:
-                logger.info(f"No home_away data, using default position: ({x}, {y})")
+                if should_use_home_away:
+                    logger.info(f"No home_away data, using default position: ({x}, {y})")
+                else:
+                    logger.info(f"Element {element.element_name} doesn't need home/away positioning, using default position: ({x}, {y})")
             
             # Calculate paste position to center the image
             paste_x = x - img.width // 2

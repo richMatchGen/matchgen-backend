@@ -508,23 +508,23 @@ class PSDLayerProcessView(APIView):
                         'image_height': 200
                     })
                 
-                # Set home/away positions for specific logos using anchor-based coordinates
-                # Club logo: home position = club position, away position = opponent position
-                # Opponent logo: home position = opponent position, away position = club position
+                # Set home/away positions for specific logos using the same coordinates as position_x/position_y
+                # Club logo: home position = position_x/position_y
+                # Opponent logo: away position = position_x/position_y
                 if layer.name == 'club_logo':
-                    # Club logo: set home position to club's own position
+                    # Club logo: set home position to same as main position
                     text_element_data.update({
-                        'home_position_x': int(layer.center_x),  # Club's own position for home games
-                        'home_position_y': int(layer.center_y)
+                        'home_position_x': position_x,  # Same as position_x
+                        'home_position_y': position_y   # Same as position_y
                     })
-                    logger.info(f"Set club_logo home position to center-center ({int(layer.center_x)}, {int(layer.center_y)})")
+                    logger.info(f"Set club_logo home position to same as main position ({position_x}, {position_y})")
                 elif layer.name == 'opponent_logo':
-                    # Opponent logo: set away position to opponent's own position
+                    # Opponent logo: set away position to same as main position
                     text_element_data.update({
-                        'away_position_x': int(layer.center_x),  # Opponent's own position for away games
-                        'away_position_y': int(layer.center_y)
+                        'away_position_x': position_x,  # Same as position_x
+                        'away_position_y': position_y   # Same as position_y
                     })
-                    logger.info(f"Set opponent_logo away position to center-center ({int(layer.center_x)}, {int(layer.center_y)})")
+                    logger.info(f"Set opponent_logo away position to same as main position ({position_x}, {position_y})")
                 
                 # Create the TextElement (handle unique constraint)
                 try:
@@ -554,15 +554,15 @@ class PSDLayerProcessView(APIView):
                             existing_element.position_y = int(layer.center_y)  # Center Y
                             logger.info(f"Updated image element {layer.name} to center-center ({int(layer.center_x)}, {int(layer.center_y)})")
                         
-                        # Update home/away positions for logos (always center-center for images)
+                        # Update home/away positions for logos using same coordinates as main position
                         if layer.name == 'club_logo':
-                            existing_element.home_position_x = int(layer.center_x)
-                            existing_element.home_position_y = int(layer.center_y)
-                            logger.info(f"Updated club_logo home position to center-center ({int(layer.center_x)}, {int(layer.center_y)})")
+                            existing_element.home_position_x = position_x
+                            existing_element.home_position_y = position_y
+                            logger.info(f"Updated club_logo home position to same as main position ({position_x}, {position_y})")
                         elif layer.name == 'opponent_logo':
-                            existing_element.away_position_x = int(layer.center_x)
-                            existing_element.away_position_y = int(layer.center_y)
-                            logger.info(f"Updated opponent_logo away position to center-center ({int(layer.center_x)}, {int(layer.center_y)})")
+                            existing_element.away_position_x = position_x
+                            existing_element.away_position_y = position_y
+                            logger.info(f"Updated opponent_logo away position to same as main position ({position_x}, {position_y})")
                         
                         existing_element.save()
                         created_text_elements.append(existing_element)

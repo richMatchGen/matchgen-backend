@@ -535,10 +535,10 @@ class MatchdayPostGenerator(APIView):
                     
                     # Use home/away specific positioning if available
                     if hasattr(match, 'home_away') and match.home_away:
-                        if match.home_away == 'HOME' and text_element.home_position_x is not None:
+                        if match.home_away == 'HOME' and text_element.home_position_x is not None and text_element.home_position_x != 0:
                             x = text_element.home_position_x
                             y = text_element.home_position_y
-                        elif match.home_away == 'AWAY' and text_element.away_position_x is not None:
+                        elif match.home_away == 'AWAY' and text_element.away_position_x is not None and text_element.away_position_x != 0:
                             x = text_element.away_position_x
                             y = text_element.away_position_y
                     
@@ -978,16 +978,16 @@ class SocialMediaPostGenerator(APIView):
         logger.info(f"Default position: ({x}, {y})")
         
         if hasattr(match, 'home_away') and match.home_away:
-            if match.home_away == 'HOME' and element.home_position_x is not None:
+            if match.home_away == 'HOME' and element.home_position_x is not None and element.home_position_x != 0:
                 x = element.home_position_x
                 y = element.home_position_y
                 logger.info(f"Using HOME position: ({x}, {y})")
-            elif match.home_away == 'AWAY' and element.away_position_x is not None:
+            elif match.home_away == 'AWAY' and element.away_position_x is not None and element.away_position_x != 0:
                 x = element.away_position_x
                 y = element.away_position_y
                 logger.info(f"Using AWAY position: ({x}, {y})")
             else:
-                logger.info(f"Using default position: ({x}, {y})")
+                logger.info(f"Home/away positions not set or are default values, using default position: ({x}, {y})")
         else:
             logger.info(f"No home_away data, using default position: ({x}, {y})")
         
@@ -1074,16 +1074,16 @@ class SocialMediaPostGenerator(APIView):
             logger.info(f"Default position: ({x}, {y})")
             
             if hasattr(match, 'home_away') and match.home_away:
-                if match.home_away == 'HOME' and element.home_position_x is not None:
+                if match.home_away == 'HOME' and element.home_position_x is not None and element.home_position_x != 0:
                     x = element.home_position_x
                     y = element.home_position_y
                     logger.info(f"Using HOME position: ({x}, {y})")
-                elif match.home_away == 'AWAY' and element.away_position_x is not None:
+                elif match.home_away == 'AWAY' and element.away_position_x is not None and element.away_position_x != 0:
                     x = element.away_position_x
                     y = element.away_position_y
                     logger.info(f"Using AWAY position: ({x}, {y})")
                 else:
-                    logger.info(f"Using default position: ({x}, {y})")
+                    logger.info(f"Home/away positions not set or are default values, using default position: ({x}, {y})")
             else:
                 logger.info(f"No home_away data, using default position: ({x}, {y})")
             

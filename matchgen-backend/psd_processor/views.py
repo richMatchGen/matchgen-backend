@@ -637,8 +637,8 @@ class PSDLayerProcessView(APIView):
                     except TextElement.DoesNotExist:
                         # Create with unique name by appending layer ID
                         text_element_data['element_name'] = f"{layer.name}_{layer.id}"
-                text_element = TextElement.objects.create(**text_element_data)
-                created_text_elements.append(text_element)
+                        text_element = TextElement.objects.create(**text_element_data)
+                        created_text_elements.append(text_element)
                 
                 # Update the PSDLayer with graphic pack and content type
                 layer.graphic_pack = graphic_pack

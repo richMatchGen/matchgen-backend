@@ -26,6 +26,12 @@ class PSDLayer(models.Model):
     height = models.IntegerField(help_text="Height of layer")
     center_x = models.FloatField(help_text="Center X coordinate of layer")
     center_y = models.FloatField(help_text="Center Y coordinate of layer")
+    
+    # Left and right position coordinates
+    left_x = models.IntegerField(help_text="Left X coordinate of layer", default=0)
+    left_y = models.IntegerField(help_text="Left Y coordinate of layer", default=0)
+    right_x = models.IntegerField(help_text="Right X coordinate of layer", default=0)
+    right_y = models.IntegerField(help_text="Right Y coordinate of layer", default=0)
     visible = models.BooleanField(default=True)
     opacity = models.FloatField(default=100.0)
     layer_type = models.CharField(max_length=50, default='layer')

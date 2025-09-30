@@ -205,6 +205,12 @@ class PSDUploadView(APIView):
                         if isinstance(opacity, (int, float)) and opacity <= 1.0:
                             opacity = opacity * 100
                         
+                        # Calculate left and right positions
+                        left_x = x  # Top-left X position
+                        left_y = y  # Top-left Y position
+                        right_x = x + width  # Top-right X position
+                        right_y = y  # Top-right Y position
+                        
                         layer_data = {
                             'name': full_layer_name,
                             'x': x,
@@ -213,6 +219,10 @@ class PSDUploadView(APIView):
                             'height': height,
                             'center_x': center_x,
                             'center_y': center_y,
+                            'left_x': left_x,
+                            'left_y': left_y,
+                            'right_x': right_x,
+                            'right_y': right_y,
                             'visible': bool(visible),
                             'opacity': float(opacity),
                             'layer_type': 'group' if hasattr(layer, 'layers') and layer.layers else 'layer'
@@ -231,6 +241,10 @@ class PSDUploadView(APIView):
                             'height': 0,
                             'center_x': 0.0,
                             'center_y': 0.0,
+                            'left_x': 0,
+                            'left_y': 0,
+                            'right_x': 0,
+                            'right_y': 0,
                             'visible': getattr(layer, 'visible', True),
                             'opacity': float(getattr(layer, 'opacity', 1.0)) * 100 if getattr(layer, 'opacity', 1.0) <= 1.0 else float(getattr(layer, 'opacity', 100.0)),
                             'layer_type': 'layer'

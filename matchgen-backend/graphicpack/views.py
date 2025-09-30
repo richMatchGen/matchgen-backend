@@ -1050,9 +1050,17 @@ class SocialMediaPostGenerator(APIView):
                         draw.text((line_x, line_y), line, font=font, fill=font_color)
                         logger.info(f"Rendered line {i+1}: '{line}' at ({line_x}, {line_y})")
         else:
-            # Use the recorded anchor point from PSD processing
-            anchor = getattr(element, 'anchor_point', 'mt')  # Default to middle-top if not set
-            logger.info(f"Using recorded anchor point: {anchor}")
+            # Determine anchor point based on alignment for single-line text
+            if alignment == 'left':
+                anchor = 'lt'  # left-top anchor
+            elif alignment == 'center':
+                anchor = 'mt'  # middle-top anchor
+            elif alignment == 'right':
+                anchor = 'rt'  # right-top anchor
+            else:
+                anchor = 'mt'  # Default to middle-top
+            
+            logger.info(f"Using anchor point '{anchor}' for alignment '{alignment}'")
             
             # Render single-line text with anchor
             draw.text(
@@ -2051,31 +2059,21 @@ class TextElementUpdateView(APIView):
                 if new_alignment != old_alignment:
                     logger.info(f"Alignment changed from {old_alignment} to {new_alignment}")
                     
-                    # Update position based on new alignment
+                    # Update position based on new alignment using stored anchor positions
                     if new_alignment == 'left':
                         # Use top-left position for left alignment
                         request.data['position_x'] = text_element.top_left_x
                         request.data['position_y'] = text_element.top_left_y
-                        request.data['anchor_point'] = 'lt'  # left-top anchor
                         logger.info(f"Updated position to top-left: ({text_element.top_left_x}, {text_element.top_left_y})")
                     elif new_alignment == 'center':
-                        # Use center position for center alignment
-                        if text_element.element_type == 'text':
-                            # For text, use center X and top Y
-                            request.data['position_x'] = text_element.top_left_x + (text_element.image_width or 100) // 2
-                            request.data['position_y'] = text_element.top_left_y
-                            request.data['anchor_point'] = 'mt'  # middle-top anchor
-                        else:
-                            # For images, use center X and center Y
-                            request.data['position_x'] = text_element.top_left_x + (text_element.image_width or 100) // 2
-                            request.data['position_y'] = text_element.top_left_y + (text_element.image_height or 100) // 2
-                            request.data['anchor_point'] = 'mm'  # middle-middle anchor
-                        logger.info(f"Updated position to center: ({request.data['position_x']}, {request.data['position_y']})")
+                        # Use top-center position for center alignment
+                        request.data['position_x'] = text_element.top_center_x
+                        request.data['position_y'] = text_element.top_center_y
+                        logger.info(f"Updated position to top-center: ({text_element.top_center_x}, {text_element.top_center_y})")
                     elif new_alignment == 'right':
                         # Use top-right position for right alignment
                         request.data['position_x'] = text_element.top_right_x
                         request.data['position_y'] = text_element.top_right_y
-                        request.data['anchor_point'] = 'rt'  # right-top anchor
                         logger.info(f"Updated position to top-right: ({text_element.top_right_x}, {text_element.top_right_y})")
             
             serializer = TextElementSerializer(text_element, data=request.data, partial=True)

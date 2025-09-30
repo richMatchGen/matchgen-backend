@@ -9,7 +9,7 @@ class PSDLayerSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = PSDLayer
-        fields = ['id', 'name', 'x', 'y', 'width', 'height', 'center_x', 'center_y', 'left_x', 'left_y', 'right_x', 'right_y', 'visible', 'opacity', 'layer_type', 'bounding_box', 'center_point']
+        fields = ['id', 'name', 'x', 'y', 'width', 'height', 'center_x', 'center_y', 'left_x', 'left_y', 'right_x', 'right_y', 'top_left_x', 'top_left_y', 'top_center_x', 'top_center_y', 'top_right_x', 'top_right_y', 'visible', 'opacity', 'layer_type', 'bounding_box', 'center_point']
 
 
 class PSDDocumentSerializer(serializers.ModelSerializer):

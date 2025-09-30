@@ -205,11 +205,19 @@ class PSDUploadView(APIView):
                         if isinstance(opacity, (int, float)) and opacity <= 1.0:
                             opacity = opacity * 100
                         
-                        # Calculate left and right positions
+                        # Calculate multiple anchor positions for text elements
                         left_x = x  # Top-left X position
                         left_y = y  # Top-left Y position
                         right_x = x + width  # Top-right X position
                         right_y = y  # Top-right Y position
+                        
+                        # Calculate anchor positions
+                        top_left_x = x  # Top-left X for left alignment
+                        top_left_y = y  # Top-left Y for left alignment
+                        top_center_x = center_x  # Top-center X for center alignment
+                        top_center_y = y  # Top-center Y for center alignment
+                        top_right_x = x + width  # Top-right X for right alignment
+                        top_right_y = y  # Top-right Y for right alignment
                         
                         layer_data = {
                             'name': full_layer_name,
@@ -223,6 +231,12 @@ class PSDUploadView(APIView):
                             'left_y': left_y,
                             'right_x': right_x,
                             'right_y': right_y,
+                            'top_left_x': top_left_x,
+                            'top_left_y': top_left_y,
+                            'top_center_x': top_center_x,
+                            'top_center_y': top_center_y,
+                            'top_right_x': top_right_x,
+                            'top_right_y': top_right_y,
                             'visible': bool(visible),
                             'opacity': float(opacity),
                             'layer_type': 'group' if hasattr(layer, 'layers') and layer.layers else 'layer'
@@ -245,6 +259,12 @@ class PSDUploadView(APIView):
                             'left_y': 0,
                             'right_x': 0,
                             'right_y': 0,
+                            'top_left_x': 0,
+                            'top_left_y': 0,
+                            'top_center_x': 0,
+                            'top_center_y': 0,
+                            'top_right_x': 0,
+                            'top_right_y': 0,
                             'visible': getattr(layer, 'visible', True),
                             'opacity': float(getattr(layer, 'opacity', 1.0)) * 100 if getattr(layer, 'opacity', 1.0) <= 1.0 else float(getattr(layer, 'opacity', 100.0)),
                             'layer_type': 'layer'
@@ -485,17 +505,13 @@ class PSDLayerProcessView(APIView):
                 # Determine alignment based on content type
                 alignment = 'left' if content_type == 'startingXI' else 'center'
                 
-                # Record top-left and top-right positions from PSD layer
-                top_left_x = int(layer.left_x)  # Top-left X from PSD layer left position
-                top_left_y = int(layer.left_y)  # Top-left Y from PSD layer left position
-                top_right_x = int(layer.right_x)  # Top-right X from PSD layer right position
-                top_right_y = int(layer.right_y)  # Top-right Y from PSD layer right position
-                
-                # Record left and right positions from PSD layer
-                left_x = int(layer.left_x)  # Left X from PSD layer
-                left_y = int(layer.left_y)  # Left Y from PSD layer
-                right_x = int(layer.right_x)  # Right X from PSD layer
-                right_y = int(layer.right_y)  # Right Y from PSD layer
+                # Calculate multiple anchor positions for text elements
+                top_left_x = int(layer.left_x)  # Top-left X for left alignment
+                top_left_y = int(layer.left_y)  # Top-left Y for left alignment
+                top_center_x = int(layer.center_x)  # Top-center X for center alignment
+                top_center_y = int(layer.y)  # Top-center Y for center alignment
+                top_right_x = int(layer.right_x)  # Top-right X for right alignment
+                top_right_y = int(layer.right_y)  # Top-right Y for right alignment
                 
                 # Calculate position and anchor point based on element type
                 if element_type == 'text':
@@ -519,15 +535,12 @@ class PSDLayerProcessView(APIView):
                     'element_type': element_type,
                     'position_x': position_x,
                     'position_y': position_y,
-                    'top_left_x': top_left_x,  # Record top-left position from PSD
-                    'top_left_y': top_left_y,  # Record top-left position from PSD
-                    'top_right_x': top_right_x,  # Record top-right position from PSD
-                    'top_right_y': top_right_y,  # Record top-right position from PSD
-                    'left_x': left_x,  # Record left position from PSD layer
-                    'left_y': left_y,  # Record left position from PSD layer
-                    'right_x': right_x,  # Record right position from PSD layer
-                    'right_y': right_y,  # Record right position from PSD layer
-                    'anchor_point': anchor_point,  # Record the anchor point from PSD
+                    'top_left_x': top_left_x,  # Top-left position for left alignment
+                    'top_left_y': top_left_y,  # Top-left position for left alignment
+                    'top_center_x': top_center_x,  # Top-center position for center alignment
+                    'top_center_y': top_center_y,  # Top-center position for center alignment
+                    'top_right_x': top_right_x,  # Top-right position for right alignment
+                    'top_right_y': top_right_y,  # Top-right position for right alignment
                     'font_size': 48,
                     'font_family': 'Montserrat',
                     'font_color': '#FFFFFF',

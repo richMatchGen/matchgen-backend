@@ -120,19 +120,13 @@ class TextElement(models.Model):
     position_x = models.IntegerField(default=400, validators=[MinValueValidator(0), MaxValueValidator(2000)])
     position_y = models.IntegerField(default=150, validators=[MinValueValidator(0), MaxValueValidator(2000)])
     
-    # Top-left position from PSD processing (for alignment calculations)
-    top_left_x = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Top-left X position from PSD layer")
-    top_left_y = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Top-left Y position from PSD layer")
-    
-    # Top-right position from PSD processing (for alignment calculations)
-    top_right_x = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Top-right X position from PSD layer")
-    top_right_y = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Top-right Y position from PSD layer")
-    
-    # Left and right positions from PSD layer processing
-    left_x = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Left X position from PSD layer")
-    left_y = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Left Y position from PSD layer")
-    right_x = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Right X position from PSD layer")
-    right_y = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Right Y position from PSD layer")
+    # Multiple anchor positions for text elements (from PSD processing)
+    top_left_x = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Top-left X position for left alignment")
+    top_left_y = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Top-left Y position for left alignment")
+    top_center_x = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Top-center X position for center alignment")
+    top_center_y = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Top-center Y position for center alignment")
+    top_right_x = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Top-right X position for right alignment")
+    top_right_y = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Top-right Y position for right alignment")
     
     # Home/Away specific positioning for images
     home_position_x = models.IntegerField(default=400, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="X position for home fixtures")
@@ -160,17 +154,7 @@ class TextElement(models.Model):
         help_text="How text is aligned within the element bounds"
     )
     
-    # Anchor point for rendering (recorded from PSD processing)
-    anchor_point = models.CharField(
-        max_length=10,
-        choices=[
-            ('lt', 'Left-Top'), ('rt', 'Right-Top'), ('mt', 'Middle-Top'),
-            ('lm', 'Left-Middle'), ('rm', 'Right-Middle'), ('mm', 'Middle-Middle'),
-            ('lb', 'Left-Bottom'), ('rb', 'Right-Bottom'), ('mb', 'Middle-Bottom')
-        ],
-        default='mt',
-        help_text="Anchor point for positioning the element"
-    )
+    # Anchor point is now determined by alignment choice (left=lt, center=mt, right=rt)
     
     # Optional settings
     font_weight = models.CharField(

@@ -471,19 +471,19 @@ class PSDLayerProcessView(APIView):
                 # Determine alignment based on content type
                 alignment = 'left' if content_type == 'startingXI' else 'center'
                 
-                # Calculate position based on anchor point
-                # Text elements: top-center anchor (position_y = top of layer)
-                # Image elements: center-center anchor (position = center of layer)
+                # Calculate position and anchor point based on element type
                 if element_type == 'text':
                     # For text elements, use top-center positioning
                     position_x = int(layer.center_x)  # Center X
                     position_y = int(layer.y)  # Top Y (not center)
-                    logger.info(f"Text element {layer.name}: using top-center positioning ({position_x}, {position_y})")
+                    anchor_point = 'mt'  # middle-top anchor
+                    logger.info(f"Text element {layer.name}: using top-center positioning ({position_x}, {position_y}) with anchor 'mt'")
                 else:
                     # For image elements, use center-center positioning
                     position_x = int(layer.center_x)  # Center X
                     position_y = int(layer.center_y)  # Center Y
-                    logger.info(f"Image element {layer.name}: using center-center positioning ({position_x}, {position_y})")
+                    anchor_point = 'mm'  # middle-middle anchor
+                    logger.info(f"Image element {layer.name}: using center-center positioning ({position_x}, {position_y}) with anchor 'mm'")
                 
                 # Create TextElement with calculated positions
                 text_element_data = {
@@ -493,6 +493,7 @@ class PSDLayerProcessView(APIView):
                     'element_type': element_type,
                     'position_x': position_x,
                     'position_y': position_y,
+                    'anchor_point': anchor_point,  # Record the anchor point from PSD
                     'font_size': 48,
                     'font_family': 'Montserrat',
                     'font_color': '#FFFFFF',

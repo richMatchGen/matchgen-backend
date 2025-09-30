@@ -1050,17 +1050,9 @@ class SocialMediaPostGenerator(APIView):
                         draw.text((line_x, line_y), line, font=font, fill=font_color)
                         logger.info(f"Rendered line {i+1}: '{line}' at ({line_x}, {line_y})")
         else:
-            # For single-line text, use anchor points based on position alignment
-            if element.element_type == 'text':
-                if alignment == 'left':
-                    anchor = 'lt'  # left-top
-                elif alignment == 'right':
-                    anchor = 'rt'  # right-top
-                else:
-                    anchor = 'mt'  # middle-top (center horizontally, top vertically)
-            else:
-                # Image elements use center-center positioning
-                anchor = 'mm'  # middle-middle
+            # Use the recorded anchor point from PSD processing
+            anchor = getattr(element, 'anchor_point', 'mt')  # Default to middle-top if not set
+            logger.info(f"Using recorded anchor point: {anchor}")
             
             # Render single-line text with anchor
             draw.text(

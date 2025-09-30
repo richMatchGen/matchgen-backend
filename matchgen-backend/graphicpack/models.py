@@ -146,6 +146,18 @@ class TextElement(models.Model):
         help_text="How text is aligned within the element bounds"
     )
     
+    # Anchor point for rendering (recorded from PSD processing)
+    anchor_point = models.CharField(
+        max_length=10,
+        choices=[
+            ('lt', 'Left-Top'), ('rt', 'Right-Top'), ('mt', 'Middle-Top'),
+            ('lm', 'Left-Middle'), ('rm', 'Right-Middle'), ('mm', 'Middle-Middle'),
+            ('lb', 'Left-Bottom'), ('rb', 'Right-Bottom'), ('mb', 'Middle-Bottom')
+        ],
+        default='mt',
+        help_text="Anchor point for positioning the element"
+    )
+    
     # Optional settings
     font_weight = models.CharField(
         max_length=20,

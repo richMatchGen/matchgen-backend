@@ -485,9 +485,11 @@ class PSDLayerProcessView(APIView):
                 # Determine alignment based on content type
                 alignment = 'left' if content_type == 'startingXI' else 'center'
                 
-                # Record top-left position from PSD layer
+                # Record top-left and top-right positions from PSD layer
                 top_left_x = int(layer.x)  # Top-left X from PSD
                 top_left_y = int(layer.y)  # Top-left Y from PSD
+                top_right_x = int(layer.x + layer.width)  # Top-right X from PSD
+                top_right_y = int(layer.y)  # Top-right Y from PSD
                 
                 # Calculate position and anchor point based on element type
                 if element_type == 'text':
@@ -513,6 +515,8 @@ class PSDLayerProcessView(APIView):
                     'position_y': position_y,
                     'top_left_x': top_left_x,  # Record top-left position from PSD
                     'top_left_y': top_left_y,  # Record top-left position from PSD
+                    'top_right_x': top_right_x,  # Record top-right position from PSD
+                    'top_right_y': top_right_y,  # Record top-right position from PSD
                     'anchor_point': anchor_point,  # Record the anchor point from PSD
                     'font_size': 48,
                     'font_family': 'Montserrat',

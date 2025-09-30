@@ -2072,11 +2072,11 @@ class TextElementUpdateView(APIView):
                             request.data['anchor_point'] = 'mm'  # middle-middle anchor
                         logger.info(f"Updated position to center: ({request.data['position_x']}, {request.data['position_y']})")
                     elif new_alignment == 'right':
-                        # Use right position for right alignment
-                        request.data['position_x'] = text_element.top_left_x + (text_element.image_width or 100)
-                        request.data['position_y'] = text_element.top_left_y
+                        # Use top-right position for right alignment
+                        request.data['position_x'] = text_element.top_right_x
+                        request.data['position_y'] = text_element.top_right_y
                         request.data['anchor_point'] = 'rt'  # right-top anchor
-                        logger.info(f"Updated position to right: ({request.data['position_x']}, {request.data['position_y']})")
+                        logger.info(f"Updated position to top-right: ({text_element.top_right_x}, {text_element.top_right_y})")
             
             serializer = TextElementSerializer(text_element, data=request.data, partial=True)
             if serializer.is_valid():

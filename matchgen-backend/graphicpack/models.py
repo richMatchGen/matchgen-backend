@@ -124,6 +124,10 @@ class TextElement(models.Model):
     top_left_x = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Top-left X position from PSD layer")
     top_left_y = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Top-left Y position from PSD layer")
     
+    # Top-right position from PSD processing (for alignment calculations)
+    top_right_x = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Top-right X position from PSD layer")
+    top_right_y = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Top-right Y position from PSD layer")
+    
     # Home/Away specific positioning for images
     home_position_x = models.IntegerField(default=400, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="X position for home fixtures")
     home_position_y = models.IntegerField(default=150, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Y position for home fixtures")

@@ -483,8 +483,12 @@ class PSDLayerProcessView(APIView):
                     status=status.HTTP_404_NOT_FOUND
                 )
             
-            # Get layers that match the selected names
-            matching_layers = document.layers.filter(name__in=layer_names)
+            # Get layers that match the selected names and have valid coordinates
+            matching_layers = document.layers.filter(
+                name__in=layer_names
+            ).exclude(
+                x=0, y=0, width=0, height=0  # Exclude invalid layers with (0,0) coordinates
+            )
             
             if not matching_layers.exists():
                 return Response(
@@ -592,17 +596,31 @@ class PSDLayerProcessView(APIView):
                         )
                         logger.info(f"TextElement already exists for {layer.name}, updating position with anchor-based coordinates")
                         
-                        # Update positions based on anchor point
+                        # Update positions and anchor points
                         if element_type == 'text':
                             # Text elements: top-center anchor
                             existing_element.position_x = int(layer.center_x)  # Center X
                             existing_element.position_y = int(layer.y)  # Top Y
-                            logger.info(f"Updated text element {layer.name} to top-center ({int(layer.center_x)}, {int(layer.y)})")
+                            # Update all anchor positions
+                            existing_element.top_left_x = int(layer.left_x)
+                            existing_element.top_left_y = int(layer.left_y)
+                            existing_element.top_center_x = int(layer.center_x)
+                            existing_element.top_center_y = int(layer.y)
+                            existing_element.top_right_x = int(layer.right_x)
+                            existing_element.top_right_y = int(layer.right_y)
+                            logger.info(f"Updated text element {layer.name} to top-center ({int(layer.center_x)}, {int(layer.y)}) with all anchor positions")
                         else:
                             # Image elements: center-center anchor
                             existing_element.position_x = int(layer.center_x)  # Center X
                             existing_element.position_y = int(layer.center_y)  # Center Y
-                            logger.info(f"Updated image element {layer.name} to center-center ({int(layer.center_x)}, {int(layer.center_y)})")
+                            # Update all anchor positions
+                            existing_element.top_left_x = int(layer.left_x)
+                            existing_element.top_left_y = int(layer.left_y)
+                            existing_element.top_center_x = int(layer.center_x)
+                            existing_element.top_center_y = int(layer.y)
+                            existing_element.top_right_x = int(layer.right_x)
+                            existing_element.top_right_y = int(layer.right_y)
+                            logger.info(f"Updated image element {layer.name} to center-center ({int(layer.center_x)}, {int(layer.center_y)}) with all anchor positions")
                         
                         # Update home/away positions for logos using same coordinates as main position
                         if layer.name == 'club_logo':
@@ -619,8 +637,8 @@ class PSDLayerProcessView(APIView):
                     except TextElement.DoesNotExist:
                         # Create with unique name by appending layer ID
                         text_element_data['element_name'] = f"{layer.name}_{layer.id}"
-                        text_element = TextElement.objects.create(**text_element_data)
-                        created_text_elements.append(text_element)
+                text_element = TextElement.objects.create(**text_element_data)
+                created_text_elements.append(text_element)
                 
                 # Update the PSDLayer with graphic pack and content type
                 layer.graphic_pack = graphic_pack

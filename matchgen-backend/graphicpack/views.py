@@ -1050,11 +1050,11 @@ class SocialMediaPostGenerator(APIView):
                         draw.text((line_x, line_y), line, font=font, fill=font_color)
                         logger.info(f"Rendered line {i+1}: '{line}' at ({line_x}, {line_y})")
         else:
-            # For single-line text, use anchor points based on text_alignment
+            # For single-line text, use anchor points based on position alignment
             if element.element_type == 'text':
-                if text_alignment == 'left':
+                if alignment == 'left':
                     anchor = 'lt'  # left-top
-                elif text_alignment == 'right':
+                elif alignment == 'right':
                     anchor = 'rt'  # right-top
                 else:
                     anchor = 'mt'  # middle-top (center horizontally, top vertically)

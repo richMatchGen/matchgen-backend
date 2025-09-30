@@ -486,10 +486,10 @@ class PSDLayerProcessView(APIView):
                 alignment = 'left' if content_type == 'startingXI' else 'center'
                 
                 # Record top-left and top-right positions from PSD layer
-                top_left_x = int(layer.x)  # Top-left X from PSD
-                top_left_y = int(layer.y)  # Top-left Y from PSD
-                top_right_x = int(layer.x + layer.width)  # Top-right X from PSD
-                top_right_y = int(layer.y)  # Top-right Y from PSD
+                top_left_x = int(layer.left_x)  # Top-left X from PSD layer left position
+                top_left_y = int(layer.left_y)  # Top-left Y from PSD layer left position
+                top_right_x = int(layer.right_x)  # Top-right X from PSD layer right position
+                top_right_y = int(layer.right_y)  # Top-right Y from PSD layer right position
                 
                 # Record left and right positions from PSD layer
                 left_x = int(layer.left_x)  # Left X from PSD layer

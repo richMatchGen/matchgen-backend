@@ -128,6 +128,12 @@ class TextElement(models.Model):
     top_right_x = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Top-right X position from PSD layer")
     top_right_y = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Top-right Y position from PSD layer")
     
+    # Left and right positions from PSD layer processing
+    left_x = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Left X position from PSD layer")
+    left_y = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Left Y position from PSD layer")
+    right_x = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Right X position from PSD layer")
+    right_y = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Right Y position from PSD layer")
+    
     # Home/Away specific positioning for images
     home_position_x = models.IntegerField(default=400, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="X position for home fixtures")
     home_position_y = models.IntegerField(default=150, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Y position for home fixtures")

@@ -949,7 +949,8 @@ class SocialMediaPostGenerator(APIView):
         font_size = element.font_size
         font_family = element.font_family
         font_color = element.font_color
-        alignment = element.alignment
+        alignment = element.alignment  # For positioning
+        text_alignment = getattr(element, 'text_alignment', element.alignment)  # For text alignment within element
         
         logger.info(f"=== FONT SIZE DEBUG ===")
         logger.info(f"Font size: {font_size}")
@@ -1018,15 +1019,15 @@ class SocialMediaPostGenerator(APIView):
             # Calculate line height (approximate)
             line_height = font_size + 5  # Add some spacing between lines
             
-            # Calculate starting Y position based on alignment
-            if alignment == 'left':
+            # Calculate starting Y position based on text_alignment
+            if text_alignment == 'left':
                 # Left-aligned multiline text
                 for i, line in enumerate(lines):
                     if line.strip():  # Only render non-empty lines
                         line_y = y + (i * line_height)
                         draw.text((x, line_y), line, font=font, fill=font_color)
                         logger.info(f"Rendered line {i+1}: '{line}' at ({x}, {line_y})")
-            elif alignment == 'right':
+            elif text_alignment == 'right':
                 # Right-aligned multiline text
                 for i, line in enumerate(lines):
                     if line.strip():  # Only render non-empty lines
@@ -1049,11 +1050,11 @@ class SocialMediaPostGenerator(APIView):
                         draw.text((line_x, line_y), line, font=font, fill=font_color)
                         logger.info(f"Rendered line {i+1}: '{line}' at ({line_x}, {line_y})")
         else:
-            # For single-line text, use anchor points
+            # For single-line text, use anchor points based on text_alignment
             if element.element_type == 'text':
-                if alignment == 'left':
+                if text_alignment == 'left':
                     anchor = 'lt'  # left-top
-                elif alignment == 'right':
+                elif text_alignment == 'right':
                     anchor = 'rt'  # right-top
                 else:
                     anchor = 'mt'  # middle-top (center horizontally, top vertically)

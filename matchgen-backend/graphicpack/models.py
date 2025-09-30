@@ -138,6 +138,14 @@ class TextElement(models.Model):
         default='center'
     )
     
+    # Text alignment within the element (separate from positioning)
+    text_alignment = models.CharField(
+        max_length=10,
+        choices=[('left', 'Left'), ('center', 'Center'), ('right', 'Right')],
+        default='center',
+        help_text="How text is aligned within the element bounds"
+    )
+    
     # Optional settings
     font_weight = models.CharField(
         max_length=20,

@@ -497,6 +497,7 @@ class PSDLayerProcessView(APIView):
                     'font_family': 'Montserrat',
                     'font_color': '#FFFFFF',
                     'alignment': alignment,
+                    'text_alignment': 'center',  # Default to center text alignment
                     'font_weight': 'normal',
                     'maintain_aspect_ratio': True,
                     'image_color_tint': '#FFFFFF'

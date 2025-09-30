@@ -599,11 +599,11 @@ class PSDLayerProcessView(APIView):
                 club_logo_element.save()
                 logger.info(f"Set club_logo away position to opponent position ({opponent_logo_element.position_x}, {opponent_logo_element.position_y})")
                 
-                # Opponent logo home position = club logo position
-                opponent_logo_element.home_position_x = club_logo_element.position_x
-                opponent_logo_element.home_position_y = club_logo_element.position_y
+                # Opponent logo home position = opponent logo's own position
+                opponent_logo_element.home_position_x = opponent_logo_element.position_x
+                opponent_logo_element.home_position_y = opponent_logo_element.position_y
                 opponent_logo_element.save()
-                logger.info(f"Set opponent_logo home position to club position ({club_logo_element.position_x}, {club_logo_element.position_y})")
+                logger.info(f"Set opponent_logo home position to its own position ({opponent_logo_element.position_x}, {opponent_logo_element.position_y})")
                 
                 # Ensure club logo home position is set to its own position
                 if club_logo_element.home_position_x is None or club_logo_element.home_position_x == 0:
@@ -612,12 +612,11 @@ class PSDLayerProcessView(APIView):
                     club_logo_element.save()
                     logger.info(f"Set club_logo home position to its own position ({club_logo_element.position_x}, {club_logo_element.position_y})")
                 
-                # Ensure opponent logo away position is set to its own position
-                if opponent_logo_element.away_position_x is None or opponent_logo_element.away_position_x == 0:
-                    opponent_logo_element.away_position_x = opponent_logo_element.position_x
-                    opponent_logo_element.away_position_y = opponent_logo_element.position_y
-                    opponent_logo_element.save()
-                    logger.info(f"Set opponent_logo away position to its own position ({opponent_logo_element.position_x}, {opponent_logo_element.position_y})")
+                # Opponent logo away position = club logo position
+                opponent_logo_element.away_position_x = club_logo_element.position_x
+                opponent_logo_element.away_position_y = club_logo_element.position_y
+                opponent_logo_element.save()
+                logger.info(f"Set opponent_logo away position to club position ({club_logo_element.position_x}, {club_logo_element.position_y})")
             
             return Response({
                 'message': f'Successfully processed {len(created_text_elements)} layers',

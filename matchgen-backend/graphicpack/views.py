@@ -2043,6 +2043,41 @@ class TextElementUpdateView(APIView):
             # Log the incoming data for debugging
             logger.info(f"Updating text element {element_id} with data: {request.data}")
             
+            # Check if alignment is being changed and update position accordingly
+            if 'alignment' in request.data:
+                new_alignment = request.data['alignment']
+                old_alignment = text_element.alignment
+                
+                if new_alignment != old_alignment:
+                    logger.info(f"Alignment changed from {old_alignment} to {new_alignment}")
+                    
+                    # Update position based on new alignment
+                    if new_alignment == 'left':
+                        # Use top-left position for left alignment
+                        request.data['position_x'] = text_element.top_left_x
+                        request.data['position_y'] = text_element.top_left_y
+                        request.data['anchor_point'] = 'lt'  # left-top anchor
+                        logger.info(f"Updated position to top-left: ({text_element.top_left_x}, {text_element.top_left_y})")
+                    elif new_alignment == 'center':
+                        # Use center position for center alignment
+                        if text_element.element_type == 'text':
+                            # For text, use center X and top Y
+                            request.data['position_x'] = text_element.top_left_x + (text_element.image_width or 100) // 2
+                            request.data['position_y'] = text_element.top_left_y
+                            request.data['anchor_point'] = 'mt'  # middle-top anchor
+                        else:
+                            # For images, use center X and center Y
+                            request.data['position_x'] = text_element.top_left_x + (text_element.image_width or 100) // 2
+                            request.data['position_y'] = text_element.top_left_y + (text_element.image_height or 100) // 2
+                            request.data['anchor_point'] = 'mm'  # middle-middle anchor
+                        logger.info(f"Updated position to center: ({request.data['position_x']}, {request.data['position_y']})")
+                    elif new_alignment == 'right':
+                        # Use right position for right alignment
+                        request.data['position_x'] = text_element.top_left_x + (text_element.image_width or 100)
+                        request.data['position_y'] = text_element.top_left_y
+                        request.data['anchor_point'] = 'rt'  # right-top anchor
+                        logger.info(f"Updated position to right: ({request.data['position_x']}, {request.data['position_y']})")
+            
             serializer = TextElementSerializer(text_element, data=request.data, partial=True)
             if serializer.is_valid():
                 serializer.save()

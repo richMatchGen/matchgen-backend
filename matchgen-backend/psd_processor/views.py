@@ -471,19 +471,23 @@ class PSDLayerProcessView(APIView):
                 # Determine alignment based on content type
                 alignment = 'left' if content_type == 'startingXI' else 'center'
                 
+                # Record top-left position from PSD layer
+                top_left_x = int(layer.x)  # Top-left X from PSD
+                top_left_y = int(layer.y)  # Top-left Y from PSD
+                
                 # Calculate position and anchor point based on element type
                 if element_type == 'text':
                     # For text elements, use top-center positioning
                     position_x = int(layer.center_x)  # Center X
                     position_y = int(layer.y)  # Top Y (not center)
                     anchor_point = 'mt'  # middle-top anchor
-                    logger.info(f"Text element {layer.name}: using top-center positioning ({position_x}, {position_y}) with anchor 'mt'")
+                    logger.info(f"Text element {layer.name}: using top-center positioning ({position_x}, {position_y}) with anchor 'mt', top-left=({top_left_x}, {top_left_y})")
                 else:
                     # For image elements, use center-center positioning
                     position_x = int(layer.center_x)  # Center X
                     position_y = int(layer.center_y)  # Center Y
                     anchor_point = 'mm'  # middle-middle anchor
-                    logger.info(f"Image element {layer.name}: using center-center positioning ({position_x}, {position_y}) with anchor 'mm'")
+                    logger.info(f"Image element {layer.name}: using center-center positioning ({position_x}, {position_y}) with anchor 'mm', top-left=({top_left_x}, {top_left_y})")
                 
                 # Create TextElement with calculated positions
                 text_element_data = {
@@ -493,6 +497,8 @@ class PSDLayerProcessView(APIView):
                     'element_type': element_type,
                     'position_x': position_x,
                     'position_y': position_y,
+                    'top_left_x': top_left_x,  # Record top-left position from PSD
+                    'top_left_y': top_left_y,  # Record top-left position from PSD
                     'anchor_point': anchor_point,  # Record the anchor point from PSD
                     'font_size': 48,
                     'font_family': 'Montserrat',

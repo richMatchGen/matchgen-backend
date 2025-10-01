@@ -817,23 +817,24 @@ class SocialMediaPostGenerator(APIView):
         if post_type == 'sub' and request:
             # Get substitution data from request - support multiple substitutions
             substitutions = request.data.get('substitutions', [])
+            minute = request.data.get('minute', 'Minute')
             
             if substitutions:
-                # Handle multiple substitutions
+                # Create substitution pairs from the arrays
+                players_on = [sub.get('player_on', '') for sub in substitutions if sub.get('player_on')]
+                players_off = [sub.get('player_off', '') for sub in substitutions if sub.get('player_off')]
+                
+                # Pair them up (assuming they're in order)
                 substitution_texts = []
-                for i, sub in enumerate(substitutions):
-                    player_on = sub.get('player_on', f'Player On {i+1}')
-                    player_off = sub.get('player_off', f'Player Off {i+1}')
-                    minute = sub.get('minute', f'Minute {i+1}')
-                    
-                    substitution_texts.append(f"{player_off} → {player_on} ({minute}')")
-                    logger.info(f"Substitution {i+1}: {player_off} → {player_on} ({minute}')")
+                for i in range(min(len(players_on), len(players_off))):
+                    substitution_texts.append(f"{players_off[i]} → {players_on[i]} ({minute}')")
+                    logger.info(f"Substitution {i+1}: {players_off[i]} → {players_on[i]} ({minute}')")
                 
                 # Update fixture data with substitution-specific values
                 fixture_data.update({
-                    "player_on": substitution_texts[0].split(' → ')[1].split(' (')[0] if substitution_texts else "Player On",
-                    "player_off": substitution_texts[0].split(' → ')[0] if substitution_texts else "Player Off", 
-                    "minute": substitution_texts[0].split('(')[1].split(')')[0] if substitution_texts else "Minute",
+                    "player_on": players_on[0] if players_on else "Player On",
+                    "player_off": players_off[0] if players_off else "Player Off", 
+                    "minute": minute,
                     "substitutions": "\n".join(substitution_texts)  # All substitutions as text
                 })
             else:

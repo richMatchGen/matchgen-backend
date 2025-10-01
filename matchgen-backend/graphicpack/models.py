@@ -128,6 +128,14 @@ class TextElement(models.Model):
     top_right_x = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Top-right X position for right alignment")
     top_right_y = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Top-right Y position for right alignment")
     
+    # Bottom anchor positions for text elements
+    bottom_left_x = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Bottom-left X position for left alignment")
+    bottom_left_y = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Bottom-left Y position for left alignment")
+    bottom_center_x = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Bottom-center X position for center alignment")
+    bottom_center_y = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Bottom-center Y position for center alignment")
+    bottom_right_x = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Bottom-right X position for right alignment")
+    bottom_right_y = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Bottom-right Y position for right alignment")
+    
     # Home/Away specific positioning for images
     home_position_x = models.IntegerField(default=400, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="X position for home fixtures")
     home_position_y = models.IntegerField(default=150, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Y position for home fixtures")
@@ -154,7 +162,15 @@ class TextElement(models.Model):
         help_text="How text is aligned within the element bounds"
     )
     
-    # Anchor point is now determined by alignment choice (left=lt, center=mt, right=rt)
+    # Position anchor (top or bottom)
+    position_anchor = models.CharField(
+        max_length=10,
+        choices=[('top', 'Top'), ('bottom', 'Bottom')],
+        default='top',
+        help_text="Whether to use top or bottom anchor points for positioning"
+    )
+    
+    # Anchor point is now determined by alignment choice and position_anchor (left=lt/lb, center=mt/mb, right=rt/rb)
     
     # Optional settings
     font_weight = models.CharField(

@@ -219,6 +219,14 @@ class PSDUploadView(APIView):
                         top_right_x = x + width  # Top-right X for right alignment
                         top_right_y = y  # Top-right Y for right alignment
                         
+                        # Calculate bottom anchor positions
+                        bottom_left_x = x  # Bottom-left X for left alignment
+                        bottom_left_y = y + height  # Bottom-left Y for left alignment
+                        bottom_center_x = center_x  # Bottom-center X for center alignment
+                        bottom_center_y = y + height  # Bottom-center Y for center alignment
+                        bottom_right_x = x + width  # Bottom-right X for right alignment
+                        bottom_right_y = y + height  # Bottom-right Y for right alignment
+                        
                         layer_data = {
                             'name': full_layer_name,
                             'x': x,
@@ -237,6 +245,12 @@ class PSDUploadView(APIView):
                             'top_center_y': top_center_y,
                             'top_right_x': top_right_x,
                             'top_right_y': top_right_y,
+                            'bottom_left_x': bottom_left_x,
+                            'bottom_left_y': bottom_left_y,
+                            'bottom_center_x': bottom_center_x,
+                            'bottom_center_y': bottom_center_y,
+                            'bottom_right_x': bottom_right_x,
+                            'bottom_right_y': bottom_right_y,
                             'visible': bool(visible),
                             'opacity': float(opacity),
                             'layer_type': 'group' if hasattr(layer, 'layers') and layer.layers else 'layer'
@@ -517,6 +531,14 @@ class PSDLayerProcessView(APIView):
                 top_right_x = int(layer.right_x)  # Top-right X for right alignment
                 top_right_y = int(layer.right_y)  # Top-right Y for right alignment
                 
+                # Calculate bottom anchor positions
+                bottom_left_x = int(layer.left_x)  # Bottom-left X for left alignment
+                bottom_left_y = int(layer.y + layer.height)  # Bottom-left Y for left alignment
+                bottom_center_x = int(layer.center_x)  # Bottom-center X for center alignment
+                bottom_center_y = int(layer.y + layer.height)  # Bottom-center Y for center alignment
+                bottom_right_x = int(layer.right_x)  # Bottom-right X for right alignment
+                bottom_right_y = int(layer.y + layer.height)  # Bottom-right Y for right alignment
+                
                 # Calculate position and anchor point based on element type
                 if element_type == 'text':
                     # For text elements, use top-center positioning
@@ -545,11 +567,18 @@ class PSDLayerProcessView(APIView):
                     'top_center_y': top_center_y,  # Top-center position for center alignment
                     'top_right_x': top_right_x,  # Top-right position for right alignment
                     'top_right_y': top_right_y,  # Top-right position for right alignment
+                    'bottom_left_x': bottom_left_x,  # Bottom-left position for left alignment
+                    'bottom_left_y': bottom_left_y,  # Bottom-left position for left alignment
+                    'bottom_center_x': bottom_center_x,  # Bottom-center position for center alignment
+                    'bottom_center_y': bottom_center_y,  # Bottom-center position for center alignment
+                    'bottom_right_x': bottom_right_x,  # Bottom-right position for right alignment
+                    'bottom_right_y': bottom_right_y,  # Bottom-right position for right alignment
                     'font_size': 48,
                     'font_family': 'Montserrat',
                     'font_color': '#FFFFFF',
                     'alignment': alignment,
                     'text_alignment': 'center',  # Default to center text alignment
+                    'position_anchor': 'top',  # Default to top anchor
                     'font_weight': 'normal',
                     'maintain_aspect_ratio': True,
                     'image_color_tint': '#FFFFFF'

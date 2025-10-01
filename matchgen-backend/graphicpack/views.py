@@ -2086,6 +2086,45 @@ class TextElementUpdateView(APIView):
             # Log the incoming data for debugging
             logger.info(f"Updating text element {element_id} with data: {request.data}")
             
+            # Handle position_anchor changes FIRST (before alignment changes)
+            if 'position_anchor' in request.data:
+                new_position_anchor = request.data['position_anchor']
+                old_position_anchor = getattr(text_element, 'position_anchor', 'top')
+                
+                if new_position_anchor != old_position_anchor:
+                    logger.info(f"Position anchor changed from {old_position_anchor} to {new_position_anchor}")
+                    
+                    # Update position based on current alignment and new position_anchor
+                    current_alignment = request.data.get('alignment', text_element.alignment)
+                    
+                    if current_alignment == 'left':
+                        if new_position_anchor == 'top':
+                            request.data['position_x'] = text_element.top_left_x
+                            request.data['position_y'] = text_element.top_left_y
+                            logger.info(f"Updated position to top-left: ({text_element.top_left_x}, {text_element.top_left_y})")
+                        else:  # bottom
+                            request.data['position_x'] = text_element.bottom_left_x
+                            request.data['position_y'] = text_element.bottom_left_y
+                            logger.info(f"Updated position to bottom-left: ({text_element.bottom_left_x}, {text_element.bottom_left_y})")
+                    elif current_alignment == 'center':
+                        if new_position_anchor == 'top':
+                            request.data['position_x'] = text_element.top_center_x
+                            request.data['position_y'] = text_element.top_center_y
+                            logger.info(f"Updated position to top-center: ({text_element.top_center_x}, {text_element.top_center_y})")
+                        else:  # bottom
+                            request.data['position_x'] = text_element.bottom_center_x
+                            request.data['position_y'] = text_element.bottom_center_y
+                            logger.info(f"Updated position to bottom-center: ({text_element.bottom_center_x}, {text_element.bottom_center_y})")
+                    elif current_alignment == 'right':
+                        if new_position_anchor == 'top':
+                            request.data['position_x'] = text_element.top_right_x
+                            request.data['position_y'] = text_element.top_right_y
+                            logger.info(f"Updated position to top-right: ({text_element.top_right_x}, {text_element.top_right_y})")
+                        else:  # bottom
+                            request.data['position_x'] = text_element.bottom_right_x
+                            request.data['position_y'] = text_element.bottom_right_y
+                            logger.info(f"Updated position to bottom-right: ({text_element.bottom_right_x}, {text_element.bottom_right_y})")
+            
             # Check if alignment is being changed and update position accordingly
             if 'alignment' in request.data:
                 new_alignment = request.data['alignment']
@@ -2118,45 +2157,6 @@ class TextElementUpdateView(APIView):
                             logger.info(f"Updated position to bottom-center: ({text_element.bottom_center_x}, {text_element.bottom_center_y})")
                     elif new_alignment == 'right':
                         if position_anchor == 'top':
-                            request.data['position_x'] = text_element.top_right_x
-                            request.data['position_y'] = text_element.top_right_y
-                            logger.info(f"Updated position to top-right: ({text_element.top_right_x}, {text_element.top_right_y})")
-                        else:  # bottom
-                            request.data['position_x'] = text_element.bottom_right_x
-                            request.data['position_y'] = text_element.bottom_right_y
-                            logger.info(f"Updated position to bottom-right: ({text_element.bottom_right_x}, {text_element.bottom_right_y})")
-            
-            # Handle position_anchor changes
-            if 'position_anchor' in request.data:
-                new_position_anchor = request.data['position_anchor']
-                old_position_anchor = getattr(text_element, 'position_anchor', 'top')
-                
-                if new_position_anchor != old_position_anchor:
-                    logger.info(f"Position anchor changed from {old_position_anchor} to {new_position_anchor}")
-                    
-                    # Update position based on current alignment and new position_anchor
-                    current_alignment = request.data.get('alignment', text_element.alignment)
-                    
-                    if current_alignment == 'left':
-                        if new_position_anchor == 'top':
-                            request.data['position_x'] = text_element.top_left_x
-                            request.data['position_y'] = text_element.top_left_y
-                            logger.info(f"Updated position to top-left: ({text_element.top_left_x}, {text_element.top_left_y})")
-                        else:  # bottom
-                            request.data['position_x'] = text_element.bottom_left_x
-                            request.data['position_y'] = text_element.bottom_left_y
-                            logger.info(f"Updated position to bottom-left: ({text_element.bottom_left_x}, {text_element.bottom_left_y})")
-                    elif current_alignment == 'center':
-                        if new_position_anchor == 'top':
-                            request.data['position_x'] = text_element.top_center_x
-                            request.data['position_y'] = text_element.top_center_y
-                            logger.info(f"Updated position to top-center: ({text_element.top_center_x}, {text_element.top_center_y})")
-                        else:  # bottom
-                            request.data['position_x'] = text_element.bottom_center_x
-                            request.data['position_y'] = text_element.bottom_center_y
-                            logger.info(f"Updated position to bottom-center: ({text_element.bottom_center_x}, {text_element.bottom_center_y})")
-                    elif current_alignment == 'right':
-                        if new_position_anchor == 'top':
                             request.data['position_x'] = text_element.top_right_x
                             request.data['position_y'] = text_element.top_right_y
                             logger.info(f"Updated position to top-right: ({text_element.top_right_x}, {text_element.top_right_y})")

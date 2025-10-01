@@ -831,9 +831,13 @@ class SocialMediaPostGenerator(APIView):
                     logger.info(f"Substitution {i+1}: {players_off[i]} → {players_on[i]} ({minute}')")
                 
                 # Update fixture data with substitution-specific values
+                # Format players as multiline text like Starting XI does
+                players_on_text = '\n'.join(players_on) if players_on else "Player On"
+                players_off_text = '\n'.join(players_off) if players_off else "Player Off"
+                
                 fixture_data.update({
-                    "player_on": players_on[0] if players_on else "Player On",
-                    "player_off": players_off[0] if players_off else "Player Off", 
+                    "player_on": players_on_text,
+                    "player_off": players_off_text, 
                     "minute": minute,
                     "substitutions": "\n".join(substitution_texts)  # All substitutions as text
                 })

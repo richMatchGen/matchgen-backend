@@ -815,19 +815,41 @@ class SocialMediaPostGenerator(APIView):
         
         # Handle substitution-specific data from request
         if post_type == 'sub' and request:
-            # Get substitution data from request
-            player_on = request.data.get('player_on', 'Player On')
-            player_off = request.data.get('player_off', 'Player Off')
-            minute = request.data.get('minute', 'Minute')
+            # Get substitution data from request - support multiple substitutions
+            substitutions = request.data.get('substitutions', [])
             
-            # Update fixture data with substitution-specific values
-            fixture_data.update({
-                "player_on": player_on,
-                "player_off": player_off,
-                "minute": minute
-            })
-            
-            logger.info(f"Substitution data: Player On={player_on}, Player Off={player_off}, Minute={minute}")
+            if substitutions:
+                # Handle multiple substitutions
+                substitution_texts = []
+                for i, sub in enumerate(substitutions):
+                    player_on = sub.get('player_on', f'Player On {i+1}')
+                    player_off = sub.get('player_off', f'Player Off {i+1}')
+                    minute = sub.get('minute', f'Minute {i+1}')
+                    
+                    substitution_texts.append(f"{player_off} → {player_on} ({minute}')")
+                    logger.info(f"Substitution {i+1}: {player_off} → {player_on} ({minute}')")
+                
+                # Update fixture data with substitution-specific values
+                fixture_data.update({
+                    "player_on": substitution_texts[0].split(' → ')[1].split(' (')[0] if substitution_texts else "Player On",
+                    "player_off": substitution_texts[0].split(' → ')[0] if substitution_texts else "Player Off", 
+                    "minute": substitution_texts[0].split('(')[1].split(')')[0] if substitution_texts else "Minute",
+                    "substitutions": "\n".join(substitution_texts)  # All substitutions as text
+                })
+            else:
+                # Fallback to single substitution format for backward compatibility
+                player_on = request.data.get('player_on', 'Player On')
+                player_off = request.data.get('player_off', 'Player Off')
+                minute = request.data.get('minute', 'Minute')
+                
+                fixture_data.update({
+                    "player_on": player_on,
+                    "player_off": player_off,
+                    "minute": minute,
+                    "substitutions": f"{player_off} → {player_on} ({minute}')"
+                })
+                
+                logger.info(f"Single substitution data: Player On={player_on}, Player Off={player_off}, Minute={minute}")
         
         # Handle halftime score data from request
         if post_type == 'halftime' and request:
@@ -1223,7 +1245,8 @@ class SocialMediaPostGenerator(APIView):
             fixture_data.update({
                 "player_on": "Player On",  # This will be overridden by request data
                 "player_off": "Player Off",  # This will be overridden by request data
-                "minute": "Minute"  # This will be overridden by request data
+                "minute": "Minute",  # This will be overridden by request data
+                "substitutions": "Player Off → Player On (Minute)"  # This will be overridden by request data
             })
         
         # Add halftime score data if post type is 'halftime'

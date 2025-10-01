@@ -2072,6 +2072,11 @@ class TextElementUpdateView(APIView):
         try:
             try:
                 text_element = TextElement.objects.get(id=element_id)
+                logger.info(f"Updating text element {element_id}")
+                logger.info(f"Request data received: {request.data}")
+                logger.info(f"Position anchor in request: {request.data.get('position_anchor', 'NOT PROVIDED')}")
+                logger.info(f"Alignment in request: {request.data.get('alignment', 'NOT PROVIDED')}")
+                logger.info(f"Position coordinates in request: x={request.data.get('position_x', 'NOT PROVIDED')}, y={request.data.get('position_y', 'NOT PROVIDED')}")
             except TextElement.DoesNotExist:
                 return Response(
                     {"error": "Text element not found."},
@@ -2162,8 +2167,11 @@ class TextElementUpdateView(APIView):
             
             serializer = TextElementSerializer(text_element, data=request.data, partial=True)
             if serializer.is_valid():
-                serializer.save()
+                updated_element = serializer.save()
                 logger.info(f"Text element {element_id} updated successfully")
+                logger.info(f"Final position_anchor: {updated_element.position_anchor}")
+                logger.info(f"Final position: ({updated_element.position_x}, {updated_element.position_y})")
+                logger.info(f"Final alignment: {updated_element.alignment}")
                 return Response(serializer.data, status=status.HTTP_200_OK)
             else:
                 logger.error(f"Validation errors for text element {element_id}: {serializer.errors}")

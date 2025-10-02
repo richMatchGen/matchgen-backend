@@ -819,8 +819,44 @@ class SocialMediaPostGenerator(APIView):
             substitutions = request.data.get('substitutions', [])
             minute = request.data.get('minute', 'Minute')
             
-            if substitutions:
-                # Create substitution pairs from the arrays
+            # Check for new direct format first
+            players_on = request.data.get('players_on', [])
+            players_off = request.data.get('players_off', [])
+            
+            if players_on or players_off:
+                # New flexible format - handle multiple players independently
+                logger.info(f"Using new flexible substitution format: {len(players_on)} players on, {len(players_off)} players off")
+                
+                # Format players as multiline text
+                players_on_text = '\n'.join(players_on) if players_on else "Player On"
+                players_off_text = '\n'.join(players_off) if players_off else "Player Off"
+                
+                # Create substitution display text
+                substitution_texts = []
+                if players_off and players_on:
+                    # Show all combinations
+                    for off_player in players_off:
+                        for on_player in players_on:
+                            substitution_texts.append(f"{off_player} → {on_player} ({minute}')")
+                elif players_off:
+                    # Only players going off
+                    for off_player in players_off:
+                        substitution_texts.append(f"{off_player} → (Substitution) ({minute}')")
+                elif players_on:
+                    # Only players coming on
+                    for on_player in players_on:
+                        substitution_texts.append(f"(Substitution) → {on_player} ({minute}')")
+                
+                fixture_data.update({
+                    "player_on": players_on_text,
+                    "player_off": players_off_text, 
+                    "minute": minute,
+                    "substitutions": "\n".join(substitution_texts)  # All substitutions as text
+                })
+                
+                logger.info(f"Substitution data: players_on={players_on_text}, players_off={players_off_text}")
+            elif substitutions:
+                # Legacy format - handle old substitution pairs
                 players_on = [sub.get('player_on', '') for sub in substitutions if sub.get('player_on')]
                 players_off = [sub.get('player_off', '') for sub in substitutions if sub.get('player_off')]
                 

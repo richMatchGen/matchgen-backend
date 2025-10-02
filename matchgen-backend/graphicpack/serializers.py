@@ -33,6 +33,7 @@ class TemplateSerializer(serializers.ModelSerializer):
 
 class GraphicPackSerializer(serializers.ModelSerializer):
     templates = TemplateSerializer(many=True, read_only=True)
+    templates_count = serializers.SerializerMethodField()
     assigned_club_name = serializers.CharField(source='assigned_club.name', read_only=True)
     
     class Meta:
@@ -40,9 +41,13 @@ class GraphicPackSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'description', 'preview_image_url', 'zip_file_url',
             'primary_color', 'tier', 'assigned_club', 'assigned_club_name', 'is_active',
-            'sport', 'created_at', 'updated_at', 'templates'
+            'sport', 'created_at', 'updated_at', 'templates', 'templates_count'
         ]
         read_only_fields = ['created_at', 'updated_at']
+    
+    def get_templates_count(self, obj):
+        """Calculate the number of templates for this graphic pack."""
+        return obj.templates.count()
 
     def to_representation(self, instance):
         """Override to handle missing fields gracefully."""

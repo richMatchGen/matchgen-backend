@@ -1050,24 +1050,24 @@ class SocialMediaPostGenerator(APIView):
             position_anchor = getattr(element, 'position_anchor', 'top')  # Default to top if not set
             logger.info(f"MULTILINE DEBUG - Position anchor: {position_anchor}")
             
-            # Calculate starting Y position based on text_alignment and position_anchor
-            if text_alignment == 'left':
+            # Calculate starting Y position based on alignment and position_anchor
+            if alignment == 'left':
                 # Left-aligned multiline text
                 for i, line in enumerate(lines):
                     if line.strip():  # Only render non-empty lines
                         if position_anchor == 'top':
                             line_y = y + (i * line_height)
-                        else:  # bottom anchor - render from bottom up
+                        else:  # bottom anchor - position so bottom line is at y
                             line_y = y - ((len(lines) - 1 - i) * line_height)
                         draw.text((x, line_y), line, font=font, fill=font_color)
                         logger.info(f"Rendered line {i+1}: '{line}' at ({x}, {line_y}) with {position_anchor} anchor")
-            elif text_alignment == 'right':
+            elif alignment == 'right':
                 # Right-aligned multiline text
                 for i, line in enumerate(lines):
                     if line.strip():  # Only render non-empty lines
                         if position_anchor == 'top':
                             line_y = y + (i * line_height)
-                        else:  # bottom anchor - render from bottom up
+                        else:  # bottom anchor - position so bottom line is at y
                             line_y = y - ((len(lines) - 1 - i) * line_height)
                         # Get text width for right alignment
                         bbox = draw.textbbox((0, 0), line, font=font)
@@ -1081,7 +1081,7 @@ class SocialMediaPostGenerator(APIView):
                     if line.strip():  # Only render non-empty lines
                         if position_anchor == 'top':
                             line_y = y + (i * line_height)
-                        else:  # bottom anchor - render from bottom up
+                        else:  # bottom anchor - position so bottom line is at y
                             line_y = y - ((len(lines) - 1 - i) * line_height)
                         # Get text width for center alignment
                         bbox = draw.textbbox((0, 0), line, font=font)

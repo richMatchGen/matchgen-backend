@@ -45,7 +45,9 @@ from .views import (
     StripeReactivateSubscriptionView,
     StripeUpgradeSubscriptionView,
     StripeDowngradeSubscriptionView,
-    DeleteAccountView
+    DeleteAccountView,
+    ForgotPasswordView,
+    ResetPasswordView
 )
 
 
@@ -77,6 +79,10 @@ urlpatterns = [
     path("me/", UserDetailView.as_view(), name="user-detail"),
     path("all-users/", UserListView.as_view(), name="all-users"),
     path("delete-account/", DeleteAccountView.as_view(), name="delete-account"),
+    
+    # Password management
+    path("forgot-password/", ForgotPasswordView.as_view(), name="forgot-password"),
+    path("reset-password/", ResetPasswordView.as_view(), name="reset-password"),
     
     # Club management
     path("club/", CreateClubView.as_view(), name="club-create"),

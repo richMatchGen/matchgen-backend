@@ -2676,3 +2676,142 @@ class DeleteAccountView(APIView):
             return Response({
                 'error': 'Failed to delete account. Please contact support if this issue persists.'
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ForgotPasswordView(APIView):
+    """
+    Send password reset instructions to user's email
+    """
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        try:
+            email = request.data.get('email')
+            
+            if not email:
+                return Response({
+                    'error': 'Email is required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if user exists
+            try:
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
+                # For security, don't reveal if email exists or not
+                return Response({
+                    'message': 'If an account with this email exists, password reset instructions have been sent.'
+                }, status=status.HTTP_200_OK)
+            
+            # Generate a simple reset token (in production, use a more secure method)
+            import uuid
+            reset_token = str(uuid.uuid4())
+            
+            # Store the reset token in cache with expiration (1 hour)
+            cache.set(f"password_reset_{reset_token}", user.id, 3600)
+            
+            # Create reset URL
+            reset_url = f"https://matchgen-frontend.vercel.app/reset-password?token={reset_token}"
+            
+            # Send email
+            subject = "MatchGen - Password Reset"
+            message = f"""
+Hello {user.email},
+
+You requested a password reset for your MatchGen account.
+
+Click the link below to reset your password:
+{reset_url}
+
+This link will expire in 1 hour.
+
+If you didn't request this password reset, please ignore this email.
+
+Best regards,
+The MatchGen Team
+            """
+            
+            try:
+                send_mail(
+                    subject,
+                    message,
+                    settings.EMAIL_HOST_USER,
+                    [email],
+                    fail_silently=False,
+                )
+                
+                logger.info(f"Password reset email sent to {email}")
+                
+                return Response({
+                    'message': 'Password reset instructions have been sent to your email address.'
+                }, status=status.HTTP_200_OK)
+                
+            except Exception as e:
+                logger.error(f"Error sending password reset email: {str(e)}")
+                return Response({
+                    'error': 'Failed to send password reset email. Please try again later.'
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                
+        except Exception as e:
+            logger.error(f"Error in forgot password: {str(e)}")
+            return Response({
+                'error': 'An error occurred. Please try again later.'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class ResetPasswordView(APIView):
+    """
+    Reset user password with token
+    """
+    permission_classes = [AllowAny]
+    
+    def post(self, request):
+        try:
+            token = request.data.get('token')
+            new_password = request.data.get('new_password')
+            
+            if not token or not new_password:
+                return Response({
+                    'error': 'Token and new password are required'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Validate password
+            try:
+                validate_password(new_password)
+            except ValidationError as e:
+                return Response({
+                    'error': 'Password validation failed',
+                    'details': list(e.messages)
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if token exists and is valid
+            user_id = cache.get(f"password_reset_{token}")
+            if not user_id:
+                return Response({
+                    'error': 'Invalid or expired reset token'
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Get user and update password
+            try:
+                user = User.objects.get(id=user_id)
+                user.set_password(new_password)
+                user.save()
+                
+                # Remove the token from cache
+                cache.delete(f"password_reset_{token}")
+                
+                logger.info(f"Password reset successful for user {user.email}")
+                
+                return Response({
+                    'message': 'Password has been reset successfully. You can now log in with your new password.'
+                }, status=status.HTTP_200_OK)
+                
+            except User.DoesNotExist:
+                return Response({
+                    'error': 'User not found'
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Exception as e:
+            logger.error(f"Error in reset password: {str(e)}")
+            return Response({
+                'error': 'An error occurred. Please try again later.'
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

@@ -1080,6 +1080,11 @@ class SocialMediaPostGenerator(APIView):
             # Determine anchor point based on alignment and position_anchor for single-line text
             position_anchor = getattr(element, 'position_anchor', 'top')  # Default to top if not set
             
+            logger.info(f"RENDERING DEBUG - Element: {element.element_name}")
+            logger.info(f"RENDERING DEBUG - Position anchor: {position_anchor}")
+            logger.info(f"RENDERING DEBUG - Alignment: {alignment}")
+            logger.info(f"RENDERING DEBUG - Position: ({x}, {y})")
+            
             if alignment == 'left':
                 anchor = 'lt' if position_anchor == 'top' else 'lb'  # left-top or left-bottom anchor
             elif alignment == 'center':
@@ -1089,6 +1094,7 @@ class SocialMediaPostGenerator(APIView):
             else:
                 anchor = 'mt' if position_anchor == 'top' else 'mb'  # Default to middle-top or middle-bottom
             
+            logger.info(f"RENDERING DEBUG - Final anchor point: '{anchor}'")
             logger.info(f"Using anchor point '{anchor}' for alignment '{alignment}'")
             
             # Render single-line text with anchor

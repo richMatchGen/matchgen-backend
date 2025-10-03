@@ -143,7 +143,7 @@ class TextElement(models.Model):
     away_position_y = models.IntegerField(default=150, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Y position for away fixtures")
     
     # Font settings
-    font_size = models.IntegerField(default=24, validators=[MinValueValidator(8), MaxValueValidator(100)])
+    font_size = models.IntegerField(default=24, validators=[MinValueValidator(8)])
     font_family = models.CharField(max_length=100, default='Arial')
     font_color = models.CharField(max_length=7, default='#FFFFFF', help_text="Hex color code")
     

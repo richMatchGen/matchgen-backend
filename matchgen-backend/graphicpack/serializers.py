@@ -89,6 +89,7 @@ class TextElementSerializer(serializers.ModelSerializer):
                 'id', 'graphic_pack', 'graphic_pack_name', 'content_type', 'element_name',
                 'element_type', 'position_x', 'position_y', 'top_left_x', 'top_left_y', 'top_center_x', 'top_center_y', 'top_right_x', 'top_right_y', 
                 'bottom_left_x', 'bottom_left_y', 'bottom_center_x', 'bottom_center_y', 'bottom_right_x', 'bottom_right_y',
+                'center_left_x', 'center_left_y', 'center_center_x', 'center_center_y', 'center_right_x', 'center_right_y',
                 'home_position_x', 'home_position_y', 'away_position_x', 'away_position_y', 'font_size', 'font_family', 'font_color',
                 'alignment', 'text_alignment', 'position_anchor', 'font_weight', 'image_width', 'image_height', 'maintain_aspect_ratio',
                 'image_color_filter', 'image_color_tint', 'image_brightness', 'image_contrast', 'image_saturation',

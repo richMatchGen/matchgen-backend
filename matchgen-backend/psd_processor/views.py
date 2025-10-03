@@ -227,6 +227,14 @@ class PSDUploadView(APIView):
                         bottom_right_x = x + width  # Bottom-right X for right alignment
                         bottom_right_y = y + height  # Bottom-right Y for right alignment
                         
+                        # Center anchor positions
+                        center_left_x = x  # Center-left X for left alignment
+                        center_left_y = center_y  # Center-left Y for left alignment
+                        center_center_x = center_x  # Center-center X for center alignment
+                        center_center_y = center_y  # Center-center Y for center alignment
+                        center_right_x = x + width  # Center-right X for right alignment
+                        center_right_y = center_y  # Center-right Y for right alignment
+                        
                         layer_data = {
                             'name': full_layer_name,
                             'x': x,
@@ -251,6 +259,12 @@ class PSDUploadView(APIView):
                             'bottom_center_y': bottom_center_y,
                             'bottom_right_x': bottom_right_x,
                             'bottom_right_y': bottom_right_y,
+                            'center_left_x': center_left_x,
+                            'center_left_y': center_left_y,
+                            'center_center_x': center_center_x,
+                            'center_center_y': center_center_y,
+                            'center_right_x': center_right_x,
+                            'center_right_y': center_right_y,
                             'visible': bool(visible),
                             'opacity': float(opacity),
                             'layer_type': 'group' if hasattr(layer, 'layers') and layer.layers else 'layer'
@@ -539,6 +553,14 @@ class PSDLayerProcessView(APIView):
                 bottom_right_x = int(layer.right_x)  # Bottom-right X for right alignment
                 bottom_right_y = int(layer.y + layer.height)  # Bottom-right Y for right alignment
                 
+                # Center anchor positions
+                center_left_x = int(layer.x)  # Center-left X for left alignment
+                center_left_y = int(layer.center_y)  # Center-left Y for left alignment
+                center_center_x = int(layer.center_x)  # Center-center X for center alignment
+                center_center_y = int(layer.center_y)  # Center-center Y for center alignment
+                center_right_x = int(layer.right_x)  # Center-right X for right alignment
+                center_right_y = int(layer.center_y)  # Center-right Y for right alignment
+                
                 # Calculate position and anchor point based on element type
                 if element_type == 'text':
                     # For text elements, use top-center positioning
@@ -573,6 +595,12 @@ class PSDLayerProcessView(APIView):
                     'bottom_center_y': bottom_center_y,  # Bottom-center position for center alignment
                     'bottom_right_x': bottom_right_x,  # Bottom-right position for right alignment
                     'bottom_right_y': bottom_right_y,  # Bottom-right position for right alignment
+                    'center_left_x': center_left_x,  # Center-left position for left alignment
+                    'center_left_y': center_left_y,  # Center-left position for left alignment
+                    'center_center_x': center_center_x,  # Center-center position for center alignment
+                    'center_center_y': center_center_y,  # Center-center position for center alignment
+                    'center_right_x': center_right_x,  # Center-right position for right alignment
+                    'center_right_y': center_right_y,  # Center-right position for right alignment
                     'font_size': 48,
                     'font_family': 'Montserrat',
                     'font_color': '#FFFFFF',

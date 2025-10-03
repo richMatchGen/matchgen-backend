@@ -48,6 +48,15 @@ class PSDLayer(models.Model):
     bottom_center_y = models.IntegerField(help_text="Bottom-center Y coordinate for text positioning", default=0)
     bottom_right_x = models.IntegerField(help_text="Bottom-right X coordinate for text positioning", default=0)
     bottom_right_y = models.IntegerField(help_text="Bottom-right Y coordinate for text positioning", default=0)
+    
+    # Center anchor positions for text elements
+    center_left_x = models.IntegerField(help_text="Center-left X coordinate for text positioning", default=0)
+    center_left_y = models.IntegerField(help_text="Center-left Y coordinate for text positioning", default=0)
+    center_center_x = models.IntegerField(help_text="Center-center X coordinate for text positioning", default=0)
+    center_center_y = models.IntegerField(help_text="Center-center Y coordinate for text positioning", default=0)
+    center_right_x = models.IntegerField(help_text="Center-right X coordinate for text positioning", default=0)
+    center_right_y = models.IntegerField(help_text="Center-right Y coordinate for text positioning", default=0)
+    
     visible = models.BooleanField(default=True)
     opacity = models.FloatField(default=100.0)
     layer_type = models.CharField(max_length=50, default='layer')

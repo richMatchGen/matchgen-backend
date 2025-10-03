@@ -136,6 +136,14 @@ class TextElement(models.Model):
     bottom_right_x = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Bottom-right X position for right alignment")
     bottom_right_y = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Bottom-right Y position for right alignment")
     
+    # Center anchor positions for text elements
+    center_left_x = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Center-left X position for left alignment")
+    center_left_y = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Center-left Y position for left alignment")
+    center_center_x = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Center-center X position for center alignment")
+    center_center_y = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Center-center Y position for center alignment")
+    center_right_x = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Center-right X position for right alignment")
+    center_right_y = models.IntegerField(default=0, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Center-right Y position for right alignment")
+    
     # Home/Away specific positioning for images
     home_position_x = models.IntegerField(default=400, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="X position for home fixtures")
     home_position_y = models.IntegerField(default=150, validators=[MinValueValidator(0), MaxValueValidator(2000)], help_text="Y position for home fixtures")

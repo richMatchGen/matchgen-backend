@@ -173,7 +173,7 @@ class TextElement(models.Model):
     # Position anchor (top or bottom)
     position_anchor = models.CharField(
         max_length=10,
-        choices=[('top', 'Top'), ('bottom', 'Bottom')],
+        choices=[('top', 'Top'), ('center', 'Center'), ('bottom', 'Bottom')],
         default='top',
         help_text="Whether to use top or bottom anchor points for positioning"
     )

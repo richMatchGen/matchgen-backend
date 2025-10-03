@@ -1094,6 +1094,10 @@ class SocialMediaPostGenerator(APIView):
                     if line.strip():  # Only render non-empty lines
                         if position_anchor == 'top':
                             line_y = y + (i * line_height)
+                        elif position_anchor == 'center':
+                            # Center anchor - position text block so it's centered around y
+                            total_height = len(lines) * line_height
+                            line_y = y - (total_height // 2) + (i * line_height)
                         else:  # bottom anchor - calculate so last line is at y
                             # Calculate total height of all lines
                             total_height = len(lines) * line_height
@@ -1107,6 +1111,10 @@ class SocialMediaPostGenerator(APIView):
                     if line.strip():  # Only render non-empty lines
                         if position_anchor == 'top':
                             line_y = y + (i * line_height)
+                        elif position_anchor == 'center':
+                            # Center anchor - position text block so it's centered around y
+                            total_height = len(lines) * line_height
+                            line_y = y - (total_height // 2) + (i * line_height)
                         else:  # bottom anchor - calculate so last line is at y
                             # Calculate total height of all lines
                             total_height = len(lines) * line_height
@@ -1124,6 +1132,10 @@ class SocialMediaPostGenerator(APIView):
                     if line.strip():  # Only render non-empty lines
                         if position_anchor == 'top':
                             line_y = y + (i * line_height)
+                        elif position_anchor == 'center':
+                            # Center anchor - position text block so it's centered around y
+                            total_height = len(lines) * line_height
+                            line_y = y - (total_height // 2) + (i * line_height)
                         else:  # bottom anchor - calculate so last line is at y
                             # Calculate total height of all lines
                             total_height = len(lines) * line_height
@@ -1145,13 +1157,33 @@ class SocialMediaPostGenerator(APIView):
             logger.info(f"RENDERING DEBUG - Position: ({x}, {y})")
             
             if alignment == 'left':
-                anchor = 'lt' if position_anchor == 'top' else 'lb'  # left-top or left-bottom anchor
+                if position_anchor == 'top':
+                    anchor = 'lt'  # left-top anchor
+                elif position_anchor == 'center':
+                    anchor = 'lm'  # left-middle anchor
+                else:  # bottom
+                    anchor = 'lb'  # left-bottom anchor
             elif alignment == 'center':
-                anchor = 'mt' if position_anchor == 'top' else 'mb'  # middle-top or middle-bottom anchor
+                if position_anchor == 'top':
+                    anchor = 'mt'  # middle-top anchor
+                elif position_anchor == 'center':
+                    anchor = 'mm'  # middle-middle anchor
+                else:  # bottom
+                    anchor = 'mb'  # middle-bottom anchor
             elif alignment == 'right':
-                anchor = 'rt' if position_anchor == 'top' else 'rb'  # right-top or right-bottom anchor
+                if position_anchor == 'top':
+                    anchor = 'rt'  # right-top anchor
+                elif position_anchor == 'center':
+                    anchor = 'rm'  # right-middle anchor
+                else:  # bottom
+                    anchor = 'rb'  # right-bottom anchor
             else:
-                anchor = 'mt' if position_anchor == 'top' else 'mb'  # Default to middle-top or middle-bottom
+                if position_anchor == 'top':
+                    anchor = 'mt'  # middle-top anchor
+                elif position_anchor == 'center':
+                    anchor = 'mm'  # middle-middle anchor
+                else:  # bottom
+                    anchor = 'mb'  # middle-bottom anchor
             
             logger.info(f"RENDERING DEBUG - Final anchor point: '{anchor}'")
             logger.info(f"Using anchor point '{anchor}' for alignment '{alignment}'")
@@ -2167,6 +2199,10 @@ class TextElementUpdateView(APIView):
                             request.data['position_x'] = text_element.top_left_x
                             request.data['position_y'] = text_element.top_left_y
                             logger.info(f"Updated position to top-left: ({text_element.top_left_x}, {text_element.top_left_y})")
+                        elif new_position_anchor == 'center':
+                            request.data['position_x'] = text_element.center_left_x
+                            request.data['position_y'] = text_element.center_left_y
+                            logger.info(f"Updated position to center-left: ({text_element.center_left_x}, {text_element.center_left_y})")
                         else:  # bottom
                             request.data['position_x'] = text_element.bottom_left_x
                             request.data['position_y'] = text_element.bottom_left_y
@@ -2176,6 +2212,10 @@ class TextElementUpdateView(APIView):
                             request.data['position_x'] = text_element.top_center_x
                             request.data['position_y'] = text_element.top_center_y
                             logger.info(f"Updated position to top-center: ({text_element.top_center_x}, {text_element.top_center_y})")
+                        elif new_position_anchor == 'center':
+                            request.data['position_x'] = text_element.center_center_x
+                            request.data['position_y'] = text_element.center_center_y
+                            logger.info(f"Updated position to center-center: ({text_element.center_center_x}, {text_element.center_center_y})")
                         else:  # bottom
                             request.data['position_x'] = text_element.bottom_center_x
                             request.data['position_y'] = text_element.bottom_center_y
@@ -2185,6 +2225,10 @@ class TextElementUpdateView(APIView):
                             request.data['position_x'] = text_element.top_right_x
                             request.data['position_y'] = text_element.top_right_y
                             logger.info(f"Updated position to top-right: ({text_element.top_right_x}, {text_element.top_right_y})")
+                        elif new_position_anchor == 'center':
+                            request.data['position_x'] = text_element.center_right_x
+                            request.data['position_y'] = text_element.center_right_y
+                            logger.info(f"Updated position to center-right: ({text_element.center_right_x}, {text_element.center_right_y})")
                         else:  # bottom
                             request.data['position_x'] = text_element.bottom_right_x
                             request.data['position_y'] = text_element.bottom_right_y
@@ -2207,6 +2251,10 @@ class TextElementUpdateView(APIView):
                             request.data['position_x'] = text_element.top_left_x
                             request.data['position_y'] = text_element.top_left_y
                             logger.info(f"Updated position to top-left: ({text_element.top_left_x}, {text_element.top_left_y})")
+                        elif position_anchor == 'center':
+                            request.data['position_x'] = text_element.center_left_x
+                            request.data['position_y'] = text_element.center_left_y
+                            logger.info(f"Updated position to center-left: ({text_element.center_left_x}, {text_element.center_left_y})")
                         else:  # bottom
                             request.data['position_x'] = text_element.bottom_left_x
                             request.data['position_y'] = text_element.bottom_left_y
@@ -2216,6 +2264,10 @@ class TextElementUpdateView(APIView):
                             request.data['position_x'] = text_element.top_center_x
                             request.data['position_y'] = text_element.top_center_y
                             logger.info(f"Updated position to top-center: ({text_element.top_center_x}, {text_element.top_center_y})")
+                        elif position_anchor == 'center':
+                            request.data['position_x'] = text_element.center_center_x
+                            request.data['position_y'] = text_element.center_center_y
+                            logger.info(f"Updated position to center-center: ({text_element.center_center_x}, {text_element.center_center_y})")
                         else:  # bottom
                             request.data['position_x'] = text_element.bottom_center_x
                             request.data['position_y'] = text_element.bottom_center_y
@@ -2225,6 +2277,10 @@ class TextElementUpdateView(APIView):
                             request.data['position_x'] = text_element.top_right_x
                             request.data['position_y'] = text_element.top_right_y
                             logger.info(f"Updated position to top-right: ({text_element.top_right_x}, {text_element.top_right_y})")
+                        elif position_anchor == 'center':
+                            request.data['position_x'] = text_element.center_right_x
+                            request.data['position_y'] = text_element.center_right_y
+                            logger.info(f"Updated position to center-right: ({text_element.center_right_x}, {text_element.center_right_y})")
                         else:  # bottom
                             request.data['position_x'] = text_element.bottom_right_x
                             request.data['position_y'] = text_element.bottom_right_y

@@ -490,7 +490,8 @@ class OpponentLogoUploadView(APIView):
                     folder="opponent_logos",
                     public_id=f"opponent_{request.user.id}_{int(time.time())}",
                     overwrite=True,
-                    resource_type="image"
+                    resource_type="image",
+                    tags=["Logo"]
                 )
                 
                 logo_url = upload_result['secure_url']

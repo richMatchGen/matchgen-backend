@@ -759,7 +759,8 @@ class EnhancedClubCreationView(APIView):
                         folder="club_logos",
                         public_id=f"club_{request.user.id}_{int(time.time())}",
                         overwrite=True,
-                        resource_type="image"
+                        resource_type="image",
+                        tags=["Logo"]
                     )
                     club_data['logo'] = upload_result['secure_url']
                     logger.info(f"Logo uploaded to Cloudinary: {club_data['logo']}")
@@ -1112,7 +1113,8 @@ class UploadLogoView(APIView):
                     folder="club_logos",
                     public_id=f"club_{request.user.id}_{int(time.time())}",
                     overwrite=True,
-                    resource_type="image"
+                    resource_type="image",
+                    tags=["Logo"]
                 )
                 
                 logo_url = upload_result['secure_url']

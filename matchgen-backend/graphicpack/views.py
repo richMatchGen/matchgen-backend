@@ -637,7 +637,8 @@ class MatchdayPostGenerator(APIView):
         # Get home/away status from the match model
         home_away = match.home_away if hasattr(match, 'home_away') and match.home_away else "HOME"
         
-        return {
+        # Base fixture data
+        fixture_data = {
             "date": date_str,
             "time": time_str,
             "venue": venue_str,
@@ -647,6 +648,21 @@ class MatchdayPostGenerator(APIView):
             "home_away": home_away,
             "club_name": match.club.name if match.club else "Club"
         }
+        
+        # Add text alternatives when logos are not available
+        if not opponent_logo_url or opponent_logo_url == "":
+            fixture_data["opponent_text"] = opponent_str  # Use opponent name as text alternative
+            logger.info(f"Opponent logo not available, using opponent_text: '{opponent_str}'")
+        else:
+            fixture_data["opponent_text"] = ""  # Empty when logo is available
+        
+        if not club_logo_url or club_logo_url == "":
+            fixture_data["club_logo_alt"] = match.club.name if match.club else "Club"  # Use club name as text alternative
+            logger.info(f"Club logo not available, using club_logo_alt: '{match.club.name if match.club else 'Club'}'")
+        else:
+            fixture_data["club_logo_alt"] = ""  # Empty when logo is available
+        
+        return fixture_data
 
 
 class SocialMediaPostGenerator(APIView):
@@ -1356,6 +1372,19 @@ class SocialMediaPostGenerator(APIView):
             "home_away": home_away,
             "club_name": match.club.name if match.club else "Club"
         }
+        
+        # Add text alternatives when logos are not available
+        if not opponent_logo_url or opponent_logo_url == "":
+            fixture_data["opponent_text"] = opponent_str  # Use opponent name as text alternative
+            logger.info(f"Opponent logo not available, using opponent_text: '{opponent_str}'")
+        else:
+            fixture_data["opponent_text"] = ""  # Empty when logo is available
+        
+        if not club_logo_url or club_logo_url == "":
+            fixture_data["club_logo_alt"] = match.club.name if match.club else "Club"  # Use club name as text alternative
+            logger.info(f"Club logo not available, using club_logo_alt: '{match.club.name if match.club else 'Club'}'")
+        else:
+            fixture_data["club_logo_alt"] = ""  # Empty when logo is available
         
         # Add substitution-specific data if post type is 'sub'
         if post_type == 'sub':
@@ -3070,4 +3099,170 @@ class AddVenueElementView(APIView):
             logger.error(f"Error creating venue element: {str(e)}", exc_info=True)
             return Response({
                 "error": "An error occurred while creating the venue element."
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AddOpponentTextElementView(APIView):
+    """Add opponent_text element to user's selected graphic pack."""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        try:
+            # Get user's club
+            try:
+                club = Club.objects.get(user=request.user)
+            except Club.DoesNotExist:
+                return Response({
+                    "error": "No club found for this user"
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get the club's selected graphic pack
+            pack = club.selected_pack
+            if not pack:
+                return Response({
+                    "error": "No graphic pack selected for this club"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if opponent_text element already exists
+            existing_element = TextElement.objects.filter(
+                graphic_pack=pack,
+                content_type='fixture',
+                element_name='opponent_text'
+            ).first()
+            
+            if existing_element:
+                return Response({
+                    "message": "Opponent text element already exists",
+                    "element_id": existing_element.id,
+                    "element_details": {
+                        "id": existing_element.id,
+                        "element_type": existing_element.element_type,
+                        "element_name": existing_element.element_name,
+                        "position_x": existing_element.position_x,
+                        "position_y": existing_element.position_y,
+                        "font_size": existing_element.font_size,
+                        "font_family": existing_element.font_family,
+                        "font_color": existing_element.font_color
+                    }
+                }, status=status.HTTP_200_OK)
+            
+            # Create the opponent_text element
+            element = TextElement.objects.create(
+                graphic_pack=pack,
+                content_type='fixture',
+                element_name='opponent_text',
+                element_type='text',
+                position_x=400,  # Center of image
+                position_y=200,  # Adjust as needed
+                font_size=24,
+                font_family='Arial',
+                font_color='#FFFFFF',
+                alignment='center'
+            )
+            
+            logger.info(f"Created opponent_text element: {element.id} for pack {pack.name}")
+            
+            return Response({
+                "message": "Opponent text element created successfully",
+                "element_id": element.id,
+                "pack_name": pack.name,
+                "element_details": {
+                    "id": element.id,
+                    "element_type": element.element_type,
+                    "element_name": element.element_name,
+                    "position_x": element.position_x,
+                    "position_y": element.position_y,
+                    "font_size": element.font_size,
+                    "font_family": element.font_family,
+                    "font_color": element.font_color
+                }
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            logger.error(f"Error creating opponent_text element: {str(e)}", exc_info=True)
+            return Response({
+                "error": "An error occurred while creating the opponent text element."
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AddClubLogoAltElementView(APIView):
+    """Add club_logo_alt element to user's selected graphic pack."""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        try:
+            # Get user's club
+            try:
+                club = Club.objects.get(user=request.user)
+            except Club.DoesNotExist:
+                return Response({
+                    "error": "No club found for this user"
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get the club's selected graphic pack
+            pack = club.selected_pack
+            if not pack:
+                return Response({
+                    "error": "No graphic pack selected for this club"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if club_logo_alt element already exists
+            existing_element = TextElement.objects.filter(
+                graphic_pack=pack,
+                content_type='fixture',
+                element_name='club_logo_alt'
+            ).first()
+            
+            if existing_element:
+                return Response({
+                    "message": "Club logo alt element already exists",
+                    "element_id": existing_element.id,
+                    "element_details": {
+                        "id": existing_element.id,
+                        "element_type": existing_element.element_type,
+                        "element_name": existing_element.element_name,
+                        "position_x": existing_element.position_x,
+                        "position_y": existing_element.position_y,
+                        "font_size": existing_element.font_size,
+                        "font_family": existing_element.font_family,
+                        "font_color": existing_element.font_color
+                    }
+                }, status=status.HTTP_200_OK)
+            
+            # Create the club_logo_alt element
+            element = TextElement.objects.create(
+                graphic_pack=pack,
+                content_type='fixture',
+                element_name='club_logo_alt',
+                element_type='text',
+                position_x=200,  # Left side of image
+                position_y=200,  # Adjust as needed
+                font_size=24,
+                font_family='Arial',
+                font_color='#FFFFFF',
+                alignment='center'
+            )
+            
+            logger.info(f"Created club_logo_alt element: {element.id} for pack {pack.name}")
+            
+            return Response({
+                "message": "Club logo alt element created successfully",
+                "element_id": element.id,
+                "pack_name": pack.name,
+                "element_details": {
+                    "id": element.id,
+                    "element_type": element.element_type,
+                    "element_name": element.element_name,
+                    "position_x": element.position_x,
+                    "position_y": element.position_y,
+                    "font_size": element.font_size,
+                    "font_family": element.font_family,
+                    "font_color": element.font_color
+                }
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            logger.error(f"Error creating club_logo_alt element: {str(e)}", exc_info=True)
+            return Response({
+                "error": "An error occurred while creating the club logo alt element."
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

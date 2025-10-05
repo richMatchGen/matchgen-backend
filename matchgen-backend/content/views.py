@@ -497,6 +497,47 @@ class OpponentLogoUploadView(APIView):
                 logo_url = upload_result['secure_url']
                 logger.info(f"Opponent logo uploaded to Cloudinary: {logo_url}")
                 
+                # Add to media manager
+                try:
+                    from users.models import Club
+                    from graphicpack.models import MediaItem
+                    
+                    club = Club.objects.get(user=request.user)
+                    
+                    # Get image dimensions
+                    width = None
+                    height = None
+                    try:
+                        from PIL import Image
+                        img = Image.open(logo_file)
+                        width, height = img.size
+                    except Exception as e:
+                        logger.warning(f"Could not get image dimensions: {str(e)}")
+                    
+                    # Create MediaItem record
+                    media_item = MediaItem.objects.create(
+                        club=club,
+                        title=f"Opponent Logo - {logo_file.name}",
+                        description="Opponent logo uploaded during match creation",
+                        media_type='opponent_logo',
+                        category='logos',
+                        file_url=logo_url,
+                        file_name=logo_file.name,
+                        file_size=logo_file.size,
+                        file_type=logo_file.content_type,
+                        width=width,
+                        height=height,
+                        cloudinary_public_id=upload_result['public_id'],
+                        cloudinary_folder=upload_result.get('folder', ''),
+                        tags=['opponent', 'logo', 'match']
+                    )
+                    
+                    logger.info(f"Added opponent logo to media manager: {media_item.id}")
+                    
+                except Exception as media_error:
+                    logger.warning(f"Failed to add opponent logo to media manager: {str(media_error)}")
+                    # Don't fail the upload if media manager addition fails
+                
                 return Response({
                     "logo_url": logo_url,
                     "message": "Opponent logo uploaded successfully"
@@ -547,6 +588,47 @@ class PlayerPhotoUploadView(APIView):
                 
                 photo_url = upload_result['secure_url']
                 logger.info(f"Player photo uploaded to Cloudinary: {photo_url}")
+                
+                # Add to media manager
+                try:
+                    from users.models import Club
+                    from graphicpack.models import MediaItem
+                    
+                    club = Club.objects.get(user=request.user)
+                    
+                    # Get image dimensions
+                    width = None
+                    height = None
+                    try:
+                        from PIL import Image
+                        img = Image.open(photo_file)
+                        width, height = img.size
+                    except Exception as e:
+                        logger.warning(f"Could not get image dimensions: {str(e)}")
+                    
+                    # Create MediaItem record
+                    media_item = MediaItem.objects.create(
+                        club=club,
+                        title=f"Player Photo - {photo_file.name}",
+                        description="Player photo uploaded during player creation",
+                        media_type='player_photo',
+                        category='players',
+                        file_url=photo_url,
+                        file_name=photo_file.name,
+                        file_size=photo_file.size,
+                        file_type=photo_file.content_type,
+                        width=width,
+                        height=height,
+                        cloudinary_public_id=upload_result['public_id'],
+                        cloudinary_folder=upload_result.get('folder', ''),
+                        tags=['player', 'photo', 'squad']
+                    )
+                    
+                    logger.info(f"Added player photo to media manager: {media_item.id}")
+                    
+                except Exception as media_error:
+                    logger.warning(f"Failed to add player photo to media manager: {str(media_error)}")
+                    # Don't fail the upload if media manager addition fails
                 
                 return Response({
                     "photo_url": photo_url,

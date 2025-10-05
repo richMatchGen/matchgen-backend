@@ -1,7 +1,7 @@
 from rest_framework import serializers
 import logging
 
-from .models import GraphicPack, UserSelection, Template, TextElement
+from .models import GraphicPack, UserSelection, Template, TextElement, MediaItem
 
 logger = logging.getLogger(__name__)
 
@@ -107,4 +107,38 @@ class TextElementSerializer(serializers.ModelSerializer):
         """Validate hex color format for image tint."""
         if not value.startswith('#') or len(value) != 7:
             raise serializers.ValidationError("Color must be a valid hex color (e.g., #FFFFFF)")
+        return value
+
+
+class MediaItemSerializer(serializers.ModelSerializer):
+    """Serializer for MediaItem model."""
+    club_name = serializers.CharField(source='club.name', read_only=True)
+    file_size_mb = serializers.ReadOnlyField()
+    aspect_ratio = serializers.ReadOnlyField()
+    
+    class Meta:
+        model = MediaItem
+        fields = [
+            'id', 'club', 'club_name', 'title', 'description', 'media_type', 'category',
+            'file_url', 'file_name', 'file_size', 'file_size_mb', 'file_type',
+            'width', 'height', 'aspect_ratio', 'cloudinary_public_id', 'cloudinary_folder',
+            'tags', 'is_active', 'usage_count', 'created_at', 'updated_at'
+        ]
+        read_only_fields = ['created_at', 'updated_at', 'usage_count']
+    
+    def validate_file_size(self, value):
+        """Validate file size (max 50MB)."""
+        max_size = 50 * 1024 * 1024  # 50MB in bytes
+        if value > max_size:
+            raise serializers.ValidationError("File size cannot exceed 50MB")
+        return value
+    
+    def validate_file_type(self, value):
+        """Validate file type (only images and common media types)."""
+        allowed_types = [
+            'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+            'image/svg+xml', 'application/pdf'
+        ]
+        if value not in allowed_types:
+            raise serializers.ValidationError(f"File type must be one of: {', '.join(allowed_types)}")
         return value

@@ -261,3 +261,83 @@ class TextElement(models.Model):
                 'contrast': self.image_contrast,
                 'saturation': self.image_saturation
             }
+
+
+class MediaItem(models.Model):
+    """Model to store uploaded media items (photos, logos, templates, etc.)"""
+    
+    MEDIA_TYPES = [
+        ('club_logo', 'Club Logo'),
+        ('opponent_logo', 'Opponent Logo'),
+        ('player_photo', 'Player Photo'),
+        ('template', 'Template'),
+        ('background', 'Background Image'),
+        ('banner', 'Banner Image'),
+        ('other', 'Other'),
+    ]
+    
+    CATEGORIES = [
+        ('logos', 'Logos'),
+        ('players', 'Player Photos'),
+        ('templates', 'Templates'),
+        ('backgrounds', 'Backgrounds'),
+        ('banners', 'Banners'),
+        ('other', 'Other'),
+    ]
+    
+    # Basic fields
+    club = models.ForeignKey('users.Club', on_delete=models.CASCADE, related_name='media_items')
+    title = models.CharField(max_length=255, help_text="Display name for the media item")
+    description = models.TextField(blank=True, null=True, help_text="Optional description")
+    
+    # Media classification
+    media_type = models.CharField(max_length=50, choices=MEDIA_TYPES, help_text="Type of media")
+    category = models.CharField(max_length=50, choices=CATEGORIES, help_text="Category for organization")
+    
+    # File information
+    file_url = models.URLField(max_length=500, help_text="URL of the uploaded file")
+    file_name = models.CharField(max_length=255, help_text="Original filename")
+    file_size = models.IntegerField(help_text="File size in bytes")
+    file_type = models.CharField(max_length=50, help_text="MIME type (e.g., image/jpeg)")
+    
+    # Image dimensions (for images)
+    width = models.IntegerField(null=True, blank=True, help_text="Image width in pixels")
+    height = models.IntegerField(null=True, blank=True, help_text="Image height in pixels")
+    
+    # Cloudinary information
+    cloudinary_public_id = models.CharField(max_length=255, blank=True, null=True, help_text="Cloudinary public ID")
+    cloudinary_folder = models.CharField(max_length=255, blank=True, null=True, help_text="Cloudinary folder")
+    
+    # Tags for organization and search
+    tags = models.JSONField(default=list, blank=True, help_text="List of tags for categorization")
+    
+    # Usage tracking
+    is_active = models.BooleanField(default=True, help_text="Whether this media item is active")
+    usage_count = models.IntegerField(default=0, help_text="Number of times this media has been used")
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['club', 'media_type']),
+            models.Index(fields=['club', 'category']),
+            models.Index(fields=['club', 'is_active']),
+        ]
+    
+    def __str__(self):
+        return f"{self.club.name} - {self.title} ({self.media_type})"
+    
+    @property
+    def file_size_mb(self):
+        """Return file size in MB."""
+        return round(self.file_size / (1024 * 1024), 2)
+    
+    @property
+    def aspect_ratio(self):
+        """Return aspect ratio if dimensions are available."""
+        if self.width and self.height:
+            return round(self.width / self.height, 2)
+        return None

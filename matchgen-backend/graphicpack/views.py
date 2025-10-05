@@ -19,8 +19,8 @@ from users.models import Club
 from content.models import Match
 from users.permissions import HasFeaturePermission, FeaturePermission
 
-from .models import GraphicPack, Template, TextElement
-from .serializers import GraphicPackSerializer, TextElementSerializer
+from .models import GraphicPack, Template, TextElement, MediaItem
+from .serializers import GraphicPackSerializer, TextElementSerializer, MediaItemSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -3295,3 +3295,284 @@ class AddClubLogoAltElementView(APIView):
             return Response({
                 "error": "An error occurred while creating the club logo alt element."
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+# Media Management Views
+
+class MediaItemListView(ListAPIView):
+    """List all media items for the authenticated user's club."""
+    serializer_class = MediaItemSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """Filter media items by club and optional filters."""
+        try:
+            club = Club.objects.get(user=self.request.user)
+            queryset = MediaItem.objects.filter(club=club, is_active=True)
+            
+            # Filter by media type
+            media_type = self.request.query_params.get('media_type')
+            if media_type:
+                queryset = queryset.filter(media_type=media_type)
+            
+            # Filter by category
+            category = self.request.query_params.get('category')
+            if category:
+                queryset = queryset.filter(category=category)
+            
+            # Search by title or description
+            search = self.request.query_params.get('search')
+            if search:
+                queryset = queryset.filter(
+                    Q(title__icontains=search) | 
+                    Q(description__icontains=search) |
+                    Q(tags__icontains=search)
+                )
+            
+            return queryset.order_by('-created_at')
+            
+        except Club.DoesNotExist:
+            return MediaItem.objects.none()
+
+
+class MediaItemUploadView(APIView):
+    """Upload a new media item."""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        """Upload a media file to Cloudinary and create a MediaItem record."""
+        try:
+            # Get user's club
+            try:
+                club = Club.objects.get(user=request.user)
+            except Club.DoesNotExist:
+                return Response({
+                    "error": "No club found for this user"
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Validate required fields
+            file = request.FILES.get('file')
+            if not file:
+                return Response({
+                    "error": "No file provided"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            media_type = request.data.get('media_type')
+            if not media_type:
+                return Response({
+                    "error": "media_type is required"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Validate file size (max 50MB)
+            max_size = 50 * 1024 * 1024  # 50MB
+            if file.size > max_size:
+                return Response({
+                    "error": "File size cannot exceed 50MB"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Validate file type
+            allowed_types = [
+                'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',
+                'image/svg+xml', 'application/pdf'
+            ]
+            if file.content_type not in allowed_types:
+                return Response({
+                    "error": f"File type not supported. Allowed types: {', '.join(allowed_types)}"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Determine category based on media type
+            category_mapping = {
+                'club_logo': 'logos',
+                'opponent_logo': 'logos',
+                'player_photo': 'players',
+                'template': 'templates',
+                'background': 'backgrounds',
+                'banner': 'banners',
+                'other': 'other'
+            }
+            category = category_mapping.get(media_type, 'other')
+            
+            # Upload to Cloudinary
+            try:
+                upload_result = cloudinary.uploader.upload(
+                    file,
+                    folder=f"media/{club.id}/{category}",
+                    resource_type="auto",
+                    quality="auto:best",
+                    format="auto"
+                )
+            except Exception as upload_error:
+                logger.error(f"Cloudinary upload failed: {str(upload_error)}")
+                return Response({
+                    "error": "Failed to upload file to Cloudinary"
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            # Get image dimensions if it's an image
+            width = None
+            height = None
+            if file.content_type.startswith('image/'):
+                try:
+                    from PIL import Image
+                    img = Image.open(file)
+                    width, height = img.size
+                except Exception as e:
+                    logger.warning(f"Could not get image dimensions: {str(e)}")
+            
+            # Create MediaItem record
+            media_item = MediaItem.objects.create(
+                club=club,
+                title=request.data.get('title', file.name),
+                description=request.data.get('description', ''),
+                media_type=media_type,
+                category=category,
+                file_url=upload_result['secure_url'],
+                file_name=file.name,
+                file_size=file.size,
+                file_type=file.content_type,
+                width=width,
+                height=height,
+                cloudinary_public_id=upload_result['public_id'],
+                cloudinary_folder=upload_result.get('folder', ''),
+                tags=request.data.get('tags', [])
+            )
+            
+            # If this is a club logo, update the club's logo field
+            if media_type == 'club_logo':
+                club.logo = upload_result['secure_url']
+                club.save()
+                logger.info(f"Updated club logo for {club.name}")
+            
+            # If this is an opponent logo, we might want to update a match's opponent_logo
+            # This would need to be handled based on the specific match context
+            
+            serializer = MediaItemSerializer(media_item)
+            return Response({
+                "message": "Media item uploaded successfully",
+                "media_item": serializer.data
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            logger.error(f"Error uploading media item: {str(e)}", exc_info=True)
+            return Response({
+                "error": "An error occurred while uploading the media item"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class MediaItemDetailView(APIView):
+    """Get, update, or delete a specific media item."""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, media_id):
+        """Get a specific media item."""
+        try:
+            club = Club.objects.get(user=request.user)
+            media_item = MediaItem.objects.get(id=media_id, club=club)
+            serializer = MediaItemSerializer(media_item)
+            return Response(serializer.data)
+        except Club.DoesNotExist:
+            return Response({
+                "error": "No club found for this user"
+            }, status=status.HTTP_404_NOT_FOUND)
+        except MediaItem.DoesNotExist:
+            return Response({
+                "error": "Media item not found"
+            }, status=status.HTTP_404_NOT_FOUND)
+    
+    def put(self, request, media_id):
+        """Update a media item."""
+        try:
+            club = Club.objects.get(user=request.user)
+            media_item = MediaItem.objects.get(id=media_id, club=club)
+            
+            # Update allowed fields
+            allowed_fields = ['title', 'description', 'tags', 'is_active']
+            for field in allowed_fields:
+                if field in request.data:
+                    setattr(media_item, field, request.data[field])
+            
+            media_item.save()
+            serializer = MediaItemSerializer(media_item)
+            return Response({
+                "message": "Media item updated successfully",
+                "media_item": serializer.data
+            })
+            
+        except Club.DoesNotExist:
+            return Response({
+                "error": "No club found for this user"
+            }, status=status.HTTP_404_NOT_FOUND)
+        except MediaItem.DoesNotExist:
+            return Response({
+                "error": "Media item not found"
+            }, status=status.HTTP_404_NOT_FOUND)
+    
+    def delete(self, request, media_id):
+        """Delete a media item."""
+        try:
+            club = Club.objects.get(user=request.user)
+            media_item = MediaItem.objects.get(id=media_id, club=club)
+            
+            # Delete from Cloudinary
+            if media_item.cloudinary_public_id:
+                try:
+                    cloudinary.uploader.destroy(media_item.cloudinary_public_id)
+                except Exception as e:
+                    logger.warning(f"Failed to delete from Cloudinary: {str(e)}")
+            
+            # Delete from database
+            media_item.delete()
+            
+            return Response({
+                "message": "Media item deleted successfully"
+            })
+            
+        except Club.DoesNotExist:
+            return Response({
+                "error": "No club found for this user"
+            }, status=status.HTTP_404_NOT_FOUND)
+        except MediaItem.DoesNotExist:
+            return Response({
+                "error": "Media item not found"
+            }, status=status.HTTP_404_NOT_FOUND)
+
+
+class MediaItemStatsView(APIView):
+    """Get statistics about media items."""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """Get media statistics for the user's club."""
+        try:
+            club = Club.objects.get(user=request.user)
+            media_items = MediaItem.objects.filter(club=club, is_active=True)
+            
+            # Count by media type
+            media_type_counts = {}
+            for media_type, _ in MediaItem.MEDIA_TYPES:
+                count = media_items.filter(media_type=media_type).count()
+                if count > 0:
+                    media_type_counts[media_type] = count
+            
+            # Count by category
+            category_counts = {}
+            for category, _ in MediaItem.CATEGORIES:
+                count = media_items.filter(category=category).count()
+                if count > 0:
+                    category_counts[category] = count
+            
+            # Total file size
+            total_size = sum(item.file_size for item in media_items)
+            total_size_mb = round(total_size / (1024 * 1024), 2)
+            
+            return Response({
+                "total_items": media_items.count(),
+                "total_size_mb": total_size_mb,
+                "media_type_counts": media_type_counts,
+                "category_counts": category_counts,
+                "club_name": club.name
+            })
+            
+        except Club.DoesNotExist:
+            return Response({
+                "error": "No club found for this user"
+            }, status=status.HTTP_404_NOT_FOUND)

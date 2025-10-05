@@ -94,6 +94,7 @@ urlpatterns = [
     path("api/content/", include("content.urls")),
     path("api/graphicpack/", include("graphicpack.urls")),
     path("api/psd/", include("psd_processor.urls")),
+    path("api/feedback/", include("feedback.urls")),
     # Global token refresh endpoint for frontend compatibility
     path("api/token/refresh/", TokenRefreshView.as_view(), name="token_refresh_global"),
     # Test endpoint for debugging

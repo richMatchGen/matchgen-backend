@@ -20,7 +20,8 @@ from .views import (
     TextElementDeleteView, TextElementByGraphicPackView, AddOpponentLogoElementView,
     AddClubLogoElementView, AddPlayerNameElementView, AddVenueElementView,
     AddOpponentTextElementView, AddClubLogoAltElementView,
-    DebugOpponentLogoView, TemplatesByPackView, TemplateCreateView, TemplateDeleteView
+    DebugOpponentLogoView, TemplatesByPackView, TemplateCreateView, TemplateDeleteView,
+    MediaItemListView, MediaItemUploadView, MediaItemDetailView, MediaItemStatsView
 )
 
 urlpatterns = [
@@ -69,4 +70,10 @@ urlpatterns = [
     # Template Management
     path('templates/create/', TemplateCreateView.as_view(), name='template-create'),
     path('templates/<int:template_id>/delete/', TemplateDeleteView.as_view(), name='template-delete'),
+    
+    # Media Management
+    path('media/', MediaItemListView.as_view(), name='media-list'),
+    path('media/upload/', MediaItemUploadView.as_view(), name='media-upload'),
+    path('media/<int:media_id>/', MediaItemDetailView.as_view(), name='media-detail'),
+    path('media/stats/', MediaItemStatsView.as_view(), name='media-stats'),
 ]

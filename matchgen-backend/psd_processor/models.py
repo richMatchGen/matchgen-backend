@@ -67,7 +67,6 @@ class PSDLayer(models.Model):
     font_color = models.CharField(max_length=20, blank=True, null=True, help_text="Font color in hex format")
     font_weight = models.CharField(max_length=20, blank=True, null=True, help_text="Font weight (normal, bold, etc.)")
     max_width = models.IntegerField(null=True, blank=True, help_text="Maximum width for text wrapping")
-    text_content = models.TextField(blank=True, null=True, help_text="Original text content of the layer")
     
     # New fields for integration with Graphic Packs
     graphic_pack = models.ForeignKey(GraphicPack, on_delete=models.CASCADE, null=True, blank=True, help_text="Associated graphic pack")

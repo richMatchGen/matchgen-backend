@@ -210,13 +210,10 @@ class PSDUploadView(APIView):
                         font_family = None
                         font_color = None
                         font_weight = None
-                        text_content = None
                         
                         # Check if this is a text layer and extract font information
                         if hasattr(layer, 'text') and layer.text:
                             try:
-                                # Extract text content
-                                text_content = str(layer.text)
                                 
                                 # Try to get font information from text engine data
                                 if hasattr(layer, 'engine_data') and layer.engine_data:
@@ -251,7 +248,7 @@ class PSDUploadView(APIView):
                                 logger.warning(f"Could not extract font information for layer {layer_name}: {str(e)}")
                         
                         # Set max_width to layer width for text wrapping
-                        max_width = width if text_content else None
+                        max_width = width if hasattr(layer, 'text') and layer.text else None
                         
                         # Calculate multiple anchor positions for text elements
                         left_x = x  # Top-left X position
@@ -320,8 +317,7 @@ class PSDUploadView(APIView):
                             'font_family': font_family,
                             'font_color': font_color,
                             'font_weight': font_weight,
-                            'max_width': max_width,
-                            'text_content': text_content
+                            'max_width': max_width
                         }
                         layers_data.append(layer_data)
                         logger.info(f"Successfully extracted layer: {full_layer_name} at ({x}, {y}) - {width}x{height}, center=({center_x:.1f}, {center_y:.1f})")

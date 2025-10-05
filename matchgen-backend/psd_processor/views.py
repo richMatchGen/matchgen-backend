@@ -212,7 +212,12 @@ class PSDUploadView(APIView):
                         font_weight = None
                         
                         # Check if this is a text layer and extract font information
-                        if hasattr(layer, 'text') and layer.text:
+                        is_text_layer = (
+                            hasattr(layer, 'kind') and layer.kind == 'type' or
+                            hasattr(layer, 'text') and layer.text
+                        )
+                        
+                        if is_text_layer:
                             # Debug: log available attributes for text layers
                             logger.info(f"Processing text layer: {layer_name}")
                             logger.debug(f"Text layer {layer_name} attributes: {[attr for attr in dir(layer) if not attr.startswith('_')]}")
@@ -222,50 +227,83 @@ class PSDUploadView(APIView):
                             
                             try:
                                 
-                                # Try to get font information from text engine data
-                                if hasattr(layer, 'engine_data') and layer.engine_data:
+                                # Try to get font information from text engine data using engine_dict
+                                if hasattr(layer, 'engine_dict') and layer.engine_dict:
+                                    engine_dict = layer.engine_dict
+                                    logger.info(f"Engine dict available: {type(engine_dict)}")
+                                    logger.debug(f"Engine dict keys: {list(engine_dict.keys()) if isinstance(engine_dict, dict) else 'Not a dict'}")
+                                    
+                                    try:
+                                        # Navigate through the proper structure: StyleRun -> RunArray -> StyleSheet -> StyleSheetData
+                                        if 'StyleRun' in engine_dict and 'RunArray' in engine_dict['StyleRun']:
+                                            run_array = engine_dict['StyleRun']['RunArray']
+                                            if run_array and len(run_array) > 0:
+                                                style_sheet_data = run_array[0].get('StyleSheet', {}).get('StyleSheetData', {})
+                                                
+                                                # Extract font size
+                                                if 'FontSize' in style_sheet_data:
+                                                    font_size = float(style_sheet_data['FontSize'])
+                                                    logger.info(f"Extracted font size from StyleSheetData: {font_size}")
+                                                
+                                                # Extract font family
+                                                if 'FontName' in style_sheet_data:
+                                                    font_family = str(style_sheet_data['FontName'])
+                                                    logger.info(f"Extracted font family from StyleSheetData: {font_family}")
+                                                
+                                                # Extract font weight/style
+                                                if 'FontStyleName' in style_sheet_data:
+                                                    font_weight = str(style_sheet_data['FontStyleName'])
+                                                    logger.info(f"Extracted font weight from StyleSheetData: {font_weight}")
+                                                
+                                                # Extract font color
+                                                if 'FillColor' in style_sheet_data:
+                                                    fill_color = style_sheet_data['FillColor']
+                                                    if 'Values' in fill_color and fill_color['Values']:
+                                                        values = fill_color['Values']
+                                                        if len(values) >= 3:
+                                                            # Convert RGB values to hex
+                                                            r = int(values[0] * 255) if values[0] is not None else 255
+                                                            g = int(values[1] * 255) if values[1] is not None else 255
+                                                            b = int(values[2] * 255) if values[2] is not None else 255
+                                                            font_color = f"#{r:02x}{g:02x}{b:02x}"
+                                                            logger.info(f"Extracted font color from StyleSheetData: {font_color}")
+                                    
+                                    except (KeyError, IndexError, TypeError) as e:
+                                        logger.warning(f"Could not parse engine_dict structure for layer {layer_name}: {str(e)}")
+                                
+                                # Try alternative method using engine_data if engine_dict didn't work
+                                elif hasattr(layer, 'engine_data') and layer.engine_data:
                                     engine_data = layer.engine_data
                                     logger.debug(f"Engine data available: {type(engine_data)}")
                                     
-                                    # Extract font size
-                                    if hasattr(engine_data, 'StyleRun') and engine_data.StyleRun:
-                                        style_run = engine_data.StyleRun[0] if engine_data.StyleRun else None
-                                        if style_run and hasattr(style_run, 'StyleSheet') and style_run.StyleSheet:
-                                            style_sheet = style_run.StyleSheet
-                                            if hasattr(style_sheet, 'FontSize'):
-                                                font_size = float(style_sheet.FontSize)
-                                                logger.info(f"Extracted font size from StyleSheet: {font_size}")
-                                            
-                                            # Extract font family
-                                            if hasattr(style_sheet, 'FontName'):
-                                                font_family = str(style_sheet.FontName)
-                                                logger.info(f"Extracted font family from StyleSheet: {font_family}")
-                                            
-                                            # Extract font weight
-                                            if hasattr(style_sheet, 'FontStyleName'):
-                                                font_weight = str(style_sheet.FontStyleName)
-                                                logger.info(f"Extracted font weight from StyleSheet: {font_weight}")
-                                            
-                                            # Extract font color
-                                            if hasattr(style_sheet, 'FillColor') and style_sheet.FillColor:
-                                                color = style_sheet.FillColor
-                                                if hasattr(color, 'Values') and color.Values:
-                                                    # Convert RGB values to hex
-                                                    r = int(color.Values[0] * 255) if len(color.Values) > 0 else 255
-                                                    g = int(color.Values[1] * 255) if len(color.Values) > 1 else 255
-                                                    b = int(color.Values[2] * 255) if len(color.Values) > 2 else 255
-                                                    font_color = f"#{r:02x}{g:02x}{b:02x}"
-                                                    logger.info(f"Extracted font color from StyleSheet: {font_color}")
-                                    
-                                    # Try alternative engine data structure
-                                    if not font_size and hasattr(engine_data, 'text') and engine_data.text:
-                                        text_data = engine_data.text
-                                        if hasattr(text_data, 'font_size'):
-                                            font_size = float(text_data.font_size)
-                                            logger.info(f"Extracted font size from text data: {font_size}")
-                                        if hasattr(text_data, 'font_family'):
-                                            font_family = str(text_data.font_family)
-                                            logger.info(f"Extracted font family from text data: {font_family}")
+                                    # Try to access the same structure through engine_data
+                                    try:
+                                        if hasattr(engine_data, 'StyleRun') and engine_data.StyleRun:
+                                            style_run = engine_data.StyleRun[0] if engine_data.StyleRun else None
+                                            if style_run and hasattr(style_run, 'StyleSheet') and style_run.StyleSheet:
+                                                style_sheet = style_run.StyleSheet
+                                                if hasattr(style_sheet, 'FontSize'):
+                                                    font_size = float(style_sheet.FontSize)
+                                                    logger.info(f"Extracted font size from StyleSheet: {font_size}")
+                                                
+                                                if hasattr(style_sheet, 'FontName'):
+                                                    font_family = str(style_sheet.FontName)
+                                                    logger.info(f"Extracted font family from StyleSheet: {font_family}")
+                                                
+                                                if hasattr(style_sheet, 'FontStyleName'):
+                                                    font_weight = str(style_sheet.FontStyleName)
+                                                    logger.info(f"Extracted font weight from StyleSheet: {font_weight}")
+                                                
+                                                if hasattr(style_sheet, 'FillColor') and style_sheet.FillColor:
+                                                    color = style_sheet.FillColor
+                                                    if hasattr(color, 'Values') and color.Values:
+                                                        r = int(color.Values[0] * 255) if len(color.Values) > 0 else 255
+                                                        g = int(color.Values[1] * 255) if len(color.Values) > 1 else 255
+                                                        b = int(color.Values[2] * 255) if len(color.Values) > 2 else 255
+                                                        font_color = f"#{r:02x}{g:02x}{b:02x}"
+                                                        logger.info(f"Extracted font color from StyleSheet: {font_color}")
+                                    except Exception as e:
+                                        logger.warning(f"Could not parse engine_data structure for layer {layer_name}: {str(e)}")
                                 
                                 # Try alternative methods for font extraction
                                 if not font_size and hasattr(layer, 'font_size'):

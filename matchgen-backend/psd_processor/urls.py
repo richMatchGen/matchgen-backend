@@ -10,6 +10,7 @@ urlpatterns = [
     path('documents/<int:document_id>/layers/', views.PSDLayerListView.as_view(), name='psd_layer_list'),
     path('documents/<int:document_id>/delete/', views.delete_psd_document, name='psd_document_delete'),
     path('process-layers/', views.PSDLayerProcessView.as_view(), name='psd_layer_process'),
+    path('debug-font-extraction/<int:document_id>/', views.DebugFontExtractionView.as_view(), name='debug_font_extraction'),
 ]
 
 

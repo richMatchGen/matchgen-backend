@@ -213,6 +213,8 @@ class PSDUploadView(APIView):
                         
                         # Check if this is a text layer and extract font information
                         if hasattr(layer, 'text') and layer.text:
+                            # Debug: log available attributes for text layers
+                            logger.debug(f"Text layer {layer_name} attributes: {[attr for attr in dir(layer) if not attr.startswith('_')]}")
                             try:
                                 
                                 # Try to get font information from text engine data
@@ -234,6 +236,16 @@ class PSDUploadView(APIView):
                                             # Extract font weight
                                             if hasattr(style_sheet, 'FontStyleName'):
                                                 font_weight = str(style_sheet.FontStyleName)
+                                            
+                                            # Extract font color
+                                            if hasattr(style_sheet, 'FillColor') and style_sheet.FillColor:
+                                                color = style_sheet.FillColor
+                                                if hasattr(color, 'Values') and color.Values:
+                                                    # Convert RGB values to hex
+                                                    r = int(color.Values[0] * 255) if len(color.Values) > 0 else 255
+                                                    g = int(color.Values[1] * 255) if len(color.Values) > 1 else 255
+                                                    b = int(color.Values[2] * 255) if len(color.Values) > 2 else 255
+                                                    font_color = f"#{r:02x}{g:02x}{b:02x}"
                                 
                                 # Try alternative methods for font extraction
                                 if not font_size and hasattr(layer, 'font_size'):
@@ -242,7 +254,20 @@ class PSDUploadView(APIView):
                                 if not font_family and hasattr(layer, 'font_family'):
                                     font_family = str(layer.font_family)
                                 
-                                logger.debug(f"Extracted font info for {layer_name}: size={font_size}, family={font_family}, weight={font_weight}")
+                                if not font_color and hasattr(layer, 'color'):
+                                    color = layer.color
+                                    if hasattr(color, 'rgb') and color.rgb:
+                                        r, g, b = color.rgb
+                                        font_color = f"#{r:02x}{g:02x}{b:02x}"
+                                
+                                # Try to get font info from layer attributes directly
+                                if not font_size and hasattr(layer, 'size'):
+                                    font_size = float(layer.size)
+                                
+                                if not font_family and hasattr(layer, 'font'):
+                                    font_family = str(layer.font)
+                                
+                                logger.info(f"Extracted font info for {layer_name}: size={font_size}, family={font_family}, color={font_color}, weight={font_weight}")
                                 
                             except Exception as e:
                                 logger.warning(f"Could not extract font information for layer {layer_name}: {str(e)}")
@@ -651,9 +676,9 @@ class PSDLayerProcessView(APIView):
                     'center_center_y': center_center_y,  # Center-center position for center alignment
                     'center_right_x': center_right_x,  # Center-right position for right alignment
                     'center_right_y': center_right_y,  # Center-right position for right alignment
-                    'font_size': layer.font_size if layer.font_size else 48,
-                    'font_family': layer.font_family if layer.font_family else 'Montserrat',
-                    'font_color': layer.font_color if layer.font_color else '#FFFFFF',
+                    'font_size': layer.font_size if layer.font_size else 24,  # More reasonable default
+                    'font_family': layer.font_family if layer.font_family else 'Arial',  # More common default
+                    'font_color': layer.font_color if layer.font_color else '#000000',  # Black default instead of white
                     'alignment': alignment,
                     'text_alignment': 'center',  # Default to center text alignment
                     'position_anchor': 'top',  # Default to top anchor
@@ -812,3 +837,49 @@ class PSDLayerProcessView(APIView):
                 {'error': f'Failed to process layers: {str(e)}'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class DebugFontExtractionView(APIView):
+    """Debug endpoint to test font extraction from PSD layers."""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request, document_id):
+        try:
+            # Get the PSD document
+            try:
+                document = PSDDocument.objects.get(id=document_id, user=request.user)
+            except PSDDocument.DoesNotExist:
+                return Response({
+                    'error': 'PSD document not found'
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get all layers with font information
+            layers = document.layers.all()
+            font_data = []
+            
+            for layer in layers:
+                layer_info = {
+                    'name': layer.name,
+                    'layer_type': layer.layer_type,
+                    'font_size': layer.font_size,
+                    'font_family': layer.font_family,
+                    'font_color': layer.font_color,
+                    'font_weight': layer.font_weight,
+                    'max_width': layer.max_width,
+                    'width': layer.width,
+                    'height': layer.height
+                }
+                font_data.append(layer_info)
+            
+            return Response({
+                'document_id': document_id,
+                'document_title': document.title,
+                'layers_count': len(font_data),
+                'layers': font_data
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error in font extraction debug: {str(e)}", exc_info=True)
+            return Response({
+                "error": "An error occurred while debugging font extraction."
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

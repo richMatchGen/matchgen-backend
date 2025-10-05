@@ -642,6 +642,9 @@ class PSDLayerProcessView(APIView):
                     status=status.HTTP_400_BAD_REQUEST
                 )
             
+            # Log the processing request for debugging
+            logger.info(f"PSD Layer Processing Request: document_id={document_id}, graphic_pack_id={graphic_pack_id}, content_type={content_type}, layer_names={layer_names}")
+            
             # Get the PSD document
             try:
                 document = PSDDocument.objects.get(id=document_id, user=request.user)
@@ -787,11 +790,14 @@ class PSDLayerProcessView(APIView):
                     logger.info(f"Set opponent_logo away position to opponent's position ({position_x}, {position_y})")
                 
                 # Create the TextElement (handle unique constraint)
+                logger.info(f"Attempting to create TextElement for {layer.name} with content_type={content_type}, graphic_pack={graphic_pack.id}")
                 try:
                     text_element = TextElement.objects.create(**text_element_data)
                     created_text_elements.append(text_element)
+                    logger.info(f"Successfully created TextElement for {layer.name} with ID {text_element.id}")
                 except Exception as e:
                     logger.warning(f"Failed to create TextElement for layer {layer.name}: {str(e)}")
+                    logger.warning(f"TextElement data: {text_element_data}")
                     # Try to get existing element or create with unique name
                     try:
                         # Check if element already exists
@@ -911,6 +917,69 @@ class PSDLayerProcessView(APIView):
                 {'error': f'Failed to process layers: {str(e)}'}, 
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
+
+
+class DebugTextElementCreationView(APIView):
+    """Debug endpoint to test TextElement creation for upcomingFixture content type."""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """Debug TextElement creation for upcomingFixture."""
+        try:
+            # Get user's club
+            try:
+                from graphicpack.models import Club
+                club = Club.objects.get(user=request.user)
+            except Club.DoesNotExist:
+                return Response({
+                    "error": "No club found for this user"
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get the club's selected graphic pack
+            pack = club.selected_pack
+            if not pack:
+                return Response({
+                    "error": "No graphic pack selected for this club"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check existing TextElements for upcomingFixture
+            existing_elements = TextElement.objects.filter(
+                graphic_pack=pack,
+                content_type='upcomingFixture'
+            )
+            
+            # Check if there are any PSD documents for this user
+            psd_documents = PSDDocument.objects.filter(user=request.user)
+            
+            return Response({
+                "club_name": club.name,
+                "pack_name": pack.name,
+                "pack_id": pack.id,
+                "existing_upcomingFixture_elements": [
+                    {
+                        "id": elem.id,
+                        "element_name": elem.element_name,
+                        "element_type": elem.element_type,
+                        "position_x": elem.position_x,
+                        "position_y": elem.position_y
+                    } for elem in existing_elements
+                ],
+                "total_upcomingFixture_elements": existing_elements.count(),
+                "psd_documents": [
+                    {
+                        "id": doc.id,
+                        "title": doc.title,
+                        "layers_count": doc.layers.count()
+                    } for doc in psd_documents
+                ],
+                "total_psd_documents": psd_documents.count()
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error in debug endpoint: {str(e)}", exc_info=True)
+            return Response({
+                "error": f"Debug error: {str(e)}"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class DebugFontExtractionView(APIView):

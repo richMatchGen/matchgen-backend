@@ -939,6 +939,20 @@ class SocialMediaPostGenerator(APIView):
             
             logger.info(f"Starting XI data: {len(starting_lineup)} starters, {len(substitutes)} substitutes")
         
+        # Handle goal data from request
+        if post_type == 'goal' and request:
+            # Get goal data from request
+            goal_scorer = request.data.get('goal_scorer', 'Player Name')
+            goal_minute = request.data.get('goal_minute', 'Minute')
+            
+            # Update fixture data with goal values
+            fixture_data.update({
+                "player_name": goal_scorer,
+                "goal_minute": goal_minute
+            })
+            
+            logger.info(f"Goal data: scorer={goal_scorer}, minute={goal_minute}")
+        
         # Create a copy of the template image to work with
         base_image = template_image.copy()
         
@@ -2884,9 +2898,169 @@ class TemplatesByPackView(APIView):
                 return Response({
                     "error": f"Error fetching templates: {str(e)}"
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AddPlayerNameElementView(APIView):
+    """Add player_name text element to user's selected graphic pack."""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        try:
+            # Get user's club
+            try:
+                club = Club.objects.get(user=request.user)
+            except Club.DoesNotExist:
+                return Response({
+                    "error": "No club found for this user"
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get the club's selected graphic pack
+            pack = club.selected_pack
+            if not pack:
+                return Response({
+                    "error": "No graphic pack selected for this club"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if player_name element already exists
+            existing_element = TextElement.objects.filter(
+                graphic_pack=pack,
+                content_type='goal',
+                element_name='player_name'
+            ).first()
+            
+            if existing_element:
+                return Response({
+                    "message": "Player name element already exists",
+                    "element_id": existing_element.id,
+                    "element_details": {
+                        "id": existing_element.id,
+                        "element_type": existing_element.element_type,
+                        "element_name": existing_element.element_name,
+                        "position_x": existing_element.position_x,
+                        "position_y": existing_element.position_y,
+                        "font_size": existing_element.font_size,
+                        "font_family": existing_element.font_family,
+                        "font_color": existing_element.font_color
+                    }
+                }, status=status.HTTP_200_OK)
+            
+            # Create the player_name text element
+            element = TextElement.objects.create(
+                graphic_pack=pack,
+                content_type='goal',
+                element_name='player_name',
+                element_type='text',
+                position_x=400,  # Center of image
+                position_y=300,  # Adjust as needed
+                font_size=24,
+                font_family='Arial',
+                font_color='#FFFFFF',
+                alignment='center'
+            )
+            
+            logger.info(f"Created player_name element: {element.id} for pack {pack.name}")
+            
+            return Response({
+                "message": "Player name element created successfully",
+                "element_id": element.id,
+                "pack_name": pack.name,
+                "element_details": {
+                    "id": element.id,
+                    "element_type": element.element_type,
+                    "element_name": element.element_name,
+                    "position_x": element.position_x,
+                    "position_y": element.position_y,
+                    "font_size": element.font_size,
+                    "font_family": element.font_family,
+                    "font_color": element.font_color
+                }
+            }, status=status.HTTP_201_CREATED)
             
         except Exception as e:
-            logger.error(f"Error in TemplatesByPackView: {str(e)}", exc_info=True)
+            logger.error(f"Error creating player_name element: {str(e)}", exc_info=True)
             return Response({
-                "error": "An error occurred while retrieving templates."
+                "error": "An error occurred while creating the player name element."
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class AddVenueElementView(APIView):
+    """Add venue text element to user's selected graphic pack."""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        try:
+            # Get user's club
+            try:
+                club = Club.objects.get(user=request.user)
+            except Club.DoesNotExist:
+                return Response({
+                    "error": "No club found for this user"
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Get the club's selected graphic pack
+            pack = club.selected_pack
+            if not pack:
+                return Response({
+                    "error": "No graphic pack selected for this club"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Check if venue element already exists
+            existing_element = TextElement.objects.filter(
+                graphic_pack=pack,
+                content_type='matchday',
+                element_name='venue'
+            ).first()
+            
+            if existing_element:
+                return Response({
+                    "message": "Venue element already exists",
+                    "element_id": existing_element.id,
+                    "element_details": {
+                        "id": existing_element.id,
+                        "element_type": existing_element.element_type,
+                        "element_name": existing_element.element_name,
+                        "position_x": existing_element.position_x,
+                        "position_y": existing_element.position_y,
+                        "font_size": existing_element.font_size,
+                        "font_family": existing_element.font_family,
+                        "font_color": existing_element.font_color
+                    }
+                }, status=status.HTTP_200_OK)
+            
+            # Create the venue text element
+            element = TextElement.objects.create(
+                graphic_pack=pack,
+                content_type='matchday',
+                element_name='venue',
+                element_type='text',
+                position_x=400,  # Center of image
+                position_y=400,  # Adjust as needed
+                font_size=20,
+                font_family='Arial',
+                font_color='#FFFFFF',
+                alignment='center'
+            )
+            
+            logger.info(f"Created venue element: {element.id} for pack {pack.name}")
+            
+            return Response({
+                "message": "Venue element created successfully",
+                "element_id": element.id,
+                "pack_name": pack.name,
+                "element_details": {
+                    "id": element.id,
+                    "element_type": element.element_type,
+                    "element_name": element.element_name,
+                    "position_x": element.position_x,
+                    "position_y": element.position_y,
+                    "font_size": element.font_size,
+                    "font_family": element.font_family,
+                    "font_color": element.font_color
+                }
+            }, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            logger.error(f"Error creating venue element: {str(e)}", exc_info=True)
+            return Response({
+                "error": "An error occurred while creating the venue element."
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

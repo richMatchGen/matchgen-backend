@@ -18,8 +18,8 @@ from .views import (
     TemplateDebugView,
     TextElementListView, TextElementCreateView, TextElementUpdateView, 
     TextElementDeleteView, TextElementByGraphicPackView, AddOpponentLogoElementView,
-    AddClubLogoElementView, DebugOpponentLogoView, TemplatesByPackView,
-    TemplateCreateView, TemplateDeleteView
+    AddClubLogoElementView, AddPlayerNameElementView, AddVenueElementView,
+    DebugOpponentLogoView, TemplatesByPackView, TemplateCreateView, TemplateDeleteView
 )
 
 urlpatterns = [
@@ -58,6 +58,8 @@ urlpatterns = [
     path('text-elements/<int:graphic_pack_id>/<str:content_type>/', TextElementByGraphicPackView.as_view(), name='text-element-by-pack'),
     path('add-opponent-logo-element/', AddOpponentLogoElementView.as_view(), name='add-opponent-logo-element'),
     path('add-club-logo-element/', AddClubLogoElementView.as_view(), name='add-club-logo-element'),
+    path('add-player-name-element/', AddPlayerNameElementView.as_view(), name='add-player-name-element'),
+    path('add-venue-element/', AddVenueElementView.as_view(), name='add-venue-element'),
     path('debug-opponent-logo/', DebugOpponentLogoView.as_view(), name='debug-opponent-logo'),
     path('templates/<int:pack_id>/', TemplatesByPackView.as_view(), name='templates-by-pack'),
     

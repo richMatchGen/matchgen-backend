@@ -214,12 +214,18 @@ class PSDUploadView(APIView):
                         # Check if this is a text layer and extract font information
                         if hasattr(layer, 'text') and layer.text:
                             # Debug: log available attributes for text layers
+                            logger.info(f"Processing text layer: {layer_name}")
                             logger.debug(f"Text layer {layer_name} attributes: {[attr for attr in dir(layer) if not attr.startswith('_')]}")
+                            
+                            # Log the actual text content for debugging
+                            logger.info(f"Text content: '{layer.text}'")
+                            
                             try:
                                 
                                 # Try to get font information from text engine data
                                 if hasattr(layer, 'engine_data') and layer.engine_data:
                                     engine_data = layer.engine_data
+                                    logger.debug(f"Engine data available: {type(engine_data)}")
                                     
                                     # Extract font size
                                     if hasattr(engine_data, 'StyleRun') and engine_data.StyleRun:
@@ -228,14 +234,17 @@ class PSDUploadView(APIView):
                                             style_sheet = style_run.StyleSheet
                                             if hasattr(style_sheet, 'FontSize'):
                                                 font_size = float(style_sheet.FontSize)
+                                                logger.info(f"Extracted font size from StyleSheet: {font_size}")
                                             
                                             # Extract font family
                                             if hasattr(style_sheet, 'FontName'):
                                                 font_family = str(style_sheet.FontName)
+                                                logger.info(f"Extracted font family from StyleSheet: {font_family}")
                                             
                                             # Extract font weight
                                             if hasattr(style_sheet, 'FontStyleName'):
                                                 font_weight = str(style_sheet.FontStyleName)
+                                                logger.info(f"Extracted font weight from StyleSheet: {font_weight}")
                                             
                                             # Extract font color
                                             if hasattr(style_sheet, 'FillColor') and style_sheet.FillColor:
@@ -246,6 +255,17 @@ class PSDUploadView(APIView):
                                                     g = int(color.Values[1] * 255) if len(color.Values) > 1 else 255
                                                     b = int(color.Values[2] * 255) if len(color.Values) > 2 else 255
                                                     font_color = f"#{r:02x}{g:02x}{b:02x}"
+                                                    logger.info(f"Extracted font color from StyleSheet: {font_color}")
+                                    
+                                    # Try alternative engine data structure
+                                    if not font_size and hasattr(engine_data, 'text') and engine_data.text:
+                                        text_data = engine_data.text
+                                        if hasattr(text_data, 'font_size'):
+                                            font_size = float(text_data.font_size)
+                                            logger.info(f"Extracted font size from text data: {font_size}")
+                                        if hasattr(text_data, 'font_family'):
+                                            font_family = str(text_data.font_family)
+                                            logger.info(f"Extracted font family from text data: {font_family}")
                                 
                                 # Try alternative methods for font extraction
                                 if not font_size and hasattr(layer, 'font_size'):
@@ -263,11 +283,27 @@ class PSDUploadView(APIView):
                                 # Try to get font info from layer attributes directly
                                 if not font_size and hasattr(layer, 'size'):
                                     font_size = float(layer.size)
+                                    logger.info(f"Extracted font size from layer.size: {font_size}")
                                 
                                 if not font_family and hasattr(layer, 'font'):
                                     font_family = str(layer.font)
+                                    logger.info(f"Extracted font family from layer.font: {font_family}")
                                 
-                                logger.info(f"Extracted font info for {layer_name}: size={font_size}, family={font_family}, color={font_color}, weight={font_weight}")
+                                # Fallback: estimate font size from layer height
+                                if not font_size and height > 0:
+                                    # Estimate font size as 70% of layer height (common ratio)
+                                    font_size = int(height * 0.7)
+                                    logger.info(f"Estimated font size from layer height: {font_size}")
+                                
+                                # Fallback: estimate font size from layer width and text length
+                                if not font_size and hasattr(layer, 'text') and layer.text and width > 0:
+                                    text_length = len(str(layer.text))
+                                    if text_length > 0:
+                                        # Rough estimation: width / text_length * 1.2
+                                        font_size = int((width / text_length) * 1.2)
+                                        logger.info(f"Estimated font size from text length: {font_size}")
+                                
+                                logger.info(f"Final extracted font info for {layer_name}: size={font_size}, family={font_family}, color={font_color}, weight={font_weight}")
                                 
                             except Exception as e:
                                 logger.warning(f"Could not extract font information for layer {layer_name}: {str(e)}")

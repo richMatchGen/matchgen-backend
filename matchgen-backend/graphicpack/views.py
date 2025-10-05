@@ -760,25 +760,34 @@ class SocialMediaPostGenerator(APIView):
             logger.info(f"Club selected pack: {pack.name} (ID: {pack.id})")
             logger.info(f"Found match: {match.opponent} vs {match.club.name}")
             
-            # Get the template for this post type
+            # Get the template for this post type (case-insensitive lookup)
             logger.info(f"Looking for template with graphic_pack={pack.id} and content_type='{post_type}'")
             try:
+                # Try exact match first
                 template = Template.objects.get(
                     graphic_pack=pack,
                     content_type=post_type
                 )
-                logger.info(f"Found {post_type} template: {template.id}")
+                logger.info(f"Found {post_type} template (exact match): {template.id}")
             except Template.DoesNotExist:
-                # Check what templates exist for this pack
-                existing_templates = Template.objects.filter(graphic_pack=pack)
-                existing_content_types = [t.content_type for t in existing_templates]
-                logger.error(f"No {post_type} template found. Available templates for pack {pack.id}: {existing_content_types}")
-                return Response({
-                    "error": f"No {post_type} template found in selected graphic pack",
-                    "available_templates": existing_content_types,
-                    "graphic_pack_id": pack.id,
-                    "graphic_pack_name": pack.name
-                }, status=status.HTTP_404_NOT_FOUND)
+                # Try case-insensitive lookup
+                try:
+                    template = Template.objects.get(
+                        graphic_pack=pack,
+                        content_type__iexact=post_type
+                    )
+                    logger.info(f"Found {post_type} template (case-insensitive match): {template.id}")
+                except Template.DoesNotExist:
+                    # Check what templates exist for this pack
+                    existing_templates = Template.objects.filter(graphic_pack=pack)
+                    existing_content_types = [t.content_type for t in existing_templates]
+                    logger.error(f"No {post_type} template found (exact or case-insensitive). Available templates for pack {pack.id}: {existing_content_types}")
+                    return Response({
+                        "error": f"No {post_type} template found in selected graphic pack",
+                        "available_templates": existing_content_types,
+                        "graphic_pack_id": pack.id,
+                        "graphic_pack_name": pack.name
+                    }, status=status.HTTP_404_NOT_FOUND)
             
             logger.info(f"Starting {post_type} post generation...")
             logger.info(f"=== {post_type.upper()} POST GENERATION STARTED ===")

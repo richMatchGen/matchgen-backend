@@ -205,6 +205,54 @@ class PSDUploadView(APIView):
                         if isinstance(opacity, (int, float)) and opacity <= 1.0:
                             opacity = opacity * 100
                         
+                        # Extract font properties for text layers
+                        font_size = None
+                        font_family = None
+                        font_color = None
+                        font_weight = None
+                        text_content = None
+                        
+                        # Check if this is a text layer and extract font information
+                        if hasattr(layer, 'text') and layer.text:
+                            try:
+                                # Extract text content
+                                text_content = str(layer.text)
+                                
+                                # Try to get font information from text engine data
+                                if hasattr(layer, 'engine_data') and layer.engine_data:
+                                    engine_data = layer.engine_data
+                                    
+                                    # Extract font size
+                                    if hasattr(engine_data, 'StyleRun') and engine_data.StyleRun:
+                                        style_run = engine_data.StyleRun[0] if engine_data.StyleRun else None
+                                        if style_run and hasattr(style_run, 'StyleSheet') and style_run.StyleSheet:
+                                            style_sheet = style_run.StyleSheet
+                                            if hasattr(style_sheet, 'FontSize'):
+                                                font_size = float(style_sheet.FontSize)
+                                            
+                                            # Extract font family
+                                            if hasattr(style_sheet, 'FontName'):
+                                                font_family = str(style_sheet.FontName)
+                                            
+                                            # Extract font weight
+                                            if hasattr(style_sheet, 'FontStyleName'):
+                                                font_weight = str(style_sheet.FontStyleName)
+                                
+                                # Try alternative methods for font extraction
+                                if not font_size and hasattr(layer, 'font_size'):
+                                    font_size = float(layer.font_size)
+                                
+                                if not font_family and hasattr(layer, 'font_family'):
+                                    font_family = str(layer.font_family)
+                                
+                                logger.debug(f"Extracted font info for {layer_name}: size={font_size}, family={font_family}, weight={font_weight}")
+                                
+                            except Exception as e:
+                                logger.warning(f"Could not extract font information for layer {layer_name}: {str(e)}")
+                        
+                        # Set max_width to layer width for text wrapping
+                        max_width = width if text_content else None
+                        
                         # Calculate multiple anchor positions for text elements
                         left_x = x  # Top-left X position
                         left_y = y  # Top-left Y position
@@ -267,7 +315,13 @@ class PSDUploadView(APIView):
                             'center_right_y': center_right_y,
                             'visible': bool(visible),
                             'opacity': float(opacity),
-                            'layer_type': 'group' if hasattr(layer, 'layers') and layer.layers else 'layer'
+                            'layer_type': 'group' if hasattr(layer, 'layers') and layer.layers else 'layer',
+                            'font_size': font_size,
+                            'font_family': font_family,
+                            'font_color': font_color,
+                            'font_weight': font_weight,
+                            'max_width': max_width,
+                            'text_content': text_content
                         }
                         layers_data.append(layer_data)
                         logger.info(f"Successfully extracted layer: {full_layer_name} at ({x}, {y}) - {width}x{height}, center=({center_x:.1f}, {center_y:.1f})")
@@ -601,13 +655,13 @@ class PSDLayerProcessView(APIView):
                     'center_center_y': center_center_y,  # Center-center position for center alignment
                     'center_right_x': center_right_x,  # Center-right position for right alignment
                     'center_right_y': center_right_y,  # Center-right position for right alignment
-                    'font_size': 48,
-                    'font_family': 'Montserrat',
-                    'font_color': '#FFFFFF',
+                    'font_size': layer.font_size if layer.font_size else 48,
+                    'font_family': layer.font_family if layer.font_family else 'Montserrat',
+                    'font_color': layer.font_color if layer.font_color else '#FFFFFF',
                     'alignment': alignment,
                     'text_alignment': 'center',  # Default to center text alignment
                     'position_anchor': 'top',  # Default to top anchor
-                    'font_weight': 'normal',
+                    'font_weight': layer.font_weight if layer.font_weight else 'normal',
                     'maintain_aspect_ratio': True,
                     'image_color_tint': '#FFFFFF'
                 }

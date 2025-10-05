@@ -9,7 +9,7 @@ class PSDLayerSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = PSDLayer
-        fields = ['id', 'name', 'x', 'y', 'width', 'height', 'center_x', 'center_y', 'left_x', 'left_y', 'right_x', 'right_y', 'top_left_x', 'top_left_y', 'top_center_x', 'top_center_y', 'top_right_x', 'top_right_y', 'bottom_left_x', 'bottom_left_y', 'bottom_center_x', 'bottom_center_y', 'bottom_right_x', 'bottom_right_y', 'center_left_x', 'center_left_y', 'center_center_x', 'center_center_y', 'center_right_x', 'center_right_y', 'visible', 'opacity', 'layer_type', 'bounding_box', 'center_point']
+        fields = ['id', 'name', 'x', 'y', 'width', 'height', 'center_x', 'center_y', 'left_x', 'left_y', 'right_x', 'right_y', 'top_left_x', 'top_left_y', 'top_center_x', 'top_center_y', 'top_right_x', 'top_right_y', 'bottom_left_x', 'bottom_left_y', 'bottom_center_x', 'bottom_center_y', 'bottom_right_x', 'bottom_right_y', 'center_left_x', 'center_left_y', 'center_center_x', 'center_center_y', 'center_right_x', 'center_right_y', 'visible', 'opacity', 'layer_type', 'font_size', 'font_family', 'font_color', 'font_weight', 'max_width', 'text_content', 'bounding_box', 'center_point']
 
 
 class PSDDocumentSerializer(serializers.ModelSerializer):

@@ -232,7 +232,8 @@ def get_font(font_family, font_size):
             "Roboto": "https://res.cloudinary.com/dxoxuyz0j/raw/upload/v1/fonts/Roboto-Regular.ttf",
             "Montserrat": "https://res.cloudinary.com/dxoxuyz0j/raw/upload/v1755936573/Montserrat-BlackItalic_pizq8t.ttf",
             "DejaVuSans": "https://res.cloudinary.com/dxoxuyz0j/raw/upload/v1/fonts/DejaVuSans.ttf",
-            "Dana": "https://res.cloudinary.com/dxoxuyz0j/raw/upload/v1759506430/DANA-REGULAR_neadc4.OTF"
+            "Dana": "https://res.cloudinary.com/dxoxuyz0j/raw/upload/v1759506430/DANA-REGULAR_neadc4.OTF",
+            "Quickly": "https://res.cloudinary.com/dxoxuyz0j/raw/upload/v1759674589/QUICKING-REGULAR_wsvwv0.OTF"
         }
         
         logger.info(f"🎯 Requesting font: {font_family} with size {font_size}")

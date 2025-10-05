@@ -2898,6 +2898,12 @@ class TemplatesByPackView(APIView):
                 return Response({
                     "error": f"Error fetching templates: {str(e)}"
                 }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        
+        except Exception as e:
+            logger.error(f"Error in TemplatesByPackView: {str(e)}", exc_info=True)
+            return Response({
+                "error": "An error occurred while retrieving templates."
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 class AddPlayerNameElementView(APIView):

@@ -761,6 +761,7 @@ class SocialMediaPostGenerator(APIView):
             logger.info(f"Found match: {match.opponent} vs {match.club.name}")
             
             # Get the template for this post type
+            logger.info(f"Looking for template with graphic_pack={pack.id} and content_type='{post_type}'")
             try:
                 template = Template.objects.get(
                     graphic_pack=pack,
@@ -768,8 +769,15 @@ class SocialMediaPostGenerator(APIView):
                 )
                 logger.info(f"Found {post_type} template: {template.id}")
             except Template.DoesNotExist:
+                # Check what templates exist for this pack
+                existing_templates = Template.objects.filter(graphic_pack=pack)
+                existing_content_types = [t.content_type for t in existing_templates]
+                logger.error(f"No {post_type} template found. Available templates for pack {pack.id}: {existing_content_types}")
                 return Response({
-                    "error": f"No {post_type} template found in selected graphic pack"
+                    "error": f"No {post_type} template found in selected graphic pack",
+                    "available_templates": existing_content_types,
+                    "graphic_pack_id": pack.id,
+                    "graphic_pack_name": pack.name
                 }, status=status.HTTP_404_NOT_FOUND)
             
             logger.info(f"Starting {post_type} post generation...")

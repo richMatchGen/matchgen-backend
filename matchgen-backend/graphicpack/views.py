@@ -669,7 +669,19 @@ class SocialMediaPostGenerator(APIView):
     """Generic social media post generator that handles all post types."""
     permission_classes = [IsAuthenticated]
     
+    def get(self, request, post_type='matchday'):
+        """Test endpoint to verify URL is accessible."""
+        return Response({
+            "message": f"SocialMediaPostGenerator endpoint is accessible for post_type: {post_type}",
+            "post_type": post_type,
+            "url": request.path,
+            "method": request.method
+        }, status=status.HTTP_200_OK)
+    
     def post(self, request, post_type='matchday'):
+        logger.info(f"SocialMediaPostGenerator called with post_type: {post_type}")
+        logger.info(f"Request URL: {request.path}")
+        logger.info(f"Request method: {request.method}")
         # Map post types to feature codes
         feature_mapping = {
             'matchday': 'post.matchday',

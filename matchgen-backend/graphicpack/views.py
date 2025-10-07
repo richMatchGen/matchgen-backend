@@ -2402,6 +2402,60 @@ class TextElementDeleteView(APIView):
             )
 
 
+class BulkUpdateTextElementsView(APIView):
+    """Bulk update multiple text elements."""
+    permission_classes = [IsAuthenticated]
+    
+    def post(self, request):
+        try:
+            element_ids = request.data.get('element_ids', [])
+            updates = request.data.get('updates', {})
+            
+            if not element_ids:
+                return Response(
+                    {"error": "No element IDs provided."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            
+            if not updates:
+                return Response(
+                    {"error": "No updates provided."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            
+            # Get the text elements
+            text_elements = TextElement.objects.filter(id__in=element_ids)
+            
+            if not text_elements.exists():
+                return Response(
+                    {"error": "No text elements found with the provided IDs."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+            
+            # Update each element
+            updated_count = 0
+            for element in text_elements:
+                for field, value in updates.items():
+                    if hasattr(element, field):
+                        setattr(element, field, value)
+                element.save()
+                updated_count += 1
+            
+            logger.info(f"Bulk updated {updated_count} text elements with updates: {updates}")
+            
+            return Response({
+                "message": f"Successfully updated {updated_count} text elements.",
+                "updated_count": updated_count
+            }, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error in bulk update: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while updating the text elements."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
 class GraphicPackDeleteView(APIView):
     """Delete a graphic pack and all its templates."""
     permission_classes = [IsAuthenticated]

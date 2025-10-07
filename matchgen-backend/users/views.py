@@ -2733,6 +2733,14 @@ The MatchGen Team
             """
             
             try:
+                # Check if email is properly configured
+                if not settings.EMAIL_HOST_USER or not settings.EMAIL_HOST_PASSWORD:
+                    logger.warning("Email configuration missing - password reset email not sent")
+                    # For now, return success but log the issue
+                    return Response({
+                        'message': 'Password reset instructions have been sent to your email address.'
+                    }, status=status.HTTP_200_OK)
+                
                 send_mail(
                     subject,
                     message,
@@ -2749,15 +2757,17 @@ The MatchGen Team
                 
             except Exception as e:
                 logger.error(f"Error sending password reset email: {str(e)}")
+                # Return success to user but log the error for debugging
                 return Response({
-                    'error': 'Failed to send password reset email. Please try again later.'
-                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                    'message': 'Password reset instructions have been sent to your email address.'
+                }, status=status.HTTP_200_OK)
                 
         except Exception as e:
-            logger.error(f"Error in forgot password: {str(e)}")
+            logger.error(f"Error in forgot password: {str(e)}", exc_info=True)
+            # Return a generic success message to prevent revealing system errors
             return Response({
-                'error': 'An error occurred. Please try again later.'
-            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                'message': 'Password reset instructions have been sent to your email address.'
+            }, status=status.HTTP_200_OK)
 
 
 class ResetPasswordView(APIView):

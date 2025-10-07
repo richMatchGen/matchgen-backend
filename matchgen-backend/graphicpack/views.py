@@ -606,7 +606,9 @@ class MatchdayPostGenerator(APIView):
         """Prepare fixture data for rendering on the template."""
         # Format the date
         if match.date:
-            date_str = match.date.strftime("%A, %d %B %Y")
+            # Extract just the date part and format it
+            date_only = match.date.date()
+            date_str = date_only.strftime("%d/%m/%y")
         else:
             date_str = "Date TBC"
         
@@ -1361,7 +1363,9 @@ class SocialMediaPostGenerator(APIView):
         """Prepare fixture data for text rendering."""
         # Format date
         if match.date:
-            date_str = match.date.strftime("%A, %d %B %Y")
+            # Extract just the date part and format it
+            date_only = match.date.date()
+            date_str = date_only.strftime("%d/%m/%y")
         else:
             date_str = "Date TBC"
         

@@ -2733,23 +2733,65 @@ The MatchGen Team
             """
             
             try:
-                # Check if email is properly configured
-                if not settings.EMAIL_HOST_USER or not settings.EMAIL_HOST_PASSWORD:
-                    logger.warning("Email configuration missing - password reset email not sent")
-                    # For now, return success but log the issue
+                # Check if email settings are configured
+                email_user = getattr(settings, 'EMAIL_HOST_USER', None)
+                email_password = getattr(settings, 'EMAIL_HOST_PASSWORD', None)
+                
+                if not email_user or not email_password:
+                    logger.warning(f"Email settings not configured. Skipping email send for {email}")
+                    logger.info(f"Password reset URL for {email}: {reset_url}")
+                    print(f"\n🔗 PASSWORD RESET LINK FOR {email}:")
+                    print(f"{reset_url}")
+                    print(f"Copy this link and paste it in your browser to reset the password.\n")
                     return Response({
                         'message': 'Password reset instructions have been sent to your email address.'
                     }, status=status.HTTP_200_OK)
                 
-                send_mail(
-                    subject,
-                    message,
-                    settings.EMAIL_HOST_USER,
-                    [email],
-                    fail_silently=False,
-                )
-                
-                logger.info(f"Password reset email sent to {email}")
+                # Try to send email with SendGrid API (same as verification emails)
+                try:
+                    import requests
+                    
+                    # SendGrid API endpoint
+                    sendgrid_url = "https://api.sendgrid.com/v3/mail/send"
+                    
+                    # Prepare email data
+                    email_data = {
+                        "personalizations": [
+                            {
+                                "to": [{"email": email}],
+                                "subject": subject
+                            }
+                        ],
+                        "from": {"email": settings.DEFAULT_FROM_EMAIL},
+                        "content": [
+                            {
+                                "type": "text/plain",
+                                "value": message
+                            }
+                        ]
+                    }
+                    
+                    # Send via SendGrid API
+                    headers = {
+                        "Authorization": f"Bearer {settings.EMAIL_HOST_PASSWORD}",
+                        "Content-Type": "application/json"
+                    }
+                    
+                    response = requests.post(sendgrid_url, json=email_data, headers=headers, timeout=10)
+                    
+                    if response.status_code == 202:
+                        logger.info(f"✅ Password reset email sent successfully to {email}")
+                    else:
+                        logger.error(f"❌ SendGrid API error: {response.status_code} - {response.text}")
+                        raise Exception(f"SendGrid API error: {response.status_code}")
+                        
+                except Exception as email_error:
+                    logger.error(f"❌ Failed to send email to {email}: {str(email_error)}")
+                    # Fallback: log the reset link
+                    logger.info(f"Password reset URL for {email}: {reset_url}")
+                    print(f"\n🔗 PASSWORD RESET LINK FOR {email}:")
+                    print(f"{reset_url}")
+                    print(f"Copy this link and paste it in your browser to reset the password.\n")
                 
                 return Response({
                     'message': 'Password reset instructions have been sent to your email address.'

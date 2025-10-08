@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database for Staging
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: ${STAGING_POSTGRES_DB:-matchgen_staging}
+      POSTGRES_USER: ${STAGING_POSTGRES_USER:-matchgen_staging}
+      POSTGRES_PASSWORD: ${STAGING_POSTGRES_PASSWORD}
+    volumes:
+      - postgres_staging_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"  # Different port to avoid conflicts
+    restart: unless-stopped
+
+  # Redis for caching
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"  # Different port to avoid conflicts
+    restart: unless-stopped
+
+  # Backend Django API
+  backend:
+    build: ./matchgen-backend
+    command: gunicorn --bind 0.0.0.0:8000 --workers 2 --timeout 120 matchgen.wsgi:application
+    volumes:
+      - ./matchgen-backend:/app
+    ports:
+      - "8001:8000"  # Different port to avoid conflicts
+    environment:
+      - DEBUG=0
+      - DATABASE_URL=${STAGING_DATABASE_URL}
+      - REDIS_URL=${STAGING_REDIS_URL}
+      - SECRET_KEY=${STAGING_SECRET_KEY}
+      - ALLOWED_HOSTS=${STAGING_ALLOWED_HOSTS:-staging.matchgen.com,localhost,127.0.0.1}
+      - CORS_ALLOWED_ORIGINS=${STAGING_CORS_ALLOWED_ORIGINS:-http://localhost:3001,https://staging.matchgen.com}
+    depends_on:
+      - db
+      - redis
+    restart: unless-stopped
+
+  # Frontend React App
+  frontend:
+    build: ./matchgen-frontend
+    command: npm run preview -- --host 0.0.0.0 --port 3000
+    volumes:
+      - ./matchgen-frontend:/app
+      - /app/node_modules
+    ports:
+      - "3001:3000"  # Different port to avoid conflicts
+    environment:
+      - VITE_API_URL=${STAGING_VITE_API_URL:-http://localhost:8001}
+      - NODE_ENV=staging
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy for Staging
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "8080:80"  # Different port to avoid conflicts
+    volumes:
+      - ./nginx.staging.conf:/etc/nginx/nginx.conf
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+
+volumes:
+  postgres_staging_data:
+

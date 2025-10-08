@@ -1,0 +1,52 @@
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: matchgen
+      POSTGRES_USER: matchgen
+      POSTGRES_PASSWORD: matchgen123
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  # Redis for caching
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+
+  # Backend Django API
+  backend:
+    build: ./matchgen-backend
+    command: cd matchgen-backend && python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./matchgen-backend:/app
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=1
+      - DATABASE_URL=postgresql://matchgen:matchgen123@db:5432/matchgen
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      - db
+      - redis
+
+  # Frontend React App
+  frontend:
+    build: ./matchgen-frontend
+    command: npm run dev -- --host 0.0.0.0
+    volumes:
+      - ./matchgen-frontend:/app
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+    environment:
+      - VITE_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:
+

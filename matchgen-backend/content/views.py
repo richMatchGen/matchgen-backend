@@ -245,6 +245,31 @@ class PlayerListCreateView(generics.ListCreateAPIView):
             )
 
 
+class PlayerDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Retrieve, update, or delete a specific player."""
+    queryset = Player.objects.all()
+    serializer_class = PlayerSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = "id"
+
+    def get_queryset(self):
+        return Player.objects.filter(club__user=self.request.user)
+
+    def perform_update(self, serializer):
+        try:
+            club = Club.objects.get(user=self.request.user)
+            serializer.save(club=club)
+            logger.info(f"Player updated: {serializer.instance.name} for club {club.name}")
+        except Club.DoesNotExist:
+            logger.error(f"No club found for user: {self.request.user.email}")
+            raise
+
+    def perform_destroy(self, instance):
+        player_name = instance.name
+        instance.delete()
+        logger.info(f"Player deleted: {player_name}")
+
+
 class LastMatchView(APIView):
     """Get the last completed match for the user's club."""
     permission_classes = [IsAuthenticated]

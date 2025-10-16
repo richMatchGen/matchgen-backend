@@ -29,3 +29,5 @@ echo "Backup completed: $BACKUP_FILE.gz"
 # Optional: Upload to cloud storage (uncomment and configure as needed)
 # aws s3 cp $BACKUP_DIR/$BACKUP_FILE.gz s3://your-backup-bucket/
 
+
+

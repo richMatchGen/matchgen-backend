@@ -719,7 +719,21 @@ class FAFulltimeScraperView(APIView):
                 return Response(
                     {
                         "error": "FA Fulltime website is not accessible. This could be due to network issues, the website being down, or anti-bot protection.",
-                        "suggestion": "Please try using the CSV upload method instead, or try again later.",
+                        "suggestion": "We recommend using our AI-powered import instead - it's faster, more reliable, and works with any text format!",
+                        "alternatives": [
+                            {
+                                "method": "AI Import",
+                                "description": "Use AI to parse fixture data from any text format",
+                                "endpoint": "/api/content/fixtures/import/ai/",
+                                "benefits": "Works with any format, no website access required, instant results"
+                            },
+                            {
+                                "method": "CSV Upload", 
+                                "description": "Upload a CSV file with your fixture data",
+                                "endpoint": "/api/content/fixtures/import/csv/",
+                                "benefits": "Bulk import, template available, reliable"
+                            }
+                        ],
                         "test_endpoint": "Use /api/content/fixtures/import/fa-fulltime/test/ to check URL accessibility"
                     },
                     status=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -1276,6 +1290,15 @@ class FixtureImportOptionsView(APIView):
     def get(self, request):
         try:
             options = {
+                "ai_import": {
+                    "name": "AI-Powered Import ⭐ RECOMMENDED",
+                    "description": "Use AI to parse fixture data from natural language text",
+                    "required_fields": ["fixture_text"],
+                    "example_text": "Arsenal vs Chelsea on 15/03/2024 at 15:00, Manchester United vs Liverpool on 22/03/2024 at Old Trafford",
+                    "note": "Simply paste or type your fixture information in natural language",
+                    "benefits": "Works with any text format, understands natural language, no specific formatting required, instant results",
+                    "status": "recommended"
+                },
                 "csv_upload": {
                     "name": "CSV Upload",
                     "description": "Upload a CSV file with fixture data",
@@ -1289,30 +1312,26 @@ class FixtureImportOptionsView(APIView):
                         "time_start": "15:00",
                         "match_type": "League",
                         "home_away": "HOME"
-                    }
+                    },
+                    "status": "reliable"
                 },
                 "fa_fulltime": {
-                    "name": "FA Fulltime Scraper",
+                    "name": "FA Fulltime Scraper ⚠️ UNRELIABLE",
                     "description": "Automatically import fixtures from FA Fulltime website",
                     "required_fields": ["fa_url"],
                     "example_url": "https://fulltime.thefa.com/displayTeam.html?id=562720767",
                     "note": "Paste your club's FA Fulltime team page URL",
-                    "troubleshooting": "If scraping fails, try: 1) Verify the URL is accessible in your browser, 2) Check if the page requires login, 3) Use CSV upload as an alternative"
+                    "troubleshooting": "Currently experiencing connectivity issues. We recommend using AI Import instead.",
+                    "status": "unreliable",
+                    "alternative": "Use AI Import for better reliability and faster results"
                 },
                 "play_cricket": {
                     "name": "Play Cricket API",
                     "description": "Import fixtures from Play Cricket API for cricket clubs",
                     "required_fields": ["team_id"],
                     "note": "Get your team ID from your Play Cricket club page URL",
-                    "api_docs": "https://play-cricket.ecb.co.uk/hc/en-us/articles/360000141669-Match-Detail-API"
-                },
-                "ai_import": {
-                    "name": "AI-Powered Import",
-                    "description": "Use AI to parse fixture data from natural language text",
-                    "required_fields": ["fixture_text"],
-                    "example_text": "Arsenal vs Chelsea on 15/03/2024 at 15:00, Manchester United vs Liverpool on 22/03/2024 at Old Trafford",
-                    "note": "Simply paste or type your fixture information in natural language",
-                    "benefits": "Works with any text format, understands natural language, no specific formatting required"
+                    "api_docs": "https://play-cricket.ecb.co.uk/hc/en-us/articles/360000141669-Match-Detail-API",
+                    "status": "specialized"
                 }
             }
             

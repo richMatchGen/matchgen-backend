@@ -1727,6 +1727,14 @@ class AIFixtureTestView(APIView):
 # Cloudflare Worker proxy configuration
 PROXY_BASE = "https://your-worker.workers.dev"  # Set to your actual Worker URL
 
+def check_proxy_availability():
+    """Check if the Cloudflare Worker proxy is available."""
+    try:
+        response = requests.get(PROXY_BASE, timeout=5)
+        return True
+    except:
+        return False
+
 
 @api_view(["POST"])
 @permission_classes([IsAuthenticated])
@@ -1740,6 +1748,37 @@ def fulltime_preview(request):
             return Response(
                 {"error": "competition_url and club_display_name are required"},
                 status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if proxy is available
+        if not check_proxy_availability():
+            return Response(
+                {
+                    "error": "FA Fulltime proxy service is not available",
+                    "message": "The Cloudflare Worker proxy has not been deployed yet. Please use one of the alternative import methods:",
+                    "alternatives": [
+                        {
+                            "method": "AI Import",
+                            "description": "Use AI to parse fixture data from any text format",
+                            "endpoint": "/api/content/fixtures/import/ai/",
+                            "benefits": "Works with any format, no external dependencies, instant results"
+                        },
+                        {
+                            "method": "CSV Upload", 
+                            "description": "Upload a CSV file with your fixture data",
+                            "endpoint": "/api/content/fixtures/import/csv/",
+                            "benefits": "Bulk import, template available, reliable"
+                        },
+                        {
+                            "method": "Direct FA Scraper",
+                            "description": "Try the direct FA Fulltime scraper (may have timeout issues)",
+                            "endpoint": "/api/content/fixtures/import/fa-fulltime/",
+                            "benefits": "Direct scraping, no proxy required"
+                        }
+                    ],
+                    "setup_required": "To use the proxy method, deploy the Cloudflare Worker using the guide in CLOUDFLARE_WORKER_DEPLOYMENT.md"
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
         
         # Fetch HTML via proxy
@@ -1770,6 +1809,37 @@ def fulltime_import(request):
             return Response(
                 {"error": "competition_url and club_display_name are required"},
                 status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if proxy is available
+        if not check_proxy_availability():
+            return Response(
+                {
+                    "error": "FA Fulltime proxy service is not available",
+                    "message": "The Cloudflare Worker proxy has not been deployed yet. Please use one of the alternative import methods:",
+                    "alternatives": [
+                        {
+                            "method": "AI Import",
+                            "description": "Use AI to parse fixture data from any text format",
+                            "endpoint": "/api/content/fixtures/import/ai/",
+                            "benefits": "Works with any format, no external dependencies, instant results"
+                        },
+                        {
+                            "method": "CSV Upload", 
+                            "description": "Upload a CSV file with your fixture data",
+                            "endpoint": "/api/content/fixtures/import/csv/",
+                            "benefits": "Bulk import, template available, reliable"
+                        },
+                        {
+                            "method": "Direct FA Scraper",
+                            "description": "Try the direct FA Fulltime scraper (may have timeout issues)",
+                            "endpoint": "/api/content/fixtures/import/fa-fulltime/",
+                            "benefits": "Direct scraping, no proxy required"
+                        }
+                    ],
+                    "setup_required": "To use the proxy method, deploy the Cloudflare Worker using the guide in CLOUDFLARE_WORKER_DEPLOYMENT.md"
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE
             )
         
         # Get user's club

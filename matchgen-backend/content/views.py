@@ -708,6 +708,22 @@ class FAFulltimeScraperView(APIView):
             # Log the URL being accessed for debugging
             logger.info(f"FA Fulltime scraper requested for URL: {fa_url}")
 
+            # Quick connectivity check to prevent worker timeout
+            try:
+                logger.info("Performing quick connectivity check...")
+                test_response = requests.head(fa_url, timeout=5)
+                logger.info(f"Connectivity check passed: {test_response.status_code}")
+            except Exception as e:
+                logger.warning(f"Connectivity check failed: {str(e)}")
+                return Response(
+                    {
+                        "error": "FA Fulltime website is not accessible. This could be due to network issues, the website being down, or anti-bot protection.",
+                        "suggestion": "Please try using the CSV upload method instead, or try again later.",
+                        "test_endpoint": "Use /api/content/fixtures/import/fa-fulltime/test/ to check URL accessibility"
+                    },
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
+
             # Get user's club
             try:
                 club = Club.objects.get(user=request.user)
@@ -717,15 +733,28 @@ class FAFulltimeScraperView(APIView):
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Scrape fixtures from FA Fulltime
+            # Scrape fixtures from FA Fulltime with timeout protection
             logger.info(f"Starting FA scraper for URL: {fa_url}")
-            fixtures_data = self.scrape_fa_fixtures(fa_url)
+            
+            try:
+                fixtures_data = self.scrape_fa_fixtures(fa_url)
+            except Exception as e:
+                logger.error(f"FA scraper failed with exception: {str(e)}")
+                return Response(
+                    {
+                        "error": "FA Fulltime scraping failed due to connection issues. The FA website may be temporarily unavailable or blocking requests.",
+                        "suggestion": "Please try using the CSV upload method instead, or try again later when the FA website is accessible.",
+                        "alternative": "You can also use the test endpoint to check URL accessibility first."
+                    },
+                    status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                )
             
             if not fixtures_data:
                 return Response(
                     {
                         "error": "No fixtures found on the provided FA Fulltime page. This could be due to: 1) The page structure has changed, 2) No fixtures are currently available, 3) The URL format is incorrect, or 4) The page requires authentication.",
-                        "suggestion": "Please try using the CSV upload method instead, or verify the FA Fulltime URL is correct and accessible."
+                        "suggestion": "Please try using the CSV upload method instead, or verify the FA Fulltime URL is correct and accessible.",
+                        "test_endpoint": "Use /api/content/fixtures/import/fa-fulltime/test/ to check URL accessibility"
                     },
                     status=status.HTTP_404_NOT_FOUND,
                 )
@@ -791,12 +820,14 @@ class FAFulltimeScraperView(APIView):
             session = requests.Session()
             session.headers.update(headers)
             
-            # Retry logic with exponential backoff
-            max_retries = 3
+            # Reduced timeout and retry logic to prevent worker timeout
+            max_retries = 2  # Reduced from 3
+            timeout_seconds = 15  # Reduced from 60 to prevent worker timeout
+            
             for attempt in range(max_retries):
                 try:
                     logger.info(f"Attempting to fetch FA page (attempt {attempt + 1}/{max_retries}): {url}")
-                    response = session.get(url, timeout=60, allow_redirects=True)
+                    response = session.get(url, timeout=timeout_seconds, allow_redirects=True)
                     response.raise_for_status()
                     break
                 except requests.exceptions.Timeout:
@@ -804,13 +835,13 @@ class FAFulltimeScraperView(APIView):
                         logger.error(f"Timeout after {max_retries} attempts for URL: {url}")
                         return []
                     logger.warning(f"Timeout on attempt {attempt + 1}, retrying...")
-                    time.sleep(2 ** attempt)  # Exponential backoff
+                    time.sleep(1)  # Reduced backoff time
                 except requests.exceptions.ConnectionError:
                     if attempt == max_retries - 1:
                         logger.error(f"Connection error after {max_retries} attempts for URL: {url}")
                         return []
                     logger.warning(f"Connection error on attempt {attempt + 1}, retrying...")
-                    time.sleep(2 ** attempt)
+                    time.sleep(1)  # Reduced backoff time
                 except requests.exceptions.RequestException as e:
                     logger.error(f"Request error: {str(e)}")
                     return []

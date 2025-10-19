@@ -69,8 +69,6 @@ def parse_fixtures_html(html: str, club_display_name: str, default_competition: 
     headers = [clean_space(th.get_text()) for th in table.find_all("th")]
     idx = {h.lower(): i for i, h in enumerate(headers)}
     
-    logger.info(f"Found table with headers: {headers}")
-
     # Helper to get column by fuzzy match
     def col(*aliases):
         for a in aliases:
@@ -86,8 +84,6 @@ def parse_fixtures_html(html: str, club_display_name: str, default_competition: 
     c_venue = col("venue", "ground")
     c_comp = col("competition")
     c_round = col("round")
-
-    logger.info(f"Column mapping: date={c_date}, time={c_time}, home={c_home}, away={c_away}, venue={c_venue}")
 
     for tr in table.find_all("tr"):
         tds = tr.find_all("td")
@@ -156,11 +152,8 @@ def parse_fixtures_html(html: str, club_display_name: str, default_competition: 
             }
             
             fixtures.append(fixture)
-            logger.debug(f"Parsed fixture: {home} vs {away} on {date_s} {time_s}")
             
         except Exception as e:
-            logger.warning(f"Failed to parse row: {str(e)}")
+            # Only log parsing errors at warning level, not debug
             continue
-            
-    logger.info(f"Successfully parsed {len(fixtures)} fixtures")
     return fixtures

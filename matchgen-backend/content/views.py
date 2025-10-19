@@ -708,16 +708,11 @@ class FAFulltimeScraperView(APIView):
                 fa_url = 'https://' + fa_url
                 logger.info(f"Added https protocol to URL: {fa_url}")
             
-            # Log the URL being accessed for debugging
-            logger.info(f"FA Fulltime scraper requested for URL: {fa_url}")
-
             # Quick connectivity check to prevent worker timeout
             try:
-                logger.info("Performing quick connectivity check...")
                 test_response = requests.head(fa_url, timeout=5)
-                logger.info(f"Connectivity check passed: {test_response.status_code}")
             except Exception as e:
-                logger.warning(f"Connectivity check failed: {str(e)}")
+                logger.warning(f"FA Fulltime connectivity check failed: {str(e)}")
                 return Response(
                     {
                         "error": "FA Fulltime website is not accessible. This could be due to network issues, the website being down, or anti-bot protection.",
@@ -1699,8 +1694,6 @@ class AIFixtureTestView(APIView):
             ]
             """
             
-            logger.info(f"Testing AI fixture parsing for club: {club_name}")
-            
             # Call OpenAI API
             response = client.chat.completions.create(
                 model="gpt-3.5-turbo",
@@ -1714,16 +1707,13 @@ class AIFixtureTestView(APIView):
             
             # Parse the AI response
             ai_response = response.choices[0].message.content.strip()
-            logger.info(f"AI test response: {ai_response}")
             
             # Try to parse as JSON
             try:
                 fixtures_data = json.loads(ai_response)
                 if isinstance(fixtures_data, list):
-                    logger.info(f"AI test successfully parsed {len(fixtures_data)} fixtures")
                     return fixtures_data
                 else:
-                    logger.error("AI test response is not a list")
                     return []
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse AI test response as JSON: {str(e)}")

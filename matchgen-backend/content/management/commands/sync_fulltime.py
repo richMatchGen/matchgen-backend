@@ -48,8 +48,6 @@ class Command(BaseCommand):
         
         for sub in subs:
             try:
-                self.stdout.write(f"Syncing {sub.club.name} - {sub.team_display_name}")
-                
                 if dry_run:
                     self.stdout.write(f"  [DRY RUN] Would fetch: {sub.competition_url}")
                     continue
@@ -95,14 +93,10 @@ class Command(BaseCommand):
                     
                     if is_created:
                         total_created += 1
-                        self.stdout.write(f"  Created: {fixture_data['home_team']} vs {fixture_data['away_team']}")
                     else:
                         total_updated += 1
-                        self.stdout.write(f"  Updated: {fixture_data['home_team']} vs {fixture_data['away_team']}")
                     
                     total_updates += 1
-                
-                self.stdout.write(self.style.SUCCESS(f"  Synced {len(by_key)} fixtures for {sub.club.name}"))
                 
             except Exception as e:
                 self.stdout.write(

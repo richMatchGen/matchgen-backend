@@ -20,3 +20,49 @@ Traceback (most recent call last):
   File "C:\Users\rich\AppData\Local\Programs\Python\Python313\Lib\site-packages\django\http\request.py", line 151, in get_host
     raise DisallowedHost(msg)
 django.core.exceptions.DisallowedHost: Invalid HTTP_HOST header: 'testserver'. You may need to add 'testserver' to ALLOWED_HOSTS.
+INFO 2025-10-08 16:39:34,237 autoreload 35356 31932 Watching for file changes with StatReloader
+WARNING 2025-10-08 16:59:46,010 basehttp 35356 26088 "GET /api/ HTTP/1.1" 404 3662
+WARNING 2025-10-08 16:59:50,979 basehttp 35356 26088 "GET /api/health/ HTTP/1.1" 401 83
+INFO 2025-10-08 17:01:14,270 basehttp 35356 34496 "GET / HTTP/1.1" 200 39
+WARNING 2025-10-08 17:01:14,313 basehttp 35356 34496 "GET /favicon.ico HTTP/1.1" 404 3683
+INFO 2025-10-08 17:01:36,213 basehttp 35356 26372 "OPTIONS /api/users/token/ HTTP/1.1" 200 0
+INFO 2025-10-08 17:07:51,038 views 35356 27232 Token request for email: rich@matchgen.co.uk
+INFO 2025-10-08 17:07:51,038 views 35356 27232 Request headers: {'Content-Length': '74', 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (Windows NT; Windows NT 10.0; en-GB) WindowsPowerShell/5.1.26100.6584', 'Host': 'localhost:8000', 'Connection': 'Keep-Alive'}
+INFO 2025-10-08 17:07:51,039 views 35356 27232 Request data: {'password': 'password123', 'email': 'rich@matchgen.co.uk'}
+WARNING 2025-10-08 17:07:53,208 views 35356 27232 Validation error during token generation: {'non_field_errors': [ErrorDetail(string='Invalid email or password.', code='invalid')]}
+WARNING 2025-10-08 17:07:53,209 basehttp 35356 27232 "POST /api/users/token/ HTTP/1.1" 400 38
+INFO 2025-10-08 19:12:26,853 basehttp 35356 37300 "OPTIONS /api/users/token/ HTTP/1.1" 200 0
+INFO 2025-10-08 19:12:33,264 basehttp 35356 37300 "OPTIONS /api/users/token/ HTTP/1.1" 200 0
+INFO 2025-10-08 19:12:35,931 basehttp 35356 37300 "OPTIONS /api/users/token/ HTTP/1.1" 200 0
+INFO 2025-10-08 19:12:48,696 basehttp 35356 37300 "OPTIONS /api/users/token/ HTTP/1.1" 200 0
+INFO 2025-10-08 19:14:43,377 views 35356 26456 Token request for email: rich@matchgen.co.uk
+INFO 2025-10-08 19:14:43,377 views 35356 26456 Request headers: {'Content-Length': '74', 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (Windows NT; Windows NT 10.0; en-GB) WindowsPowerShell/5.1.26100.6584', 'Host': 'localhost:8000', 'Connection': 'Keep-Alive'}
+INFO 2025-10-08 19:14:43,378 views 35356 26456 Request data: {'password': 'password123', 'email': 'rich@matchgen.co.uk'}
+WARNING 2025-10-08 19:14:45,671 views 35356 26456 Validation error during token generation: {'non_field_errors': [ErrorDetail(string='Invalid email or password.', code='invalid')]}
+WARNING 2025-10-08 19:14:45,672 basehttp 35356 26456 "POST /api/users/token/ HTTP/1.1" 400 38
+INFO 2025-10-08 19:16:41,132 views 35356 22808 Token request for email: rich@matchgen.co.uk
+INFO 2025-10-08 19:16:41,133 views 35356 22808 Request headers: {'Content-Length': '74', 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (Windows NT; Windows NT 10.0; en-GB) WindowsPowerShell/5.1.26100.6584', 'Host': 'localhost:8000', 'Connection': 'Keep-Alive'}
+INFO 2025-10-08 19:16:41,133 views 35356 22808 Request data: {'password': 'password123', 'email': 'rich@matchgen.co.uk'}
+WARNING 2025-10-08 19:16:43,348 views 35356 22808 Validation error during token generation: {'non_field_errors': [ErrorDetail(string='Invalid email or password.', code='invalid')]}
+WARNING 2025-10-08 19:16:43,349 basehttp 35356 22808 "POST /api/users/token/ HTTP/1.1" 400 38
+INFO 2025-10-08 19:17:37,047 autoreload 28664 34208 Watching for file changes with StatReloader
+INFO 2025-10-08 19:17:58,752 views 28664 17444 Token request for email: rich@matchgen.co.uk
+INFO 2025-10-08 19:17:58,752 views 28664 17444 Request headers: {'Content-Length': '74', 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (Windows NT; Windows NT 10.0; en-GB) WindowsPowerShell/5.1.26100.6584', 'Host': 'localhost:8000'}
+INFO 2025-10-08 19:17:58,753 views 28664 17444 Request data: {'password': 'password123', 'email': 'rich@matchgen.co.uk'}
+WARNING 2025-10-08 19:18:01,206 views 28664 17444 Validation error during token generation: {'non_field_errors': [ErrorDetail(string='Invalid email or password.', code='invalid')]}
+WARNING 2025-10-08 19:18:01,207 basehttp 28664 17444 "POST /api/users/token/ HTTP/1.1" 400 38
+INFO 2025-10-08 19:20:11,533 views 28664 12088 Token request for email: rich@matchgen.co.uk
+INFO 2025-10-08 19:20:11,534 views 28664 12088 Request headers: {'Content-Length': '74', 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (Windows NT; Windows NT 10.0; en-GB) WindowsPowerShell/5.1.26100.6584', 'Host': 'localhost:8000'}
+INFO 2025-10-08 19:20:11,534 views 28664 12088 Request data: {'password': 'password123', 'email': 'rich@matchgen.co.uk'}
+WARNING 2025-10-08 19:20:13,899 views 28664 12088 Validation error during token generation: {'non_field_errors': [ErrorDetail(string='Invalid email or password.', code='invalid')]}
+WARNING 2025-10-08 19:20:13,901 basehttp 28664 12088 "POST /api/users/token/ HTTP/1.1" 400 38
+INFO 2025-10-08 19:20:55,450 autoreload 35696 37452 Watching for file changes with StatReloader
+INFO 2025-10-08 19:20:58,753 views 35696 24884 Token request for email: rich@matchgen.co.uk
+INFO 2025-10-08 19:20:58,754 views 35696 24884 Request headers: {'Content-Length': '74', 'Content-Type': 'application/json', 'User-Agent': 'Mozilla/5.0 (Windows NT; Windows NT 10.0; en-GB) WindowsPowerShell/5.1.26100.6584', 'Host': 'localhost:8000'}
+INFO 2025-10-08 19:20:58,754 views 35696 24884 Request data: {'password': 'password123', 'email': 'rich@matchgen.co.uk'}
+WARNING 2025-10-08 19:21:01,043 views 35696 24884 Validation error during token generation: {'non_field_errors': [ErrorDetail(string='Invalid email or password.', code='invalid')]}
+WARNING 2025-10-08 19:21:01,045 basehttp 35696 24884 "POST /api/users/token/ HTTP/1.1" 400 38
+INFO 2025-10-08 19:22:26,268 basehttp 35696 28304 "OPTIONS /api/users/token/ HTTP/1.1" 200 0
+INFO 2025-10-08 19:26:04,056 basehttp 35696 28304 "OPTIONS /api/users/token/ HTTP/1.1" 200 0
+INFO 2025-10-08 19:29:41,425 autoreload 35836 7988 Watching for file changes with StatReloader
+INFO 2025-10-08 19:32:41,199 autoreload 2132 2124 Watching for file changes with StatReloader

@@ -12,6 +12,8 @@ from .views import (
     PlayerPhotoUploadView,
     SubstitutionPlayersView,
     UpcomingMatchView,
+    import_fa_fixtures,
+    import_cricket_fixtures,
 )
 
 urlpatterns = [
@@ -26,4 +28,6 @@ urlpatterns = [
     path("players/substitution/", SubstitutionPlayersView.as_view(), name="substitution-players"),
     path("matches/upload-opponent-logo/", OpponentLogoUploadView.as_view(), name="upload-opponent-logo"),
     path("players/upload-photo/", PlayerPhotoUploadView.as_view(), name="upload-player-photo"),
+    path("fixtures/import-fa/", import_fa_fixtures, name="import-fa-fixtures"),
+    path("fixtures/import-cricket/", import_cricket_fixtures, name="import-cricket-fixtures"),
 ]

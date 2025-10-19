@@ -17,17 +17,19 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
-COPY requirements.txt .
+COPY matchgen-backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy project
 COPY . .
 
 # Collect static files
-RUN python manage.py collectstatic --noinput
+RUN cd matchgen-backend && python manage.py collectstatic --noinput
 
 # Expose port
 EXPOSE 8000
 
 # Run the application
+WORKDIR /app/matchgen-backend
 CMD ["gunicorn", "--bind", "0.0.0.0:8000", "matchgen.wsgi:application"]
+

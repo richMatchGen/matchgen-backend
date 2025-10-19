@@ -6,3 +6,7 @@ urlpatterns = [
     path('list/', FeedbackListView.as_view(), name='feedback-list'),
     path('stats/', FeedbackStatsView.as_view(), name='feedback-stats'),
 ]
+
+
+
+

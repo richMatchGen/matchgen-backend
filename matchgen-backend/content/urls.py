@@ -16,6 +16,7 @@ from .views import (
     PlayCricketAPIView,
     EnhancedBulkUploadMatchesView,
     FixtureImportOptionsView,
+    FAFulltimeTestView,
 )
 
 urlpatterns = [
@@ -34,5 +35,6 @@ urlpatterns = [
     path("fixtures/import-options/", FixtureImportOptionsView.as_view(), name="fixture-import-options"),
     path("fixtures/import/csv/", EnhancedBulkUploadMatchesView.as_view(), name="fixture-import-csv"),
     path("fixtures/import/fa-fulltime/", FAFulltimeScraperView.as_view(), name="fixture-import-fa"),
+    path("fixtures/import/fa-fulltime/test/", FAFulltimeTestView.as_view(), name="fixture-import-fa-test"),
     path("fixtures/import/play-cricket/", PlayCricketAPIView.as_view(), name="fixture-import-cricket"),
 ]

@@ -699,6 +699,14 @@ class FAFulltimeScraperView(APIView):
                     {"error": "Please provide a valid FA Fulltime URL."}, 
                     status=status.HTTP_400_BAD_REQUEST
                 )
+            
+            # Ensure URL has proper format
+            if not fa_url.startswith('http'):
+                fa_url = 'https://' + fa_url
+                logger.info(f"Added https protocol to URL: {fa_url}")
+            
+            # Log the URL being accessed for debugging
+            logger.info(f"FA Fulltime scraper requested for URL: {fa_url}")
 
             # Get user's club
             try:
@@ -710,11 +718,15 @@ class FAFulltimeScraperView(APIView):
                 )
 
             # Scrape fixtures from FA Fulltime
+            logger.info(f"Starting FA scraper for URL: {fa_url}")
             fixtures_data = self.scrape_fa_fixtures(fa_url)
             
             if not fixtures_data:
                 return Response(
-                    {"error": "No fixtures found on the provided FA Fulltime page."},
+                    {
+                        "error": "No fixtures found on the provided FA Fulltime page. This could be due to: 1) The page structure has changed, 2) No fixtures are currently available, 3) The URL format is incorrect, or 4) The page requires authentication.",
+                        "suggestion": "Please try using the CSV upload method instead, or verify the FA Fulltime URL is correct and accessible."
+                    },
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
@@ -761,31 +773,83 @@ class FAFulltimeScraperView(APIView):
     def scrape_fa_fixtures(self, url):
         """Scrape fixture data from FA Fulltime website."""
         try:
+            # Enhanced headers to mimic a real browser
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Cache-Control': 'max-age=0'
             }
             
-            response = requests.get(url, headers=headers, timeout=30)
-            response.raise_for_status()
+            # Try with session for better connection handling
+            session = requests.Session()
+            session.headers.update(headers)
+            
+            # Retry logic with exponential backoff
+            max_retries = 3
+            for attempt in range(max_retries):
+                try:
+                    logger.info(f"Attempting to fetch FA page (attempt {attempt + 1}/{max_retries}): {url}")
+                    response = session.get(url, timeout=60, allow_redirects=True)
+                    response.raise_for_status()
+                    break
+                except requests.exceptions.Timeout:
+                    if attempt == max_retries - 1:
+                        logger.error(f"Timeout after {max_retries} attempts for URL: {url}")
+                        return []
+                    logger.warning(f"Timeout on attempt {attempt + 1}, retrying...")
+                    time.sleep(2 ** attempt)  # Exponential backoff
+                except requests.exceptions.ConnectionError:
+                    if attempt == max_retries - 1:
+                        logger.error(f"Connection error after {max_retries} attempts for URL: {url}")
+                        return []
+                    logger.warning(f"Connection error on attempt {attempt + 1}, retrying...")
+                    time.sleep(2 ** attempt)
+                except requests.exceptions.RequestException as e:
+                    logger.error(f"Request error: {str(e)}")
+                    return []
             
             soup = BeautifulSoup(response.content, 'html.parser')
             fixtures = []
             
-            # Look for fixture tables or lists
-            fixture_tables = soup.find_all('table', class_=['fixtures', 'results', 'matches'])
+            # Enhanced fixture detection - look for more patterns
+            logger.info("Parsing FA page content...")
             
-            for table in fixture_tables:
+            # Method 1: Look for fixture tables with various class names
+            fixture_tables = soup.find_all('table', class_=lambda x: x and any(
+                keyword in x.lower() for keyword in ['fixture', 'result', 'match', 'game', 'schedule']
+            ))
+            
+            # Method 2: Look for divs containing fixture information
+            fixture_divs = soup.find_all('div', class_=lambda x: x and any(
+                keyword in x.lower() for keyword in ['fixture', 'result', 'match', 'game', 'schedule']
+            ))
+            
+            # Method 3: Look for any table that might contain fixture data
+            all_tables = soup.find_all('table')
+            
+            for table in fixture_tables + all_tables:
                 rows = table.find_all('tr')
-                for row in rows[1:]:  # Skip header row
-                    cells = row.find_all(['td', 'th'])
-                    if len(cells) >= 3:  # Ensure we have enough data
-                        fixture_data = self.parse_fixture_row(cells)
-                        if fixture_data:
-                            fixtures.append(fixture_data)
+                if len(rows) > 1:  # Has header and data rows
+                    for row in rows[1:]:  # Skip header row
+                        cells = row.find_all(['td', 'th'])
+                        if len(cells) >= 2:  # At least date and opponent
+                            fixture_data = self.parse_fixture_row(cells)
+                            if fixture_data:
+                                fixtures.append(fixture_data)
+                                logger.info(f"Found fixture: {fixture_data.get('opponent', 'Unknown')} on {fixture_data.get('date', 'Unknown')}")
             
-            # If no tables found, look for fixture lists
+            # Method 4: Look for fixture lists
             if not fixtures:
-                fixture_lists = soup.find_all(['ul', 'ol'], class_=['fixtures', 'results', 'matches'])
+                fixture_lists = soup.find_all(['ul', 'ol'], class_=lambda x: x and any(
+                    keyword in x.lower() for keyword in ['fixture', 'result', 'match', 'game', 'schedule']
+                ))
                 for fixture_list in fixture_lists:
                     items = fixture_list.find_all('li')
                     for item in items:
@@ -793,6 +857,24 @@ class FAFulltimeScraperView(APIView):
                         if fixture_data:
                             fixtures.append(fixture_data)
             
+            # Method 5: Look for any text that might contain fixture information
+            if not fixtures:
+                # Look for common fixture patterns in the page text
+                page_text = soup.get_text()
+                fixture_patterns = [
+                    r'(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s+(.+?)\s+vs\s+(.+)',
+                    r'(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s+(.+?)\s+v\s+(.+)',
+                    r'(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s+(.+?)\s+@\s+(.+)',
+                ]
+                
+                for pattern in fixture_patterns:
+                    matches = re.findall(pattern, page_text, re.IGNORECASE)
+                    for match in matches:
+                        fixture_data = self.parse_fixture_text(f"{match[0]} {match[1]} vs {match[2]}")
+                        if fixture_data:
+                            fixtures.append(fixture_data)
+            
+            logger.info(f"Found {len(fixtures)} fixtures from FA page")
             return fixtures
             
         except requests.RequestException as e:
@@ -1182,7 +1264,8 @@ class FixtureImportOptionsView(APIView):
                     "description": "Automatically import fixtures from FA Fulltime website",
                     "required_fields": ["fa_url"],
                     "example_url": "https://fulltime.thefa.com/displayTeam.html?id=562720767",
-                    "note": "Paste your club's FA Fulltime team page URL"
+                    "note": "Paste your club's FA Fulltime team page URL",
+                    "troubleshooting": "If scraping fails, try: 1) Verify the URL is accessible in your browser, 2) Check if the page requires login, 3) Use CSV upload as an alternative"
                 },
                 "play_cricket": {
                     "name": "Play Cricket API",
@@ -1199,5 +1282,93 @@ class FixtureImportOptionsView(APIView):
             logger.error(f"Error getting import options: {str(e)}", exc_info=True)
             return Response(
                 {"error": "An error occurred while fetching import options."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class FAFulltimeTestView(APIView):
+    """Test FA Fulltime URL accessibility without importing fixtures."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            fa_url = request.data.get('fa_url')
+            if not fa_url:
+                return Response(
+                    {"error": "FA Fulltime URL is required."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Validate URL format
+            if 'fulltime.thefa.com' not in fa_url:
+                return Response(
+                    {"error": "Please provide a valid FA Fulltime URL."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            # Ensure URL has proper format
+            if not fa_url.startswith('http'):
+                fa_url = 'https://' + fa_url
+
+            # Test URL accessibility
+            try:
+                headers = {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                }
+                
+                response = requests.get(fa_url, headers=headers, timeout=30)
+                response.raise_for_status()
+                
+                # Parse the page to check for fixture content
+                soup = BeautifulSoup(response.content, 'html.parser')
+                
+                # Look for common fixture indicators
+                fixture_indicators = [
+                    'fixture', 'result', 'match', 'game', 'schedule', 'team', 'opponent'
+                ]
+                
+                page_text = soup.get_text().lower()
+                found_indicators = [indicator for indicator in fixture_indicators if indicator in page_text]
+                
+                # Check for tables that might contain fixtures
+                tables = soup.find_all('table')
+                table_count = len(tables)
+                
+                return Response({
+                    "status": "success",
+                    "url": fa_url,
+                    "status_code": response.status_code,
+                    "page_title": soup.title.string if soup.title else "No title found",
+                    "fixture_indicators_found": found_indicators,
+                    "table_count": table_count,
+                    "page_size": len(response.content),
+                    "message": "URL is accessible and contains potential fixture data"
+                })
+                
+            except requests.exceptions.Timeout:
+                return Response({
+                    "status": "error",
+                    "error": "Connection timeout - the FA website is not responding",
+                    "suggestion": "Try again later or use CSV upload instead"
+                }, status=status.HTTP_408_REQUEST_TIMEOUT)
+                
+            except requests.exceptions.ConnectionError:
+                return Response({
+                    "status": "error", 
+                    "error": "Connection error - unable to reach the FA website",
+                    "suggestion": "Check your internet connection or try again later"
+                }, status=status.HTTP_503_SERVICE_UNAVAILABLE)
+                
+            except requests.exceptions.RequestException as e:
+                return Response({
+                    "status": "error",
+                    "error": f"Request failed: {str(e)}",
+                    "suggestion": "The URL might be incorrect or the page might require authentication"
+                }, status=status.HTTP_400_BAD_REQUEST)
+                
+        except Exception as e:
+            logger.error(f"FA test error: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while testing the FA URL."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )

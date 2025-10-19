@@ -19,6 +19,8 @@ from .views import (
     FAFulltimeTestView,
     AIFixtureImportView,
     AIFixtureTestView,
+    fulltime_preview,
+    fulltime_import,
 )
 
 urlpatterns = [
@@ -41,4 +43,7 @@ urlpatterns = [
     path("fixtures/import/play-cricket/", PlayCricketAPIView.as_view(), name="fixture-import-cricket"),
     path("fixtures/import/ai/", AIFixtureImportView.as_view(), name="fixture-import-ai"),
     path("fixtures/import/ai/test/", AIFixtureTestView.as_view(), name="fixture-import-ai-test"),
+    # New FA Fulltime proxy endpoints
+    path("fixtures/import/fulltime/preview/", fulltime_preview, name="fulltime-preview"),
+    path("fixtures/import/fulltime/import/", fulltime_import, name="fulltime-import"),
 ]

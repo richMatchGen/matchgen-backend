@@ -17,10 +17,12 @@ from rest_framework.parsers import JSONParser, MultiPartParser
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.decorators import api_view, permission_classes
 from users.models import Club
 
-from .models import Match, Player
+from .models import Match, Player, FullTimeSubscription
 from .serializers import FixturesSerializer, MatchSerializer, PlayerSerializer
+from .sources.fulltime import fetch_via_proxy, parse_fixtures_html
 
 logger = logging.getLogger(__name__)
 
@@ -1730,3 +1732,133 @@ class AIFixtureTestView(APIView):
         except Exception as e:
             logger.error(f"AI test parsing error: {str(e)}", exc_info=True)
             return []
+
+
+# Cloudflare Worker proxy configuration
+PROXY_BASE = "https://your-worker.workers.dev"  # Set to your actual Worker URL
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def fulltime_preview(request):
+    """Preview fixtures from FA Fulltime without importing them."""
+    try:
+        competition_url = request.data.get("competition_url")
+        club_display_name = request.data.get("club_display_name")
+        
+        if not competition_url or not club_display_name:
+            return Response(
+                {"error": "competition_url and club_display_name are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Fetch HTML via proxy
+        html = fetch_via_proxy(PROXY_BASE, competition_url)
+        
+        # Parse fixtures
+        fixtures = parse_fixtures_html(html, club_display_name)
+        
+        return Response(fixtures, status=status.HTTP_200_OK)
+        
+    except Exception as e:
+        logger.error(f"FA Fulltime preview error: {str(e)}", exc_info=True)
+        return Response(
+            {"error": f"Failed to preview fixtures: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def fulltime_import(request):
+    """Import fixtures from FA Fulltime and save to database."""
+    try:
+        competition_url = request.data.get("competition_url")
+        club_display_name = request.data.get("club_display_name")
+        
+        if not competition_url or not club_display_name:
+            return Response(
+                {"error": "competition_url and club_display_name are required"},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Get user's club
+        try:
+            club = Club.objects.get(user=request.user)
+        except Club.DoesNotExist:
+            return Response(
+                {"error": "Club not found for user"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Fetch HTML via proxy
+        html = fetch_via_proxy(PROXY_BASE, competition_url)
+        
+        # Parse fixtures
+        fixtures = parse_fixtures_html(html, club_display_name)
+        
+        if not fixtures:
+            return Response(
+                {"error": "No fixtures found in the provided URL"},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        
+        # Import fixtures with upsert
+        created, updated = 0, 0
+        
+        for fixture_data in fixtures:
+            # Convert to Match model format
+            match_data = {
+                "club": club,
+                "source": "fulltime_html",
+                "source_competition_url": competition_url,
+                "fixture_key": fixture_data["fixture_key"],
+                "competition": fixture_data["competition"],
+                "round_name": fixture_data["round_name"],
+                "home_team": fixture_data["home_team"],
+                "away_team": fixture_data["away_team"],
+                "home_away": "HOME" if fixture_data["home_away"] == "H" else "AWAY",
+                "opponent": fixture_data["opponent_name"],
+                "date": datetime.datetime.fromisoformat(fixture_data["kickoff_utc"].replace('Z', '+00:00')),
+                "kickoff_utc": datetime.datetime.fromisoformat(fixture_data["kickoff_utc"].replace('Z', '+00:00')),
+                "kickoff_local_tz": fixture_data["kickoff_local_tz"],
+                "venue": fixture_data["venue"],
+                "status": fixture_data["status"],
+                "raw_payload": fixture_data["raw"],
+                "last_synced_at": timezone.now(),
+            }
+            
+            # Upsert the fixture
+            match, is_created = Match.objects.update_or_create(
+                club=club,
+                fixture_key=fixture_data["fixture_key"],
+                defaults=match_data
+            )
+            
+            if is_created:
+                created += 1
+            else:
+                updated += 1
+        
+        # Create or update subscription
+        FullTimeSubscription.objects.update_or_create(
+            club=club,
+            competition_url=competition_url,
+            defaults={
+                "team_display_name": club_display_name,
+                "is_active": True
+            }
+        )
+        
+        return Response({
+            "created": created,
+            "updated": updated,
+            "total": created + updated
+        }, status=status.HTTP_201_CREATED)
+        
+    except Exception as e:
+        logger.error(f"FA Fulltime import error: {str(e)}", exc_info=True)
+        return Response(
+            {"error": f"Failed to import fixtures: {str(e)}"},
+            status=status.HTTP_500_INTERNAL_SERVER_ERROR
+        )

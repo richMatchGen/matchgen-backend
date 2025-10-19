@@ -4,6 +4,7 @@ import logging
 import time
 import requests
 import re
+import json
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
@@ -1304,6 +1305,14 @@ class FixtureImportOptionsView(APIView):
                     "required_fields": ["team_id"],
                     "note": "Get your team ID from your Play Cricket club page URL",
                     "api_docs": "https://play-cricket.ecb.co.uk/hc/en-us/articles/360000141669-Match-Detail-API"
+                },
+                "ai_import": {
+                    "name": "AI-Powered Import",
+                    "description": "Use AI to parse fixture data from natural language text",
+                    "required_fields": ["fixture_text"],
+                    "example_text": "Arsenal vs Chelsea on 15/03/2024 at 15:00, Manchester United vs Liverpool on 22/03/2024 at Old Trafford",
+                    "note": "Simply paste or type your fixture information in natural language",
+                    "benefits": "Works with any text format, understands natural language, no specific formatting required"
                 }
             }
             
@@ -1403,3 +1412,302 @@ class FAFulltimeTestView(APIView):
                 {"error": "An error occurred while testing the FA URL."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class AIFixtureImportView(APIView):
+    """Import fixtures using AI (ChatGPT/OpenAI) to parse natural language fixture data."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            fixture_text = request.data.get('fixture_text')
+            if not fixture_text:
+                return Response(
+                    {"error": "Fixture text is required."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Get user's club
+            try:
+                club = Club.objects.get(user=request.user)
+            except Club.DoesNotExist:
+                return Response(
+                    {"error": "Club not found for this user. Please create a club first."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Use AI to parse fixture data
+            fixtures_data = self.parse_fixtures_with_ai(fixture_text, club.name)
+            
+            if not fixtures_data:
+                return Response(
+                    {
+                        "error": "No fixtures could be extracted from the provided text.",
+                        "suggestion": "Please provide fixture information in a clear format, such as: 'Arsenal vs Chelsea on 15/03/2024 at 15:00' or 'Manchester United vs Liverpool, 22/03/2024, Old Trafford'"
+                    },
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            # Create matches
+            matches_created = []
+            errors = []
+
+            for fixture in fixtures_data:
+                try:
+                    match = Match.objects.create(
+                        club=club,
+                        opponent=fixture.get('opponent', ''),
+                        date=fixture.get('date'),
+                        location=fixture.get('location', ''),
+                        venue=fixture.get('venue', ''),
+                        time_start=fixture.get('time_start', ''),
+                        match_type=fixture.get('match_type', 'League'),
+                        home_away=fixture.get('home_away', 'HOME')
+                    )
+                    matches_created.append(match.id)
+                except Exception as e:
+                    errors.append(f"Error creating match: {str(e)}")
+                    logger.warning(f"Error creating match from AI data: {str(e)}")
+
+            logger.info(f"AI fixture import completed. {len(matches_created)} matches created, {len(errors)} errors")
+            
+            response_data = {
+                "created": matches_created,
+                "total_found": len(fixtures_data),
+                "message": f"Successfully imported {len(matches_created)} fixtures using AI"
+            }
+            if errors:
+                response_data["errors"] = errors
+
+            return Response(response_data, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            logger.error(f"AI fixture import error: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while processing fixtures with AI."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def parse_fixtures_with_ai(self, fixture_text, club_name):
+        """Use OpenAI to parse fixture data from natural language text."""
+        try:
+            import openai
+            from django.conf import settings
+            
+            # Get OpenAI API key from settings
+            openai_api_key = getattr(settings, 'OPENAI_API_KEY', None)
+            if not openai_api_key:
+                logger.error("OpenAI API key not configured")
+                return []
+            
+            # Initialize OpenAI client
+            client = openai.OpenAI(api_key=openai_api_key)
+            
+            # Create a prompt for the AI to extract fixture data
+            prompt = f"""
+            Extract fixture/match information from the following text and return it as a JSON array.
+            The user's club is: {club_name}
+            
+            For each fixture, extract:
+            - opponent: The team they're playing against
+            - date: Match date (convert to YYYY-MM-DD format)
+            - time_start: Match time (HH:MM format)
+            - venue: Stadium/ground name
+            - location: City or location
+            - home_away: "HOME" if {club_name} is playing at home, "AWAY" if away
+            - match_type: Type of match (League, Cup, Friendly, etc.)
+            
+            Text to parse:
+            {fixture_text}
+            
+            Return only a JSON array of fixtures, no other text. Example format:
+            [
+                {{
+                    "opponent": "Arsenal",
+                    "date": "2024-03-15",
+                    "time_start": "15:00",
+                    "venue": "Emirates Stadium",
+                    "location": "London",
+                    "home_away": "AWAY",
+                    "match_type": "League"
+                }}
+            ]
+            """
+            
+            logger.info(f"Using AI to parse fixture text for club: {club_name}")
+            
+            # Call OpenAI API
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that extracts fixture/match information from text and returns it as structured JSON data."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=2000,
+                temperature=0.1
+            )
+            
+            # Parse the AI response
+            ai_response = response.choices[0].message.content.strip()
+            logger.info(f"AI response: {ai_response}")
+            
+            # Try to parse as JSON
+            try:
+                fixtures_data = json.loads(ai_response)
+                if isinstance(fixtures_data, list):
+                    # Convert date strings to datetime objects
+                    for fixture in fixtures_data:
+                        if 'date' in fixture and fixture['date']:
+                            try:
+                                fixture['date'] = datetime.strptime(fixture['date'], '%Y-%m-%d')
+                            except ValueError:
+                                # Try other date formats
+                                for fmt in ['%d/%m/%Y', '%d-%m-%Y', '%Y-%m-%d']:
+                                    try:
+                                        fixture['date'] = datetime.strptime(fixture['date'], fmt)
+                                        break
+                                    except ValueError:
+                                        continue
+                                else:
+                                    logger.warning(f"Could not parse date: {fixture['date']}")
+                                    fixture['date'] = datetime.now()
+                    
+                    logger.info(f"AI successfully parsed {len(fixtures_data)} fixtures")
+                    return fixtures_data
+                else:
+                    logger.error("AI response is not a list")
+                    return []
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse AI response as JSON: {str(e)}")
+                return []
+            
+        except Exception as e:
+            logger.error(f"AI parsing error: {str(e)}", exc_info=True)
+            return []
+
+
+class AIFixtureTestView(APIView):
+    """Test AI fixture parsing without creating matches."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            fixture_text = request.data.get('fixture_text')
+            if not fixture_text:
+                return Response(
+                    {"error": "Fixture text is required."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Get user's club
+            try:
+                club = Club.objects.get(user=request.user)
+            except Club.DoesNotExist:
+                return Response(
+                    {"error": "Club not found for this user. Please create a club first."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Test AI parsing
+            fixtures_data = self.parse_fixtures_with_ai(fixture_text, club.name)
+            
+            if not fixtures_data:
+                return Response({
+                    "status": "error",
+                    "error": "No fixtures could be extracted from the provided text.",
+                    "suggestion": "Try formatting your text more clearly, such as: 'Arsenal vs Chelsea on 15/03/2024 at 15:00'"
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            return Response({
+                "status": "success",
+                "fixtures_found": len(fixtures_data),
+                "fixtures": fixtures_data,
+                "message": f"AI successfully identified {len(fixtures_data)} fixtures"
+            })
+            
+        except Exception as e:
+            logger.error(f"AI test error: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while testing AI fixture parsing."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def parse_fixtures_with_ai(self, fixture_text, club_name):
+        """Use OpenAI to parse fixture data from natural language text."""
+        try:
+            import openai
+            from django.conf import settings
+            
+            # Get OpenAI API key from settings
+            openai_api_key = getattr(settings, 'OPENAI_API_KEY', None)
+            if not openai_api_key:
+                logger.error("OpenAI API key not configured")
+                return []
+            
+            # Initialize OpenAI client
+            client = openai.OpenAI(api_key=openai_api_key)
+            
+            # Create a prompt for the AI to extract fixture data
+            prompt = f"""
+            Extract fixture/match information from the following text and return it as a JSON array.
+            The user's club is: {club_name}
+            
+            For each fixture, extract:
+            - opponent: The team they're playing against
+            - date: Match date (convert to YYYY-MM-DD format)
+            - time_start: Match time (HH:MM format)
+            - venue: Stadium/ground name
+            - location: City or location
+            - home_away: "HOME" if {club_name} is playing at home, "AWAY" if away
+            - match_type: Type of match (League, Cup, Friendly, etc.)
+            
+            Text to parse:
+            {fixture_text}
+            
+            Return only a JSON array of fixtures, no other text. Example format:
+            [
+                {{
+                    "opponent": "Arsenal",
+                    "date": "2024-03-15",
+                    "time_start": "15:00",
+                    "venue": "Emirates Stadium",
+                    "location": "London",
+                    "home_away": "AWAY",
+                    "match_type": "League"
+                }}
+            ]
+            """
+            
+            logger.info(f"Testing AI fixture parsing for club: {club_name}")
+            
+            # Call OpenAI API
+            response = client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are a helpful assistant that extracts fixture/match information from text and returns it as structured JSON data."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=2000,
+                temperature=0.1
+            )
+            
+            # Parse the AI response
+            ai_response = response.choices[0].message.content.strip()
+            logger.info(f"AI test response: {ai_response}")
+            
+            # Try to parse as JSON
+            try:
+                fixtures_data = json.loads(ai_response)
+                if isinstance(fixtures_data, list):
+                    logger.info(f"AI test successfully parsed {len(fixtures_data)} fixtures")
+                    return fixtures_data
+                else:
+                    logger.error("AI test response is not a list")
+                    return []
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse AI test response as JSON: {str(e)}")
+                return []
+            
+        except Exception as e:
+            logger.error(f"AI test parsing error: {str(e)}", exc_info=True)
+            return []

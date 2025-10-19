@@ -12,8 +12,10 @@ from .views import (
     PlayerPhotoUploadView,
     SubstitutionPlayersView,
     UpcomingMatchView,
-    import_fa_fixtures,
-    import_cricket_fixtures,
+    FAFulltimeScraperView,
+    PlayCricketAPIView,
+    EnhancedBulkUploadMatchesView,
+    FixtureImportOptionsView,
 )
 
 urlpatterns = [
@@ -28,6 +30,9 @@ urlpatterns = [
     path("players/substitution/", SubstitutionPlayersView.as_view(), name="substitution-players"),
     path("matches/upload-opponent-logo/", OpponentLogoUploadView.as_view(), name="upload-opponent-logo"),
     path("players/upload-photo/", PlayerPhotoUploadView.as_view(), name="upload-player-photo"),
-    path("fixtures/import-fa/", import_fa_fixtures, name="import-fa-fixtures"),
-    path("fixtures/import-cricket/", import_cricket_fixtures, name="import-cricket-fixtures"),
+    # New fixture import endpoints
+    path("fixtures/import-options/", FixtureImportOptionsView.as_view(), name="fixture-import-options"),
+    path("fixtures/import/csv/", EnhancedBulkUploadMatchesView.as_view(), name="fixture-import-csv"),
+    path("fixtures/import/fa-fulltime/", FAFulltimeScraperView.as_view(), name="fixture-import-fa"),
+    path("fixtures/import/play-cricket/", PlayCricketAPIView.as_view(), name="fixture-import-cricket"),
 ]

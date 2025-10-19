@@ -1,287 +1,1203 @@
-# ... existing code ...
-
-from django.http import JsonResponse
-from django.views.decorators.csrf import csrf_exempt
-from django.views.decorators.http import require_http_methods
-import json
-import requests
-from bs4 import BeautifulSoup
-import re
-from datetime import datetime
+import csv
+import io
 import logging
+import time
+import requests
+import re
+from datetime import datetime, timedelta
+from bs4 import BeautifulSoup
+from urllib.parse import urljoin, urlparse
+
+from django.utils import timezone
+from django.core.cache import cache
+from rest_framework import generics, status
+from rest_framework.generics import ListAPIView, RetrieveUpdateDestroyAPIView
+from rest_framework.parsers import JSONParser, MultiPartParser
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from users.models import Club
+
+from .models import Match, Player
+from .serializers import FixturesSerializer, MatchSerializer, PlayerSerializer
 
 logger = logging.getLogger(__name__)
 
-@csrf_exempt
-@require_http_methods(["POST"])
-def import_fa_fixtures(request):
-    """
-    Import fixtures from FA Fulltime page
-    """
-    try:
-        data = json.loads(request.body)
-        url = data.get('url')
+# Simple rate limiting for debugging
+class RateLimitMixin:
+    def check_rate_limit(self, user_id, endpoint, limit_seconds=5):
+        """Simple rate limiting to prevent excessive calls."""
+        cache_key = f"rate_limit_{endpoint}_{user_id}"
+        last_call = cache.get(cache_key)
+        current_time = timezone.now()
         
-        if not url:
-            return JsonResponse({'error': 'URL is required'}, status=400)
+        if last_call:
+            time_diff = (current_time - last_call).total_seconds()
+            if time_diff < limit_seconds:
+                logger.warning(f"Rate limit exceeded for user {user_id} on {endpoint}. Time since last call: {time_diff}s")
+                return False
         
-        # Validate FA Fulltime URL
-        if 'fulltime.thefa.com' not in url:
-            return JsonResponse({'error': 'Invalid FA Fulltime URL'}, status=400)
-        
-        # Scrape fixtures from FA Fulltime
-        fixtures = scrape_fa_fixtures(url)
-        
-        if not fixtures:
-            return JsonResponse({'error': 'No fixtures found on the page'}, status=404)
-        
-        # Create fixtures in database
-        created_count = 0
-        for fixture_data in fixtures:
-            try:
-                match = Match.objects.create(
-                    match_type=fixture_data.get('match_type', 'League'),
-                    opponent=fixture_data.get('opponent', ''),
-                    date=fixture_data.get('date'),
-                    time_start=fixture_data.get('time'),
-                    venue=fixture_data.get('venue', 'Home'),
-                    home_away=fixture_data.get('home_away', 'HOME'),
-                    competition=fixture_data.get('competition', ''),
-                    notes=fixture_data.get('notes', '')
-                )
-                created_count += 1
-            except Exception as e:
-                logger.error(f"Error creating fixture: {e}")
-                continue
-        
-        return JsonResponse({
-            'success': True,
-            'count': created_count,
-            'message': f'Successfully imported {created_count} fixtures'
-        })
-        
-    except Exception as e:
-        logger.error(f"Error importing FA fixtures: {e}")
-        return JsonResponse({'error': str(e)}, status=500)
+        cache.set(cache_key, current_time, 60)  # Cache for 1 minute
+        return True
 
-@csrf_exempt
-@require_http_methods(["POST"])
-def import_cricket_fixtures(request):
-    """
-    Import fixtures from Play Cricket API
-    """
-    try:
-        data = json.loads(request.body)
-        url = data.get('url')
-        
-        if not url:
-            return JsonResponse({'error': 'URL is required'}, status=400)
-        
-        # Validate Play Cricket URL
-        if 'play-cricket.ecb.co.uk' not in url:
-            return JsonResponse({'error': 'Invalid Play Cricket URL'}, status=400)
-        
-        # Extract site ID from URL
-        site_id = extract_site_id_from_url(url)
-        if not site_id:
-            return JsonResponse({'error': 'Could not extract site ID from URL'}, status=400)
-        
-        # Fetch fixtures from Play Cricket API
-        fixtures = fetch_cricket_fixtures(site_id)
-        
-        if not fixtures:
-            return JsonResponse({'error': 'No fixtures found'}, status=404)
-        
-        # Create fixtures in database
-        created_count = 0
-        for fixture_data in fixtures:
-            try:
-                match = Match.objects.create(
-                    match_type=fixture_data.get('match_type', 'League'),
-                    opponent=fixture_data.get('opponent', ''),
-                    date=fixture_data.get('date'),
-                    time_start=fixture_data.get('time'),
-                    venue=fixture_data.get('venue', 'Home'),
-                    home_away=fixture_data.get('home_away', 'HOME'),
-                    competition=fixture_data.get('competition', ''),
-                    notes=fixture_data.get('notes', '')
-                )
-                created_count += 1
-            except Exception as e:
-                logger.error(f"Error creating fixture: {e}")
-                continue
-        
-        return JsonResponse({
-            'success': True,
-            'count': created_count,
-            'message': f'Successfully imported {created_count} fixtures'
-        })
-        
-    except Exception as e:
-        logger.error(f"Error importing cricket fixtures: {e}")
-        return JsonResponse({'error': str(e)}, status=500)
 
-def scrape_fa_fixtures(url):
-    """
-    Scrape fixtures from FA Fulltime page
-    """
-    try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-        }
+class MatchListView(ListAPIView, RateLimitMixin):
+    """List all matches for the authenticated user."""
+    serializer_class = FixturesSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        user = self.request.user
+        # Add request tracking
+        logger.info(f"MatchListView called by user {user.email} at {timezone.now()}")
+        logger.info(f"Request headers: {dict(self.request.headers)}")
         
-        response = requests.get(url, headers=headers, timeout=30)
-        response.raise_for_status()
+        # Check rate limiting
+        if not self.check_rate_limit(user.id, "matches", limit_seconds=30):  # Increased from 3 to 30 seconds
+            logger.warning(f"Rate limit exceeded for matches endpoint - user {user.email}")
+            # Return empty queryset instead of raising error to avoid breaking frontend
+            return Match.objects.none()
         
-        soup = BeautifulSoup(response.content, 'html.parser')
-        fixtures = []
-        
-        # Look for fixture tables or lists
-        fixture_rows = soup.find_all('tr', class_=re.compile(r'fixture|match'))
-        
-        for row in fixture_rows:
+        matches = Match.objects.filter(club__user=user).order_by("date")
+        logger.info(f"Found {matches.count()} matches for user {user.email}")
+        return matches
+
+
+class MatchListCreateView(generics.ListCreateAPIView):
+    """List and create matches."""
+    queryset = Match.objects.all()
+    serializer_class = MatchSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Match.objects.filter(club__user=self.request.user)
+
+    def perform_create(self, serializer):
+        try:
+            club = Club.objects.get(user=self.request.user)
+            match = serializer.save(club=club)
+            logger.info(f"Match created: {match.opponent} vs {match.club.name} on {match.date}")
+        except Club.DoesNotExist:
+            logger.error(f"No club found for user: {self.request.user.email}")
+            raise
+        except Exception as e:
+            logger.error(f"Error creating match: {str(e)}", exc_info=True)
+            raise
+
+    def create(self, request, *args, **kwargs):
+        try:
+            data = request.data
+            if isinstance(data, list):
+                serializer = self.get_serializer(data=data, many=True)
+            else:
+                serializer = self.get_serializer(data=data)
+
+            serializer.is_valid(raise_exception=True)
+
             try:
-                cells = row.find_all(['td', 'th'])
-                if len(cells) < 3:
+                club = Club.objects.get(user=request.user)
+            except Club.DoesNotExist:
+                return Response(
+                    {"error": "Club not found for this user. Please create a club first."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            serializer.save(club=club)
+            logger.info(f"Match(es) created successfully for user: {request.user.email}")
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            logger.error(f"Error in match creation: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while creating the match(es)."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class MatchDetailView(RetrieveUpdateDestroyAPIView):
+    """Retrieve, update, or delete a specific match."""
+    serializer_class = MatchSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Match.objects.filter(club__user=self.request.user)
+
+    def perform_update(self, serializer):
+        try:
+            match = serializer.save()
+            logger.info(f"Match updated: {match.opponent} vs {match.club.name} on {match.date}")
+        except Exception as e:
+            logger.error(f"Error updating match: {str(e)}", exc_info=True)
+            raise
+
+    def perform_destroy(self, instance):
+        try:
+            match_info = f"{instance.opponent} vs {instance.club.name} on {instance.date}"
+            instance.delete()
+            logger.info(f"Match deleted: {match_info}")
+        except Exception as e:
+            logger.error(f"Error deleting match: {str(e)}", exc_info=True)
+            raise
+
+
+class BulkUploadMatchesView(APIView):
+    """Bulk upload matches from CSV file."""
+    parser_classes = [MultiPartParser]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            csv_file = request.FILES.get("file")
+            if not csv_file:
+                return Response({"error": "No file uploaded."}, status=status.HTTP_400_BAD_REQUEST)
+
+            if not csv_file.name.endswith('.csv'):
+                return Response({"error": "Please upload a CSV file."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Get user's club
+            try:
+                club = Club.objects.get(user=request.user)
+            except Club.DoesNotExist:
+                return Response(
+                    {"error": "Club not found for this user. Please create a club first."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            decoded_file = csv_file.read().decode("utf-8")
+            io_string = io.StringIO(decoded_file)
+            reader = csv.DictReader(io_string)
+
+            matches_created = []
+            errors = []
+
+            for row_num, row in enumerate(reader, start=2):  # Start from 2 to account for header
+                try:
+                    match = Match.objects.create(
+                        club=club,
+                        opponent=row.get("opponent", ""),
+                        date=row.get("date"),
+                        location=row.get("location", ""),
+                        venue=row.get("venue", ""),
+                        time_start=row.get("time_start", ""),
+                        match_type=row.get("match_type", "League"),
+                    )
+                    matches_created.append(match.id)
+                except Exception as e:
+                    errors.append(f"Row {row_num}: {str(e)}")
+                    logger.warning(f"Error processing CSV row {row_num}: {str(e)}")
+
+            logger.info(f"Bulk upload completed. {len(matches_created)} matches created, {len(errors)} errors")
+            
+            response_data = {"created": matches_created}
+            if errors:
+                response_data["errors"] = errors
+
+            return Response(response_data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            logger.error(f"Bulk upload error: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred during bulk upload."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class PlayerListCreateView(generics.ListCreateAPIView):
+    """List and create players."""
+    queryset = Player.objects.all()
+    serializer_class = PlayerSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        return Player.objects.filter(club__user=self.request.user)
+
+    def perform_create(self, serializer):
+        try:
+            club = Club.objects.get(user=self.request.user)
+            player = serializer.save(club=club)
+            logger.info(f"Player created: {player.name} for club {club.name}")
+        except Club.DoesNotExist:
+            logger.error(f"No club found for user: {self.request.user.email}")
+            raise
+        except Exception as e:
+            logger.error(f"Error creating player: {str(e)}", exc_info=True)
+            raise
+
+    def create(self, request, *args, **kwargs):
+        try:
+            data = request.data
+            if isinstance(data, list):
+                serializer = self.get_serializer(data=data, many=True)
+            else:
+                serializer = self.get_serializer(data=data)
+
+            serializer.is_valid(raise_exception=True)
+
+            try:
+                club = Club.objects.get(user=request.user)
+            except Club.DoesNotExist:
+                return Response(
+                    {"error": "Club not found for this user. Please create a club first."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            serializer.save(club=club)
+            logger.info(f"Player(s) created successfully for user: {request.user.email}")
+            return Response(serializer.data, status=status.HTTP_201_CREATED)
+        except Exception as e:
+            logger.error(f"Error in player creation: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while creating the player(s)."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class PlayerDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Retrieve, update, or delete a specific player."""
+    queryset = Player.objects.all()
+    serializer_class = PlayerSerializer
+    permission_classes = [IsAuthenticated]
+    lookup_field = "id"
+
+    def get_queryset(self):
+        return Player.objects.filter(club__user=self.request.user)
+
+    def perform_update(self, serializer):
+        try:
+            club = Club.objects.get(user=self.request.user)
+            serializer.save(club=club)
+            logger.info(f"Player updated: {serializer.instance.name} for club {club.name}")
+        except Club.DoesNotExist:
+            logger.error(f"No club found for user: {self.request.user.email}")
+            raise
+
+    def perform_destroy(self, instance):
+        player_name = instance.name
+        instance.delete()
+        logger.info(f"Player deleted: {player_name}")
+
+
+class LastMatchView(APIView):
+    """Get the last completed match for the user's club."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            user = request.user
+            
+            # Try to get club with error handling for migration issues
+            try:
+                club = user.clubs.first()
+            except Exception as club_error:
+                logger.error(f"Error accessing user clubs: {str(club_error)}", exc_info=True)
+                # Fallback: try direct Club query
+                try:
+                    club = Club.objects.filter(user=user).first()
+                except Exception as fallback_error:
+                    logger.error(f"Fallback club query also failed: {str(fallback_error)}", exc_info=True)
+                    return Response(
+                        {"detail": "Database migration in progress. Please try again later."},
+                        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    )
+
+            if not club:
+                return Response(
+                    {"detail": "User is not associated with any clubs."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            today = timezone.now().date()
+
+            last_match = (
+                Match.objects.filter(club=club)
+                .filter(date__lt=today)  # only matches before today
+                .order_by("-date", "-time_start")  # latest first
+                .first()
+            )
+
+            if last_match:
+                logger.info(f"Last match retrieved for club {club.name}: {last_match.opponent}")
+                return Response(MatchSerializer(last_match).data)
+
+            return Response(
+                {"detail": "No past matches found."}, status=status.HTTP_200_OK
+            )
+
+        except Exception as e:
+            logger.error(f"Error fetching last match: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while fetching the last match."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class MatchdayView(APIView):
+    """Get the next upcoming match for the user's club."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            user = request.user
+            
+            # Try to get club with error handling for migration issues
+            try:
+                club = user.clubs.first()
+            except Exception as club_error:
+                logger.error(f"Error accessing user clubs: {str(club_error)}", exc_info=True)
+                # Fallback: try direct Club query
+                try:
+                    club = Club.objects.filter(user=user).first()
+                except Exception as fallback_error:
+                    logger.error(f"Fallback club query also failed: {str(fallback_error)}", exc_info=True)
+                    return Response(
+                        {"detail": "Database migration in progress. Please try again later."},
+                        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    )
+
+            if not club:
+                return Response(
+                    {"detail": "User is not associated with any clubs."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            now = timezone.now()
+
+            next_match = (
+                Match.objects.filter(club=club)
+                .filter(date__gte=now.date())  # upcoming matches (today or later)
+                .order_by("date", "time_start")  # soonest first
+                .first()
+            )
+
+            if next_match:
+                logger.info(f"Next match retrieved for club {club.name}: {next_match.opponent}")
+                return Response(MatchSerializer(next_match).data)
+
+            return Response(
+                {"detail": "No upcoming matches found."}, status=status.HTTP_200_OK
+            )
+
+        except Exception as e:
+            logger.error(f"Error fetching next match: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while fetching the next match."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class UpcomingMatchView(APIView):
+    """Get the second upcoming match for the user's club."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            user = request.user
+            
+            # Try to get club with error handling for migration issues
+            try:
+                club = user.clubs.first()
+            except Exception as club_error:
+                logger.error(f"Error accessing user clubs: {str(club_error)}", exc_info=True)
+                # Fallback: try direct Club query
+                try:
+                    club = Club.objects.filter(user=user).first()
+                except Exception as fallback_error:
+                    logger.error(f"Fallback club query also failed: {str(fallback_error)}", exc_info=True)
+                    return Response(
+                        {"detail": "Database migration in progress. Please try again later."},
+                        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    )
+
+            if not club:
+                return Response(
+                    {"detail": "User is not associated with any clubs."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            now = timezone.now()
+
+            upcoming_matches = (
+                Match.objects.filter(club=club)
+                .filter(date__gte=now.date())
+                .order_by("date", "time_start")
+            )
+
+            if upcoming_matches.count() > 1:
+                second_match = upcoming_matches[1]
+                logger.info(f"Second upcoming match retrieved for club {club.name}: {second_match.opponent}")
+                return Response(MatchSerializer(second_match).data)
+            elif upcoming_matches.exists():
+                return Response(
+                    {"detail": "Only one upcoming match found."},
+                    status=status.HTTP_200_OK,
+                )
+            else:
+                return Response(
+                    {"detail": "No upcoming matches found."}, status=status.HTTP_200_OK
+                )
+
+        except Exception as e:
+            logger.error(f"Error fetching second upcoming match: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while fetching the upcoming match."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class SubstitutionPlayersView(APIView):
+    """Get players for substitution dropdowns."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            user = request.user
+            
+            # Try to get club with error handling for migration issues
+            try:
+                club = user.clubs.first()
+            except Exception as club_error:
+                logger.error(f"Error accessing user clubs: {str(club_error)}", exc_info=True)
+                # Fallback: try direct Club query
+                try:
+                    club = Club.objects.filter(user=user).first()
+                except Exception as fallback_error:
+                    logger.error(f"Fallback club query also failed: {str(fallback_error)}", exc_info=True)
+                    return Response(
+                        {"detail": "Database migration in progress. Please try again later."},
+                        status=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    )
+
+            if not club:
+                return Response(
+                    {"detail": "User is not associated with any clubs."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            players = Player.objects.filter(club=club).order_by('name')
+            
+            # Return simplified player data for dropdowns
+            player_data = [
+                {
+                    "id": player.id,
+                    "name": player.name,
+                    "squad_no": player.squad_no,
+                    "position": player.position
+                }
+                for player in players
+            ]
+
+            logger.info(f"Retrieved {len(player_data)} players for substitution dropdowns for club {club.name}")
+            return Response(player_data)
+
+        except Exception as e:
+            logger.error(f"Error fetching players for substitution: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while fetching players."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class OpponentLogoUploadView(APIView):
+    """Upload opponent logo for matches."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser]
+
+    def post(self, request):
+        try:
+            logo_file = request.FILES.get('logo')
+            if not logo_file:
+                return Response(
+                    {"error": "No logo file provided."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Upload to Cloudinary
+            try:
+                import cloudinary
+                import cloudinary.uploader
+                from django.conf import settings
+                
+                upload_result = cloudinary.uploader.upload(
+                    logo_file,
+                    folder="opponent_logos",
+                    public_id=f"opponent_{request.user.id}_{int(time.time())}",
+                    overwrite=True,
+                    resource_type="image",
+                    tags=["Logo"]
+                )
+                
+                logo_url = upload_result['secure_url']
+                logger.info(f"Opponent logo uploaded to Cloudinary: {logo_url}")
+                
+                # Add to media manager
+                try:
+                    from users.models import Club
+                    from graphicpack.models import MediaItem
+                    
+                    club = Club.objects.get(user=request.user)
+                    
+                    # Get image dimensions
+                    width = None
+                    height = None
+                    try:
+                        from PIL import Image
+                        img = Image.open(logo_file)
+                        width, height = img.size
+                    except Exception as e:
+                        logger.warning(f"Could not get image dimensions: {str(e)}")
+                    
+                    # Create MediaItem record
+                    media_item = MediaItem.objects.create(
+                        club=club,
+                        title=f"Opponent Logo - {logo_file.name}",
+                        description="Opponent logo uploaded during match creation",
+                        media_type='opponent_logo',
+                        category='logos',
+                        file_url=logo_url,
+                        file_name=logo_file.name,
+                        file_size=logo_file.size,
+                        file_type=logo_file.content_type,
+                        width=width,
+                        height=height,
+                        cloudinary_public_id=upload_result['public_id'],
+                        cloudinary_folder=upload_result.get('folder', ''),
+                        tags=['opponent', 'logo', 'match']
+                    )
+                    
+                    logger.info(f"Added opponent logo to media manager: {media_item.id}")
+                    
+                except Exception as media_error:
+                    logger.warning(f"Failed to add opponent logo to media manager: {str(media_error)}")
+                    # Don't fail the upload if media manager addition fails
+                
+                return Response({
+                    "logo_url": logo_url,
+                    "message": "Opponent logo uploaded successfully"
+                }, status=status.HTTP_200_OK)
+                
+            except Exception as e:
+                logger.error(f"Opponent logo upload failed: {str(e)}")
+                return Response(
+                    {"error": "Failed to upload opponent logo. Please try again."}, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+                
+        except Exception as e:
+            logger.error(f"Error in opponent logo upload: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while uploading the logo."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class PlayerPhotoUploadView(APIView):
+    """Upload player photo."""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser]
+
+    def post(self, request):
+        try:
+            photo_file = request.FILES.get('photo')
+            if not photo_file:
+                return Response(
+                    {"error": "No photo file provided."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Upload to Cloudinary
+            try:
+                import cloudinary
+                import cloudinary.uploader
+                from django.conf import settings
+                
+                upload_result = cloudinary.uploader.upload(
+                    photo_file,
+                    folder="player_photos",
+                    public_id=f"player_{request.user.id}_{int(time.time())}",
+                    overwrite=True,
+                    resource_type="image"
+                )
+                
+                photo_url = upload_result['secure_url']
+                logger.info(f"Player photo uploaded to Cloudinary: {photo_url}")
+                
+                # Add to media manager
+                try:
+                    from users.models import Club
+                    from graphicpack.models import MediaItem
+                    
+                    club = Club.objects.get(user=request.user)
+                    
+                    # Get image dimensions
+                    width = None
+                    height = None
+                    try:
+                        from PIL import Image
+                        img = Image.open(photo_file)
+                        width, height = img.size
+                    except Exception as e:
+                        logger.warning(f"Could not get image dimensions: {str(e)}")
+                    
+                    # Create MediaItem record
+                    media_item = MediaItem.objects.create(
+                        club=club,
+                        title=f"Player Photo - {photo_file.name}",
+                        description="Player photo uploaded during player creation",
+                        media_type='player_photo',
+                        category='players',
+                        file_url=photo_url,
+                        file_name=photo_file.name,
+                        file_size=photo_file.size,
+                        file_type=photo_file.content_type,
+                        width=width,
+                        height=height,
+                        cloudinary_public_id=upload_result['public_id'],
+                        cloudinary_folder=upload_result.get('folder', ''),
+                        tags=['player', 'photo', 'squad']
+                    )
+                    
+                    logger.info(f"Added player photo to media manager: {media_item.id}")
+                    
+                except Exception as media_error:
+                    logger.warning(f"Failed to add player photo to media manager: {str(media_error)}")
+                    # Don't fail the upload if media manager addition fails
+                
+                return Response({
+                    "photo_url": photo_url,
+                    "message": "Player photo uploaded successfully"
+                }, status=status.HTTP_200_OK)
+                
+            except Exception as e:
+                logger.error(f"Player photo upload failed: {str(e)}")
+                return Response(
+                    {"error": "Failed to upload player photo. Please try again."}, 
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
+                
+        except Exception as e:
+            logger.error(f"Error in player photo upload: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while uploading the photo."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class FAFulltimeScraperView(APIView):
+    """Scrape fixtures from FA Fulltime website."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            fa_url = request.data.get('fa_url')
+            if not fa_url:
+                return Response(
+                    {"error": "FA Fulltime URL is required."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Validate URL format
+            if 'fulltime.thefa.com' not in fa_url:
+                return Response(
+                    {"error": "Please provide a valid FA Fulltime URL."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Get user's club
+            try:
+                club = Club.objects.get(user=request.user)
+            except Club.DoesNotExist:
+                return Response(
+                    {"error": "Club not found for this user. Please create a club first."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            # Scrape fixtures from FA Fulltime
+            fixtures_data = self.scrape_fa_fixtures(fa_url)
+            
+            if not fixtures_data:
+                return Response(
+                    {"error": "No fixtures found on the provided FA Fulltime page."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            # Create matches
+            matches_created = []
+            errors = []
+
+            for fixture in fixtures_data:
+                try:
+                    match = Match.objects.create(
+                        club=club,
+                        opponent=fixture.get('opponent', ''),
+                        date=fixture.get('date'),
+                        location=fixture.get('location', ''),
+                        venue=fixture.get('venue', ''),
+                        time_start=fixture.get('time_start', ''),
+                        match_type=fixture.get('match_type', 'League'),
+                        home_away=fixture.get('home_away', 'HOME')
+                    )
+                    matches_created.append(match.id)
+                except Exception as e:
+                    errors.append(f"Error creating match: {str(e)}")
+                    logger.warning(f"Error creating match from FA data: {str(e)}")
+
+            logger.info(f"FA scraper completed. {len(matches_created)} matches created, {len(errors)} errors")
+            
+            response_data = {
+                "created": matches_created,
+                "total_found": len(fixtures_data),
+                "message": f"Successfully imported {len(matches_created)} fixtures from FA Fulltime"
+            }
+            if errors:
+                response_data["errors"] = errors
+
+            return Response(response_data, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            logger.error(f"FA scraper error: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while scraping FA fixtures."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def scrape_fa_fixtures(self, url):
+        """Scrape fixture data from FA Fulltime website."""
+        try:
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+            }
+            
+            response = requests.get(url, headers=headers, timeout=30)
+            response.raise_for_status()
+            
+            soup = BeautifulSoup(response.content, 'html.parser')
+            fixtures = []
+            
+            # Look for fixture tables or lists
+            fixture_tables = soup.find_all('table', class_=['fixtures', 'results', 'matches'])
+            
+            for table in fixture_tables:
+                rows = table.find_all('tr')
+                for row in rows[1:]:  # Skip header row
+                    cells = row.find_all(['td', 'th'])
+                    if len(cells) >= 3:  # Ensure we have enough data
+                        fixture_data = self.parse_fixture_row(cells)
+                        if fixture_data:
+                            fixtures.append(fixture_data)
+            
+            # If no tables found, look for fixture lists
+            if not fixtures:
+                fixture_lists = soup.find_all(['ul', 'ol'], class_=['fixtures', 'results', 'matches'])
+                for fixture_list in fixture_lists:
+                    items = fixture_list.find_all('li')
+                    for item in items:
+                        fixture_data = self.parse_fixture_text(item.get_text())
+                        if fixture_data:
+                            fixtures.append(fixture_data)
+            
+            return fixtures
+            
+        except requests.RequestException as e:
+            logger.error(f"Error fetching FA page: {str(e)}")
+            return []
+        except Exception as e:
+            logger.error(f"Error parsing FA page: {str(e)}")
+            return []
+
+    def parse_fixture_row(self, cells):
+        """Parse fixture data from table row."""
+        try:
+            if len(cells) < 3:
+                return None
+                
+            # Extract date
+            date_text = cells[0].get_text(strip=True)
+            match_date = self.parse_date(date_text)
+            
+            # Extract opponent
+            opponent = cells[1].get_text(strip=True) if len(cells) > 1 else ""
+            
+            # Extract venue/location
+            venue = cells[2].get_text(strip=True) if len(cells) > 2 else ""
+            
+            # Extract time if available
+            time_text = cells[3].get_text(strip=True) if len(cells) > 3 else ""
+            
+            # Determine if home or away
+            home_away = 'HOME' if 'home' in venue.lower() or 'vs' in opponent.lower() else 'AWAY'
+            
+            return {
+                'date': match_date,
+                'opponent': opponent,
+                'venue': venue,
+                'location': venue,
+                'time_start': time_text,
+                'home_away': home_away,
+                'match_type': 'League'
+            }
+            
+        except Exception as e:
+            logger.warning(f"Error parsing fixture row: {str(e)}")
+            return None
+
+    def parse_fixture_text(self, text):
+        """Parse fixture data from text."""
+        try:
+            # Simple regex patterns for common fixture formats
+            patterns = [
+                r'(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s+(.+?)\s+vs\s+(.+)',
+                r'(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s+(.+?)\s+v\s+(.+)',
+            ]
+            
+            for pattern in patterns:
+                match = re.search(pattern, text, re.IGNORECASE)
+                if match:
+                    date_str = match.group(1)
+                    home_team = match.group(2).strip()
+                    away_team = match.group(3).strip()
+                    
+                    match_date = self.parse_date(date_str)
+                    
+                    return {
+                        'date': match_date,
+                        'opponent': away_team,
+                        'venue': 'Home',
+                        'location': 'Home',
+                        'time_start': '',
+                        'home_away': 'HOME',
+                        'match_type': 'League'
+                    }
+            
+            return None
+            
+        except Exception as e:
+            logger.warning(f"Error parsing fixture text: {str(e)}")
+            return None
+
+    def parse_date(self, date_str):
+        """Parse date string into datetime object."""
+        try:
+            # Try different date formats
+            formats = [
+                '%d/%m/%Y',
+                '%d-%m-%Y',
+                '%d/%m/%y',
+                '%d-%m-%y',
+                '%Y-%m-%d',
+                '%d %B %Y',
+                '%d %b %Y'
+            ]
+            
+            for fmt in formats:
+                try:
+                    return datetime.strptime(date_str, fmt)
+                except ValueError:
                     continue
-                
-                # Extract fixture data based on common FA Fulltime structure
-                opponent = extract_opponent_from_cells(cells)
-                date = extract_date_from_cells(cells)
-                time = extract_time_from_cells(cells)
-                venue = extract_venue_from_cells(cells)
-                competition = extract_competition_from_cells(cells)
-                
-                if opponent and date:
-                    fixtures.append({
-                        'opponent': opponent,
-                        'date': date,
-                        'time': time,
-                        'venue': venue,
-                        'competition': competition,
-                        'match_type': 'League',
-                        'home_away': 'HOME' if 'home' in venue.lower() else 'AWAY',
-                        'notes': f'Imported from FA Fulltime'
-                    })
-            except Exception as e:
-                logger.error(f"Error parsing fixture row: {e}")
-                continue
-        
-        return fixtures
-        
-    except Exception as e:
-        logger.error(f"Error scraping FA fixtures: {e}")
-        return []
+            
+            # If no format matches, return current date
+            logger.warning(f"Could not parse date: {date_str}")
+            return datetime.now()
+            
+        except Exception as e:
+            logger.warning(f"Error parsing date {date_str}: {str(e)}")
+            return datetime.now()
 
-def extract_opponent_from_cells(cells):
-    """Extract opponent name from table cells"""
-    for cell in cells:
-        text = cell.get_text().strip()
-        if text and not any(keyword in text.lower() for keyword in ['date', 'time', 'venue', 'competition']):
-            return text
-    return ''
 
-def extract_date_from_cells(cells):
-    """Extract date from table cells"""
-    for cell in cells:
-        text = cell.get_text().strip()
-        if re.match(r'\d{1,2}/\d{1,2}/\d{4}', text):
+class PlayCricketAPIView(APIView):
+    """Import fixtures from Play Cricket API."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            team_id = request.data.get('team_id')
+            if not team_id:
+                return Response(
+                    {"error": "Play Cricket team ID is required."}, 
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Get user's club
             try:
-                return datetime.strptime(text, '%d/%m/%Y').strftime('%Y-%m-%d')
-            except:
-                continue
-    return ''
+                club = Club.objects.get(user=request.user)
+            except Club.DoesNotExist:
+                return Response(
+                    {"error": "Club not found for this user. Please create a club first."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
-def extract_time_from_cells(cells):
-    """Extract time from table cells"""
-    for cell in cells:
-        text = cell.get_text().strip()
-        if re.match(r'\d{1,2}:\d{2}', text):
-            return text
-    return ''
+            # Fetch fixtures from Play Cricket API
+            fixtures_data = self.fetch_play_cricket_fixtures(team_id)
+            
+            if not fixtures_data:
+                return Response(
+                    {"error": "No fixtures found for the provided team ID."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
 
-def extract_venue_from_cells(cells):
-    """Extract venue from table cells"""
-    for cell in cells:
-        text = cell.get_text().strip()
-        if any(keyword in text.lower() for keyword in ['home', 'away', 'venue']):
-            return text
-    return 'Home'
+            # Create matches
+            matches_created = []
+            errors = []
 
-def extract_competition_from_cells(cells):
-    """Extract competition from table cells"""
-    for cell in cells:
-        text = cell.get_text().strip()
-        if any(keyword in text.lower() for keyword in ['league', 'cup', 'friendly']):
-            return text
-    return ''
+            for fixture in fixtures_data:
+                try:
+                    match = Match.objects.create(
+                        club=club,
+                        opponent=fixture.get('opponent', ''),
+                        date=fixture.get('date'),
+                        location=fixture.get('location', ''),
+                        venue=fixture.get('venue', ''),
+                        time_start=fixture.get('time_start', ''),
+                        match_type=fixture.get('match_type', 'League'),
+                        home_away=fixture.get('home_away', 'HOME')
+                    )
+                    matches_created.append(match.id)
+                except Exception as e:
+                    errors.append(f"Error creating match: {str(e)}")
+                    logger.warning(f"Error creating match from Play Cricket data: {str(e)}")
 
-def extract_site_id_from_url(url):
-    """Extract site ID from Play Cricket URL"""
-    try:
-        # Common patterns for Play Cricket URLs
-        patterns = [
-            r'/website/web_pages/(\d+)',
-            r'/website/(\d+)',
-            r'id=(\d+)'
+            logger.info(f"Play Cricket API completed. {len(matches_created)} matches created, {len(errors)} errors")
+            
+            response_data = {
+                "created": matches_created,
+                "total_found": len(fixtures_data),
+                "message": f"Successfully imported {len(matches_created)} fixtures from Play Cricket"
+            }
+            if errors:
+                response_data["errors"] = errors
+
+            return Response(response_data, status=status.HTTP_201_CREATED)
+
+        except Exception as e:
+            logger.error(f"Play Cricket API error: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while fetching Play Cricket fixtures."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def fetch_play_cricket_fixtures(self, team_id):
+        """Fetch fixture data from Play Cricket API."""
+        try:
+            # Play Cricket API endpoint for team fixtures
+            api_url = f"https://play-cricket.ecb.co.uk/api/v1/teams/{team_id}/matches"
+            
+            headers = {
+                'User-Agent': 'MatchGen/1.0',
+                'Accept': 'application/json'
+            }
+            
+            response = requests.get(api_url, headers=headers, timeout=30)
+            response.raise_for_status()
+            
+            data = response.json()
+            fixtures = []
+            
+            if 'data' in data:
+                for match in data['data']:
+                    fixture_data = self.parse_play_cricket_match(match)
+                    if fixture_data:
+                        fixtures.append(fixture_data)
+            
+            return fixtures
+            
+        except requests.RequestException as e:
+            logger.error(f"Error fetching Play Cricket data: {str(e)}")
+            return []
+        except Exception as e:
+            logger.error(f"Error parsing Play Cricket data: {str(e)}")
+            return []
+
+    def parse_play_cricket_match(self, match_data):
+        """Parse match data from Play Cricket API."""
+        try:
+            # Extract match details
+            match_date = match_data.get('match_date')
+            if match_date:
+                match_date = datetime.fromisoformat(match_date.replace('Z', '+00:00'))
+            
+            home_team = match_data.get('home_team', {}).get('name', '')
+            away_team = match_data.get('away_team', {}).get('name', '')
+            venue = match_data.get('ground', {}).get('name', '')
+            
+            # Determine opponent and home/away status
+            # This would need to be customized based on the club name
+            opponent = away_team if home_team else home_team
+            home_away = 'HOME' if home_team else 'AWAY'
+            
+            return {
+                'date': match_date,
+                'opponent': opponent,
+                'venue': venue,
+                'location': venue,
+                'time_start': match_data.get('start_time', ''),
+                'home_away': home_away,
+                'match_type': match_data.get('competition', {}).get('name', 'League')
+            }
+            
+        except Exception as e:
+            logger.warning(f"Error parsing Play Cricket match: {str(e)}")
+            return None
+
+
+class EnhancedBulkUploadMatchesView(APIView):
+    """Enhanced bulk upload matches from CSV file with better error handling."""
+    parser_classes = [MultiPartParser]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            csv_file = request.FILES.get("file")
+            if not csv_file:
+                return Response({"error": "No file uploaded."}, status=status.HTTP_400_BAD_REQUEST)
+
+            if not csv_file.name.endswith('.csv'):
+                return Response({"error": "Please upload a CSV file."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # Get user's club
+            try:
+                club = Club.objects.get(user=request.user)
+            except Club.DoesNotExist:
+                return Response(
+                    {"error": "Club not found for this user. Please create a club first."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            decoded_file = csv_file.read().decode("utf-8")
+            io_string = io.StringIO(decoded_file)
+            reader = csv.DictReader(io_string)
+
+            matches_created = []
+            errors = []
+            warnings = []
+
+            # Validate CSV headers
+            required_headers = ['opponent', 'date']
+            optional_headers = ['location', 'venue', 'time_start', 'match_type', 'home_away']
+            
+            csv_headers = reader.fieldnames or []
+            missing_headers = [h for h in required_headers if h not in csv_headers]
+            
+            if missing_headers:
+                return Response(
+                    {"error": f"Missing required columns: {', '.join(missing_headers)}"},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            for row_num, row in enumerate(reader, start=2):  # Start from 2 to account for header
+                try:
+                    # Parse date
+                    date_str = row.get("date", "")
+                    if not date_str:
+                        errors.append(f"Row {row_num}: Date is required")
+                        continue
+                    
+                    try:
+                        # Try different date formats
+                        match_date = self.parse_csv_date(date_str)
+                    except ValueError:
+                        errors.append(f"Row {row_num}: Invalid date format '{date_str}'. Use DD/MM/YYYY or YYYY-MM-DD")
+                        continue
+
+                    # Create match
+                    match = Match.objects.create(
+                        club=club,
+                        opponent=row.get("opponent", "").strip(),
+                        date=match_date,
+                        location=row.get("location", "").strip(),
+                        venue=row.get("venue", "").strip(),
+                        time_start=row.get("time_start", "").strip(),
+                        match_type=row.get("match_type", "League").strip(),
+                        home_away=row.get("home_away", "HOME").strip()
+                    )
+                    matches_created.append(match.id)
+                    
+                except Exception as e:
+                    errors.append(f"Row {row_num}: {str(e)}")
+                    logger.warning(f"Error processing CSV row {row_num}: {str(e)}")
+
+            logger.info(f"Enhanced bulk upload completed. {len(matches_created)} matches created, {len(errors)} errors")
+            
+            response_data = {
+                "created": matches_created,
+                "total_processed": len(matches_created) + len(errors),
+                "message": f"Successfully imported {len(matches_created)} fixtures from CSV"
+            }
+            
+            if errors:
+                response_data["errors"] = errors
+            if warnings:
+                response_data["warnings"] = warnings
+
+            return Response(response_data, status=status.HTTP_201_CREATED)
+            
+        except Exception as e:
+            logger.error(f"Enhanced bulk upload error: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred during bulk upload."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+    def parse_csv_date(self, date_str):
+        """Parse date string from CSV into datetime object."""
+        formats = [
+            '%d/%m/%Y',
+            '%d-%m-%Y',
+            '%Y-%m-%d',
+            '%d/%m/%y',
+            '%d-%m-%y',
+            '%d %B %Y',
+            '%d %b %Y'
         ]
         
-        for pattern in patterns:
-            match = re.search(pattern, url)
-            if match:
-                return match.group(1)
-        return None
-    except:
-        return None
+        for fmt in formats:
+            try:
+                return datetime.strptime(date_str.strip(), fmt)
+            except ValueError:
+                continue
+        
+        raise ValueError(f"Unable to parse date: {date_str}")
 
-def fetch_cricket_fixtures(site_id):
-    """
-    Fetch fixtures from Play Cricket API
-    """
-    try:
-        # Play Cricket API endpoints
-        api_base = 'https://play-cricket.com/api/v2'
-        
-        # Get upcoming matches
-        matches_url = f"{api_base}/matches.json?site_id={site_id}&from_date={datetime.now().strftime('%Y-%m-%d')}"
-        
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-        }
-        
-        response = requests.get(matches_url, headers=headers, timeout=30)
-        response.raise_for_status()
-        
-        data = response.json()
-        fixtures = []
-        
-        if 'matches' in data:
-            for match in data['matches']:
-                try:
-                    # Extract fixture data from API response
-                    opponent = match.get('opponent_name', '')
-                    match_date = match.get('match_date', '')
-                    match_time = match.get('match_time', '')
-                    venue = match.get('ground_name', 'Home')
-                    competition = match.get('competition_name', '')
-                    
-                    if opponent and match_date:
-                        fixtures.append({
-                            'opponent': opponent,
-                            'date': match_date,
-                            'time': match_time,
-                            'venue': venue,
-                            'competition': competition,
-                            'match_type': 'League',
-                            'home_away': 'HOME' if match.get('home_away') == 'H' else 'AWAY',
-                            'notes': f'Imported from Play Cricket'
-                        })
-                except Exception as e:
-                    logger.error(f"Error processing cricket match: {e}")
-                    continue
-        
-        return fixtures
-        
-    except Exception as e:
-        logger.error(f"Error fetching cricket fixtures: {e}")
-        return []
+
+class FixtureImportOptionsView(APIView):
+    """Get available fixture import options and their requirements."""
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        try:
+            options = {
+                "csv_upload": {
+                    "name": "CSV Upload",
+                    "description": "Upload a CSV file with fixture data",
+                    "required_fields": ["opponent", "date"],
+                    "optional_fields": ["location", "venue", "time_start", "match_type", "home_away"],
+                    "sample_format": {
+                        "opponent": "Team Name",
+                        "date": "DD/MM/YYYY",
+                        "location": "Stadium Name",
+                        "venue": "Home/Away",
+                        "time_start": "15:00",
+                        "match_type": "League",
+                        "home_away": "HOME"
+                    }
+                },
+                "fa_fulltime": {
+                    "name": "FA Fulltime Scraper",
+                    "description": "Automatically import fixtures from FA Fulltime website",
+                    "required_fields": ["fa_url"],
+                    "example_url": "https://fulltime.thefa.com/displayTeam.html?id=562720767",
+                    "note": "Paste your club's FA Fulltime team page URL"
+                },
+                "play_cricket": {
+                    "name": "Play Cricket API",
+                    "description": "Import fixtures from Play Cricket API for cricket clubs",
+                    "required_fields": ["team_id"],
+                    "note": "Get your team ID from your Play Cricket club page URL",
+                    "api_docs": "https://play-cricket.ecb.co.uk/hc/en-us/articles/360000141669-Match-Detail-API"
+                }
+            }
+            
+            return Response(options, status=status.HTTP_200_OK)
+            
+        except Exception as e:
+            logger.error(f"Error getting import options: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while fetching import options."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )

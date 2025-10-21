@@ -1666,6 +1666,34 @@ class ClubListView(APIView):
         return Response(ClubSerializer(clubs, many=True).data)
 
 
+class AllClubsListView(APIView):
+    """View for listing all clubs in the system"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """Get all clubs from the database"""
+        try:
+            clubs = Club.objects.all().order_by('name')
+            # Return simplified club data for selection
+            club_data = [
+                {
+                    "id": club.id,
+                    "name": club.name,
+                    "logo": club.logo,
+                    "sport": club.sport,
+                    "location": club.location
+                }
+                for club in clubs
+            ]
+            return Response(club_data)
+        except Exception as e:
+            logger.error(f"Error fetching all clubs: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while fetching clubs."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
 class ClubCreateView(APIView):
     """View for creating clubs"""
     permission_classes = [IsAuthenticated]

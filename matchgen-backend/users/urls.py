@@ -19,6 +19,7 @@ from .views import (
     UserListView,
     UserProfileView,
     ClubListView,
+    AllClubsListView,
     ClubCreateView,
     ClubUpdateView,
     ClubDeleteView,
@@ -96,6 +97,7 @@ urlpatterns = [
     
     # Club Management
     path('clubs/', ClubListView.as_view(), name='club_list'),
+    path('clubs/all/', AllClubsListView.as_view(), name='all_clubs_list'),
     path('clubs/create/', ClubCreateView.as_view(), name='club_create'),
     path('clubs/<int:pk>/', ClubDetailView.as_view(), name='club_detail'),
     path('clubs/<int:pk>/update/', ClubUpdateView.as_view(), name='club_update'),

@@ -3400,13 +3400,24 @@ class MediaItemUploadView(APIView):
     def post(self, request):
         """Upload a media file to Cloudinary and create a MediaItem record."""
         try:
-            # Get user's club
-            try:
-                club = Club.objects.get(user=request.user)
-            except Club.DoesNotExist:
-                return Response({
-                    "error": "No club found for this user"
-                }, status=status.HTTP_404_NOT_FOUND)
+            # Get club - either from request data or user's club
+            club_id = request.data.get('club_id')
+            if club_id:
+                # Use specified club
+                try:
+                    club = Club.objects.get(id=club_id)
+                except Club.DoesNotExist:
+                    return Response({
+                        "error": f"Club with ID {club_id} not found"
+                    }, status=status.HTTP_404_NOT_FOUND)
+            else:
+                # Use user's club as fallback
+                try:
+                    club = Club.objects.get(user=request.user)
+                except Club.DoesNotExist:
+                    return Response({
+                        "error": "No club found for this user. Please specify a club_id or create a club first."
+                    }, status=status.HTTP_404_NOT_FOUND)
             
             # Validate required fields
             file = request.FILES.get('file')

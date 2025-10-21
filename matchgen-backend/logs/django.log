@@ -66,3 +66,8 @@ INFO 2025-10-08 19:22:26,268 basehttp 35696 28304 "OPTIONS /api/users/token/ HTT
 INFO 2025-10-08 19:26:04,056 basehttp 35696 28304 "OPTIONS /api/users/token/ HTTP/1.1" 200 0
 INFO 2025-10-08 19:29:41,425 autoreload 35836 7988 Watching for file changes with StatReloader
 INFO 2025-10-08 19:32:41,199 autoreload 2132 2124 Watching for file changes with StatReloader
+INFO 2025-10-21 21:45:26,353 views 41436 17360 MyClubView called by user rich@matchgen.co.uk at 2025-10-21 20:45:26.353499+00:00
+INFO 2025-10-21 21:45:26,364 views 41436 17360 Request headers: {'Cookie': '', 'Content-Type': 'application/octet-stream'}
+INFO 2025-10-21 21:45:26,534 views 41436 17360 User rich@matchgen.co.uk - Membership query result: None
+WARNING 2025-10-21 21:45:26,702 views 41436 17360 No active club membership or direct club found for user rich@matchgen.co.uk
+INFO 2025-10-21 21:45:26,702 views 41436 17360 Admin user rich@matchgen.co.uk has no club - providing admin access

@@ -986,10 +986,21 @@ class MyClubView(APIView, RateLimitMixin):
                     logger.info(f"Created membership for user {request.user.email} as owner of {direct_club.name}")
                 else:
                     logger.warning(f"No active club membership or direct club found for user {request.user.email}")
-                    return Response(
-                        {"detail": "No club found for this user."}, 
-                        status=status.HTTP_404_NOT_FOUND
-                    )
+                    
+                    # Check if user is admin/staff - provide admin access instead of error
+                    if request.user.is_staff or request.user.is_superuser:
+                        logger.info(f"Admin user {request.user.email} has no club - providing admin access")
+                        return Response({
+                            "detail": "No club found for this user.",
+                            "is_admin": True,
+                            "admin_dashboard_url": "/api/users/admin/dashboard/",
+                            "message": "As an admin user, you can access the admin dashboard to manage all clubs."
+                        }, status=status.HTTP_200_OK)
+                    else:
+                        return Response(
+                            {"detail": "No club found for this user."}, 
+                            status=status.HTTP_404_NOT_FOUND
+                        )
             
             club = membership.club
             serializer = ClubSerializer(club)
@@ -1775,6 +1786,11 @@ class AdminDashboardView(APIView):
                     "email": request.user.email,
                     "is_staff": request.user.is_staff,
                     "is_superuser": request.user.is_superuser,
+                },
+                "available_endpoints": {
+                    "all_clubs": "/api/users/clubs/all/",
+                    "admin_dashboard": "/api/users/admin/dashboard/",
+                    "graphic_pack_upload": "/api/graphicpack/media/upload/",
                 }
             }
             

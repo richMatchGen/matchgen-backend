@@ -1766,6 +1766,27 @@ class AdminDashboardView(APIView):
                 }
                 clubs_data.append(club_info)
             
+            # Get all graphic packs with detailed information
+            graphic_packs = GraphicPack.objects.all().order_by('-created_at')
+            graphic_packs_data = []
+            for pack in graphic_packs:
+                pack_info = {
+                    "id": pack.id,
+                    "name": pack.name,
+                    "description": pack.description,
+                    "is_bespoke": pack.is_bespoke,
+                    "is_active": pack.is_active,
+                    "sport": pack.sport,
+                    "tier": pack.tier,
+                    "primary_color": pack.primary_color,
+                    "preview_image_url": pack.preview_image_url,
+                    "assigned_club_name": pack.assigned_club.name if pack.assigned_club else None,
+                    "assigned_club_id": pack.assigned_club.id if pack.assigned_club else None,
+                    "created_at": pack.created_at.isoformat() if pack.created_at else None,
+                    "updated_at": pack.updated_at.isoformat() if pack.updated_at else None,
+                }
+                graphic_packs_data.append(pack_info)
+            
             # Get recent activity (last 10 matches created)
             recent_matches = Match.objects.all().order_by('-id')[:10]
             recent_activity = []
@@ -1781,6 +1802,7 @@ class AdminDashboardView(APIView):
             dashboard_data = {
                 "stats": stats,
                 "clubs": clubs_data,
+                "graphic_packs": graphic_packs_data,
                 "recent_activity": recent_activity,
                 "admin_user": {
                     "email": request.user.email,

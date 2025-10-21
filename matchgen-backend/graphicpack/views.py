@@ -105,10 +105,26 @@ def get_font(font_family, font_size, font_weight='normal'):
 
 
 class GraphicPackListView(ListAPIView):
-    """List all available graphic packs."""
-    queryset = GraphicPack.objects.all()
+    """List all available graphic packs (excluding bespoke packs)."""
     serializer_class = GraphicPackSerializer
     permission_classes = [AllowAny]
+    
+    def get_queryset(self):
+        """Filter out bespoke packs from general template selection."""
+        return GraphicPack.objects.filter(is_bespoke=False, is_active=True)
+
+
+class AdminGraphicPackListView(ListAPIView):
+    """List all graphic packs including bespoke ones (admin only)."""
+    serializer_class = GraphicPackSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """Return all graphic packs for admin users."""
+        # Check if user is admin/staff
+        if not (self.request.user.is_staff or self.request.user.is_superuser):
+            return GraphicPack.objects.none()
+        return GraphicPack.objects.all()
 
     def get(self, request, *args, **kwargs):
         """Override get to add debug logging and error handling."""
@@ -2532,6 +2548,7 @@ class GraphicPackCreateView(APIView):
             assigned_club_id = request.data.get('assigned_club_id')
             preview_image_url = request.data.get('preview_image_url')
             is_active = request.data.get('is_active', True)
+            is_bespoke = request.data.get('is_bespoke', False)
             
             if not name:
                 return Response(
@@ -2560,7 +2577,8 @@ class GraphicPackCreateView(APIView):
                 tier=tier,
                 assigned_club=assigned_club,
                 preview_image_url=preview_image_url,
-                is_active=is_active
+                is_active=is_active,
+                is_bespoke=is_bespoke
             )
             
             return Response({

@@ -71,3 +71,13 @@ INFO 2025-10-21 21:45:26,364 views 41436 17360 Request headers: {'Cookie': '', '
 INFO 2025-10-21 21:45:26,534 views 41436 17360 User rich@matchgen.co.uk - Membership query result: None
 WARNING 2025-10-21 21:45:26,702 views 41436 17360 No active club membership or direct club found for user rich@matchgen.co.uk
 INFO 2025-10-21 21:45:26,702 views 41436 17360 Admin user rich@matchgen.co.uk has no club - providing admin access
+INFO 2025-10-21 21:55:20,457 views 28288 14416 MyClubView called by user rich@matchgen.co.uk at 2025-10-21 20:55:20.457504+00:00
+INFO 2025-10-21 21:55:20,458 views 28288 14416 Request headers: {'Cookie': '', 'Content-Type': 'application/octet-stream'}
+INFO 2025-10-21 21:55:20,631 views 28288 14416 User rich@matchgen.co.uk - Membership query result: None
+WARNING 2025-10-21 21:55:20,795 views 28288 14416 No active club membership or direct club found for user rich@matchgen.co.uk
+INFO 2025-10-21 21:55:20,795 views 28288 14416 Admin user rich@matchgen.co.uk has no club - providing admin access
+INFO 2025-10-21 21:55:51,740 views 41980 16288 MyClubView called by user rich@matchgen.co.uk at 2025-10-21 20:55:51.740126+00:00
+INFO 2025-10-21 21:55:51,740 views 41980 16288 Request headers: {'Cookie': '', 'Content-Type': 'application/octet-stream'}
+INFO 2025-10-21 21:55:51,907 views 41980 16288 User rich@matchgen.co.uk - Membership query result: None
+WARNING 2025-10-21 21:55:52,069 views 41980 16288 No active club membership or direct club found for user rich@matchgen.co.uk
+INFO 2025-10-21 21:55:52,070 views 41980 16288 Admin user rich@matchgen.co.uk has no club - providing admin access

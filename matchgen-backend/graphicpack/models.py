@@ -21,6 +21,7 @@ class GraphicPack(models.Model):
     assigned_club = models.ForeignKey('users.Club', on_delete=models.SET_NULL, null=True, blank=True, help_text="Specific club (null for all clubs)")
     is_active = models.BooleanField(default=True, help_text="Whether the pack is active")
     sport = models.CharField(max_length=50, blank=True, null=True, help_text="Sport type for the graphic pack")
+    is_bespoke = models.BooleanField(default=False, help_text="Whether this is a bespoke pack (hidden from general templates)")
     
     created_at = models.DateTimeField(auto_now_add=True, null=True, blank=True)
     updated_at = models.DateTimeField(auto_now=True, null=True, blank=True)

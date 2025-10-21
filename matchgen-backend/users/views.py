@@ -1694,6 +1694,100 @@ class AllClubsListView(APIView):
             )
 
 
+class AdminDashboardView(APIView):
+    """Admin dashboard for managing all clubs and system data"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """Get admin dashboard data - only accessible by staff/superusers"""
+        try:
+            # Check if user is admin/staff
+            if not (request.user.is_staff or request.user.is_superuser):
+                return Response({
+                    "error": "Access denied. Admin privileges required."
+                }, status=status.HTTP_403_FORBIDDEN)
+            
+            # Get system statistics
+            from users.models import User, Club
+            from content.models import Match, Player
+            from graphicpack.models import GraphicPack, MediaItem
+            
+            stats = {
+                "users": {
+                    "total": User.objects.count(),
+                    "active": User.objects.filter(is_active=True).count(),
+                    "staff": User.objects.filter(is_staff=True).count(),
+                    "superusers": User.objects.filter(is_superuser=True).count(),
+                },
+                "clubs": {
+                    "total": Club.objects.count(),
+                    "with_logos": Club.objects.exclude(logo__isnull=True).exclude(logo='').count(),
+                    "with_subscriptions": Club.objects.filter(subscription_active=True).count(),
+                },
+                "content": {
+                    "matches": Match.objects.count(),
+                    "players": Player.objects.count(),
+                },
+                "graphic_packs": {
+                    "total": GraphicPack.objects.count(),
+                    "media_items": MediaItem.objects.count(),
+                }
+            }
+            
+            # Get all clubs with detailed information
+            clubs = Club.objects.all().order_by('name')
+            clubs_data = []
+            for club in clubs:
+                club_info = {
+                    "id": club.id,
+                    "name": club.name,
+                    "logo": club.logo,
+                    "sport": club.sport,
+                    "location": club.location,
+                    "user_email": club.user.email,
+                    "user_active": club.user.is_active,
+                    "subscription_tier": club.subscription_tier,
+                    "subscription_active": club.subscription_active,
+                    "matches_count": Match.objects.filter(club=club).count(),
+                    "players_count": Player.objects.filter(club=club).count(),
+                    "media_items_count": MediaItem.objects.filter(club=club).count(),
+                    "created_at": club.user.date_joined.isoformat() if hasattr(club.user, 'date_joined') else None,
+                }
+                clubs_data.append(club_info)
+            
+            # Get recent activity (last 10 matches created)
+            recent_matches = Match.objects.all().order_by('-id')[:10]
+            recent_activity = []
+            for match in recent_matches:
+                recent_activity.append({
+                    "type": "match_created",
+                    "club_name": match.club.name,
+                    "opponent": match.opponent,
+                    "date": match.date.isoformat(),
+                    "created_by": match.club.user.email,
+                })
+            
+            dashboard_data = {
+                "stats": stats,
+                "clubs": clubs_data,
+                "recent_activity": recent_activity,
+                "admin_user": {
+                    "email": request.user.email,
+                    "is_staff": request.user.is_staff,
+                    "is_superuser": request.user.is_superuser,
+                }
+            }
+            
+            return Response(dashboard_data)
+            
+        except Exception as e:
+            logger.error(f"Error fetching admin dashboard data: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while fetching admin dashboard data."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
 class ClubCreateView(APIView):
     """View for creating clubs"""
     permission_classes = [IsAuthenticated]

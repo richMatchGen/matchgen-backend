@@ -20,6 +20,7 @@ from .views import (
     UserProfileView,
     ClubListView,
     AllClubsListView,
+    AdminDashboardView,
     ClubCreateView,
     ClubUpdateView,
     ClubDeleteView,
@@ -99,6 +100,9 @@ urlpatterns = [
     path('clubs/', ClubListView.as_view(), name='club_list'),
     path('clubs/all/', AllClubsListView.as_view(), name='all_clubs_list'),
     path('clubs/create/', ClubCreateView.as_view(), name='club_create'),
+    
+    # Admin Dashboard
+    path('admin/dashboard/', AdminDashboardView.as_view(), name='admin_dashboard'),
     path('clubs/<int:pk>/', ClubDetailView.as_view(), name='club_detail'),
     path('clubs/<int:pk>/update/', ClubUpdateView.as_view(), name='club_update'),
     path('clubs/<int:pk>/delete/', ClubDeleteView.as_view(), name='club_delete'),

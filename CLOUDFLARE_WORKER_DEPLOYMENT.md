@@ -200,3 +200,4 @@ Cloudflare Workers pricing:
 - **Additional**: $0.50 per 1M requests
 
 For most applications, the free tier should be sufficient.
+

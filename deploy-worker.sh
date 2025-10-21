@@ -53,3 +53,4 @@ echo "2. Update PROXY_BASE in matchgen-backend/content/views.py"
 echo "3. Test the proxy functionality"
 echo ""
 echo "🔗 Worker URL format: https://fulltime-proxy.your-subdomain.workers.dev"
+

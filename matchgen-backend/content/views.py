@@ -61,9 +61,14 @@ class MatchListView(ListAPIView, RateLimitMixin):
             # Return empty queryset instead of raising error to avoid breaking frontend
             return Match.objects.none()
         
-        matches = Match.objects.filter(club__user=user).order_by("date")
-        logger.info(f"Found {matches.count()} matches for user {user.email}")
-        return matches
+        try:
+            matches = Match.objects.filter(club__user=user).order_by("date")
+            logger.info(f"Found {matches.count()} matches for user {user.email}")
+            return matches
+        except Exception as e:
+            logger.error(f"Error fetching matches for user {user.email}: {str(e)}", exc_info=True)
+            # Return empty queryset to prevent 500 error
+            return Match.objects.none()
 
 
 class MatchListCreateView(generics.ListCreateAPIView):
@@ -73,7 +78,12 @@ class MatchListCreateView(generics.ListCreateAPIView):
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Match.objects.filter(club__user=self.request.user)
+        try:
+            return Match.objects.filter(club__user=self.request.user)
+        except Exception as e:
+            logger.error(f"Error fetching matches for user {self.request.user.email}: {str(e)}", exc_info=True)
+            # Return empty queryset to prevent 500 error
+            return Match.objects.none()
 
     def perform_create(self, serializer):
         try:
@@ -309,12 +319,19 @@ class LastMatchView(APIView):
 
             today = timezone.now().date()
 
-            last_match = (
-                Match.objects.filter(club=club)
-                .filter(date__lt=today)  # only matches before today
-                .order_by("-date", "-time_start")  # latest first
-                .first()
-            )
+            try:
+                last_match = (
+                    Match.objects.filter(club=club)
+                    .filter(date__lt=today)  # only matches before today
+                    .order_by("-date", "-time_start")  # latest first
+                    .first()
+                )
+            except Exception as match_error:
+                logger.error(f"Error querying last match for club {club.name}: {str(match_error)}", exc_info=True)
+                return Response(
+                    {"error": "Database error occurred while fetching the last match."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
 
             if last_match:
                 logger.info(f"Last match retrieved for club {club.name}: {last_match.opponent}")
@@ -363,12 +380,19 @@ class MatchdayView(APIView):
 
             now = timezone.now()
 
-            next_match = (
-                Match.objects.filter(club=club)
-                .filter(date__gte=now.date())  # upcoming matches (today or later)
-                .order_by("date", "time_start")  # soonest first
-                .first()
-            )
+            try:
+                next_match = (
+                    Match.objects.filter(club=club)
+                    .filter(date__gte=now.date())  # upcoming matches (today or later)
+                    .order_by("date", "time_start")  # soonest first
+                    .first()
+                )
+            except Exception as match_error:
+                logger.error(f"Error querying matches for club {club.name}: {str(match_error)}", exc_info=True)
+                return Response(
+                    {"error": "Database error occurred while fetching matches."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
 
             if next_match:
                 logger.info(f"Next match retrieved for club {club.name}: {next_match.opponent}")

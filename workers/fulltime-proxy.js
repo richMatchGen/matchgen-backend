@@ -162,3 +162,4 @@ function getCorsHeaders(request) {
         'Vary': 'Origin'
     };
 }
+

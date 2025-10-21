@@ -59,3 +59,4 @@ Write-Host "2. Update PROXY_BASE in matchgen-backend/content/views.py" -Foregrou
 Write-Host "3. Test the proxy functionality" -ForegroundColor White
 Write-Host ""
 Write-Host "🔗 Worker URL format: https://fulltime-proxy.your-subdomain.workers.dev" -ForegroundColor Yellow
+

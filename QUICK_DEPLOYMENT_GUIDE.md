@@ -80,3 +80,4 @@ Once deployed, the proxy should:
 ## 🎯 Result
 
 After deployment, users will be able to use the "FA Proxy" import method without the setup warning!
+

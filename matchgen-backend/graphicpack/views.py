@@ -120,11 +120,10 @@ class AdminGraphicPackListView(ListAPIView):
     permission_classes = [IsAuthenticated]
     
     def get_queryset(self):
-        """Return all graphic packs for admin users."""
-        # Check if user is admin/staff
-        if not (self.request.user.is_staff or self.request.user.is_superuser):
-            return GraphicPack.objects.none()
-        return GraphicPack.objects.all()
+        """Return all graphic packs including bespoke ones."""
+        # Allow all authenticated users to see all packs on the upload page
+        # This is needed for the /upload-graphic-pack page to show all packs
+        return GraphicPack.objects.all().order_by('-created_at')
 
     def get(self, request, *args, **kwargs):
         """Override get to add debug logging and error handling."""

@@ -207,13 +207,14 @@ class ClubSerializer(serializers.ModelSerializer):
     user_email = serializers.EmailField(source='user.email', read_only=True)
     user_role = serializers.SerializerMethodField()
     available_features = serializers.SerializerMethodField()
+    selected_pack_details = serializers.SerializerMethodField()
     
     class Meta:
         model = Club
         fields = [
             "id", "name", "sport", "logo", "location", "founded_year", 
             "venue_name", "website", "primary_color", "secondary_color", 
-            "bio", "league", "selected_pack", "user_email", "user_role", "available_features",
+            "bio", "league", "selected_pack", "selected_pack_details", "user_email", "user_role", "available_features",
             "subscription_tier", "subscription_active", "subscription_start_date", "subscription_end_date"
         ]
         read_only_fields = ["id", "user_email", "subscription_start_date"]
@@ -226,6 +227,17 @@ class ClubSerializer(serializers.ModelSerializer):
     
     def get_available_features(self, obj):
         return FeaturePermission.get_available_features(obj)
+    
+    def get_selected_pack_details(self, obj):
+        """Return selected pack details including is_bespoke flag."""
+        if obj.selected_pack:
+            return {
+                "id": obj.selected_pack.id,
+                "name": obj.selected_pack.name,
+                "is_bespoke": obj.selected_pack.is_bespoke,
+                "is_active": obj.selected_pack.is_active
+            }
+        return None
 
     def validate_name(self, value):
         """Validate club name."""

@@ -123,17 +123,49 @@ class AdminGraphicPackListView(ListAPIView):
         """Return all graphic packs including bespoke ones."""
         # Allow all authenticated users to see all packs on the upload page
         # This is needed for the /upload-graphic-pack page to show all packs
-        return GraphicPack.objects.all().order_by('-created_at')
+        # Use select_related and prefetch_related to optimize queries
+        return GraphicPack.objects.select_related('assigned_club').prefetch_related('templates').all().order_by('-created_at')
 
-    def get(self, request, *args, **kwargs):
-        """Override get to add debug logging and error handling."""
+    def list(self, request, *args, **kwargs):
+        """Override list to add better error handling."""
         try:
-            response = super().get(request, *args, **kwargs)
-            logger.info(f"Graphic packs response: {response.data}")
-            return response
+            queryset = self.filter_queryset(self.get_queryset())
+            page = self.paginate_queryset(queryset)
+            
+            if page is not None:
+                serializer = self.get_serializer(page, many=True)
+                return self.get_paginated_response(serializer.data)
+            
+            serializer = self.get_serializer(queryset, many=True)
+            logger.info(f"Successfully fetched {len(serializer.data)} graphic packs")
+            return Response(serializer.data)
         except Exception as e:
-            logger.error(f"Error in GraphicPackListView: {str(e)}", exc_info=True)
-            return Response([], status=200)
+            logger.error(f"Error in AdminGraphicPackListView: {str(e)}", exc_info=True)
+            # Try to return at least basic pack info without templates
+            try:
+                queryset = GraphicPack.objects.all().order_by('-created_at')
+                basic_data = []
+                for pack in queryset:
+                    basic_data.append({
+                        'id': pack.id,
+                        'name': pack.name,
+                        'description': pack.description or '',
+                        'is_bespoke': getattr(pack, 'is_bespoke', False),
+                        'is_active': pack.is_active,
+                        'sport': pack.sport or '',
+                        'tier': pack.tier or '',
+                        'assigned_club': pack.assigned_club.id if pack.assigned_club else None,
+                        'assigned_club_name': pack.assigned_club.name if pack.assigned_club else None,
+                        'templates': [],
+                        'templates_count': 0
+                    })
+                return Response(basic_data)
+            except Exception as fallback_error:
+                logger.error(f"Fallback serialization also failed: {str(fallback_error)}", exc_info=True)
+                return Response(
+                    {"error": "An error occurred while fetching graphic packs. Please check server logs."},
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
+                )
 
 
 class GraphicPackDetailView(RetrieveAPIView):

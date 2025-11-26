@@ -23,31 +23,36 @@ class TemplateSerializer(serializers.ModelSerializer):
             # Return basic data if there's an error
             return {
                 'id': instance.id,
-                'graphic_pack': instance.graphic_pack.id,
+                'graphic_pack': instance.graphic_pack.id if instance.graphic_pack else None,
                 'content_type': instance.content_type,
                 'image_url': instance.image_url,
                 'sport': instance.sport,
-                'template_config': getattr(instance, 'template_config', {})
+                'template_config': getattr(instance, 'template_config', {}),
+                'homeoraway': getattr(instance, 'homeoraway', 'Default')
             }
 
 
 class GraphicPackSerializer(serializers.ModelSerializer):
     templates = TemplateSerializer(many=True, read_only=True)
     templates_count = serializers.SerializerMethodField()
-    assigned_club_name = serializers.CharField(source='assigned_club.name', read_only=True)
+    assigned_club_name = serializers.SerializerMethodField()
     
     class Meta:
         model = GraphicPack
         fields = [
             'id', 'name', 'description', 'preview_image_url', 'zip_file_url',
             'primary_color', 'tier', 'assigned_club', 'assigned_club_name', 'is_active',
-            'sport', 'created_at', 'updated_at', 'templates', 'templates_count'
+            'sport', 'is_bespoke', 'created_at', 'updated_at', 'templates', 'templates_count'
         ]
         read_only_fields = ['created_at', 'updated_at']
     
     def get_templates_count(self, obj):
         """Calculate the number of templates for this graphic pack."""
         return obj.templates.count()
+    
+    def get_assigned_club_name(self, obj):
+        """Safely get assigned club name, handling None case."""
+        return obj.assigned_club.name if obj.assigned_club else None
 
     def to_representation(self, instance):
         """Override to handle missing fields gracefully."""

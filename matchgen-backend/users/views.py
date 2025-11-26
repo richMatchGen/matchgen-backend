@@ -1826,6 +1826,136 @@ class AdminDashboardView(APIView):
             )
 
 
+class AdminFixtureTaskListView(APIView):
+    """Get upcoming fixtures for Premium clubs with Bespoke template packages"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """Get task list of upcoming fixtures for eligible clubs"""
+        try:
+            # Check if user is admin/staff
+            if not (request.user.is_staff or request.user.is_superuser):
+                return Response({
+                    "error": "Access denied. Admin privileges required."
+                }, status=status.HTTP_403_FORBIDDEN)
+            
+            from users.models import Club
+            from content.models import Match
+            from graphicpack.models import GraphicPack
+            from django.utils import timezone
+            
+            now = timezone.now()
+            
+            # Get clubs that are on Premium Plans (prem) with Bespoke template packages
+            eligible_clubs = Club.objects.filter(
+                subscription_tier='prem',
+                subscription_active=True,
+                selected_pack__is_bespoke=True
+            ).select_related('selected_pack')
+            
+            # Get upcoming fixtures for these clubs
+            upcoming_fixtures = Match.objects.filter(
+                club__in=eligible_clubs,
+                date__gte=now,
+                status='SCHEDULED'
+            ).select_related('club', 'club__selected_pack').order_by('date', 'time_start')
+            
+            fixtures_data = []
+            for fixture in upcoming_fixtures:
+                fixture_info = {
+                    "id": fixture.id,
+                    "club_id": fixture.club.id,
+                    "club_name": fixture.club.name,
+                    "club_logo": fixture.club.logo,
+                    "opponent": fixture.opponent,
+                    "opponent_logo": fixture.opponent_logo,
+                    "date": fixture.date.isoformat() if fixture.date else None,
+                    "time_start": fixture.time_start,
+                    "venue": fixture.venue,
+                    "competition": fixture.competition,
+                    "home_away": fixture.home_away,
+                    "matchday_post_url": fixture.matchday_post_url,
+                    "upcoming_fixture_post_url": fixture.upcoming_fixture_post_url,
+                    "starting_xi_post_url": fixture.starting_xi_post_url,
+                    "graphic_pack_name": fixture.club.selected_pack.name if fixture.club.selected_pack else None,
+                }
+                fixtures_data.append(fixture_info)
+            
+            return Response({
+                "count": len(fixtures_data),
+                "fixtures": fixtures_data
+            })
+            
+        except Exception as e:
+            logger.error(f"Error fetching admin fixture task list: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while fetching fixture task list."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class AdminUploadPostView(APIView):
+    """Admin endpoint to upload Matchday, Upcoming Fixture, or Starting XI posts"""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser]
+    
+    def post(self, request):
+        """Upload a post URL for a fixture"""
+        try:
+            # Check if user is admin/staff
+            if not (request.user.is_staff or request.user.is_superuser):
+                return Response({
+                    "error": "Access denied. Admin privileges required."
+                }, status=status.HTTP_403_FORBIDDEN)
+            
+            from content.models import Match
+            
+            fixture_id = request.data.get('fixture_id')
+            post_type = request.data.get('post_type')  # 'matchday', 'upcoming_fixture', 'starting_xi'
+            post_url = request.data.get('post_url')
+            
+            if not fixture_id or not post_type or not post_url:
+                return Response({
+                    "error": "Missing required fields: fixture_id, post_type, and post_url are required."
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if post_type not in ['matchday', 'upcoming_fixture', 'starting_xi']:
+                return Response({
+                    "error": "Invalid post_type. Must be one of: matchday, upcoming_fixture, starting_xi"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            try:
+                fixture = Match.objects.get(id=fixture_id)
+            except Match.DoesNotExist:
+                return Response({
+                    "error": "Fixture not found."
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Update the appropriate field
+            if post_type == 'matchday':
+                fixture.matchday_post_url = post_url
+            elif post_type == 'upcoming_fixture':
+                fixture.upcoming_fixture_post_url = post_url
+            elif post_type == 'starting_xi':
+                fixture.starting_xi_post_url = post_url
+            
+            fixture.save()
+            
+            return Response({
+                "message": f"{post_type.replace('_', ' ').title()} post URL uploaded successfully.",
+                "fixture_id": fixture.id,
+                "post_type": post_type,
+                "post_url": post_url
+            })
+            
+        except Exception as e:
+            logger.error(f"Error uploading post: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while uploading the post."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
 class ClubCreateView(APIView):
     """View for creating clubs"""
     permission_classes = [IsAuthenticated]

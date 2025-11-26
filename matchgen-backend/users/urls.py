@@ -21,6 +21,8 @@ from .views import (
     ClubListView,
     AllClubsListView,
     AdminDashboardView,
+    AdminFixtureTaskListView,
+    AdminUploadPostView,
     ClubCreateView,
     ClubUpdateView,
     ClubDeleteView,
@@ -103,6 +105,8 @@ urlpatterns = [
     
     # Admin Dashboard
     path('admin/dashboard/', AdminDashboardView.as_view(), name='admin_dashboard'),
+    path('admin/fixture-tasks/', AdminFixtureTaskListView.as_view(), name='admin_fixture_tasks'),
+    path('admin/upload-post/', AdminUploadPostView.as_view(), name='admin_upload_post'),
     path('clubs/<int:pk>/', ClubDetailView.as_view(), name='club_detail'),
     path('clubs/<int:pk>/update/', ClubUpdateView.as_view(), name='club_update'),
     path('clubs/<int:pk>/delete/', ClubDeleteView.as_view(), name='club_delete'),

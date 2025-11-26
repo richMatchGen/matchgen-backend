@@ -62,6 +62,8 @@ class Match(models.Model):
     opponent_logo = models.URLField(max_length=500, blank=True, null=True)
     sponsor = models.URLField(max_length=500, blank=True, null=True)
     matchday_post_url = models.URLField(max_length=500, blank=True, null=True)
+    upcoming_fixture_post_url = models.URLField(max_length=500, blank=True, null=True, help_text="URL for uploaded upcoming fixture post")
+    starting_xi_post_url = models.URLField(max_length=500, blank=True, null=True, help_text="URL for uploaded starting XI post")
     
     # Raw data and sync tracking
     raw_payload = models.JSONField(blank=True, null=True)

@@ -60,3 +60,7 @@ def test_all_clubs_endpoint():
 
 if __name__ == "__main__":
     test_all_clubs_endpoint()
+
+
+
+

@@ -60,3 +60,7 @@ Write-Host "3. Test the proxy functionality" -ForegroundColor White
 Write-Host ""
 Write-Host "🔗 Worker URL format: https://fulltime-proxy.your-subdomain.workers.dev" -ForegroundColor Yellow
 
+
+
+
+

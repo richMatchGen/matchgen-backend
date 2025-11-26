@@ -2759,16 +2759,33 @@ class TemplateCreateView(APIView):
             if homeoraway not in ['Default', 'Home', 'Away']:
                 homeoraway = 'Default'
             
-            # Create template
-            template = Template.objects.create(
-                graphic_pack=graphic_pack,
-                content_type=content_type,
-                file_url=upload_result['secure_url'],
-                image_url=upload_result['secure_url'],  # Save to image_url as well
-                file_name=file.name,
-                file_size=file.size,
-                homeoraway=homeoraway
-            )
+            # Create template - try with homeoraway first, fallback if migration hasn't been run
+            try:
+                template = Template.objects.create(
+                    graphic_pack=graphic_pack,
+                    content_type=content_type,
+                    file_url=upload_result['secure_url'],
+                    image_url=upload_result['secure_url'],  # Save to image_url as well
+                    file_name=file.name,
+                    file_size=file.size,
+                    homeoraway=homeoraway
+                )
+            except Exception as db_error:
+                # If error is about missing column (migration not run), try without homeoraway
+                error_str = str(db_error).lower()
+                if 'homeoraway' in error_str or 'column' in error_str or 'does not exist' in error_str:
+                    logger.warning(f"homeoraway field not available in database, creating template without it: {str(db_error)}")
+                    template = Template.objects.create(
+                        graphic_pack=graphic_pack,
+                        content_type=content_type,
+                        file_url=upload_result['secure_url'],
+                        image_url=upload_result['secure_url'],
+                        file_name=file.name,
+                        file_size=file.size
+                    )
+                else:
+                    # Re-raise if it's a different error
+                    raise
             
             return Response({
                 "message": "Template created successfully.",

@@ -25,6 +25,31 @@ from .serializers import GraphicPackSerializer, TextElementSerializer, MediaItem
 logger = logging.getLogger(__name__)
 
 
+def _homeoraway_column_exists():
+    """Check if homeoraway column exists in the database."""
+    from django.db import connection
+    try:
+        with connection.cursor() as cursor:
+            table_name = Template._meta.db_table
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name=%s 
+                AND column_name='homeoraway'
+            """, [table_name])
+            return cursor.fetchone() is not None
+    except Exception:
+        return False
+
+
+def _get_template_queryset():
+    """Get a Template queryset that handles missing homeoraway column."""
+    if not _homeoraway_column_exists():
+        # Column doesn't exist - defer it to avoid SELECT error
+        return Template.objects.defer('homeoraway')
+    return Template.objects.all()
+
+
 def apply_image_color_modifications(img, element):
     """Apply color modifications to an image based on element settings."""
     if element.image_color_filter == 'none':
@@ -185,7 +210,7 @@ class GraphicPackDetailView(RetrieveAPIView):
                 pack = GraphicPack.objects.get(id=pack_id)
                 logger.info(f"Found graphic pack: {pack.name}")
                 
-                templates_count = Template.objects.filter(graphic_pack=pack).count()
+                templates_count = _get_template_queryset().filter(graphic_pack=pack).count()
                 logger.info(f"Found {templates_count} templates for pack {pack_id}")
                 
             except GraphicPack.DoesNotExist:
@@ -812,8 +837,10 @@ class SocialMediaPostGenerator(APIView):
             # Get the template for this post type (case-insensitive lookup)
             logger.info(f"Looking for template with graphic_pack={pack.id} and content_type='{post_type}'")
             try:
+                # Use queryset that handles missing homeoraway column
+                queryset = _get_template_queryset()
                 # Try exact match first
-                template = Template.objects.get(
+                template = queryset.get(
                     graphic_pack=pack,
                     content_type=post_type
                 )
@@ -821,14 +848,16 @@ class SocialMediaPostGenerator(APIView):
             except Template.DoesNotExist:
                 # Try case-insensitive lookup
                 try:
-                    template = Template.objects.get(
+                    queryset = _get_template_queryset()
+                    template = queryset.get(
                         graphic_pack=pack,
                         content_type__iexact=post_type
                     )
                     logger.info(f"Found {post_type} template (case-insensitive match): {template.id}")
                 except Template.DoesNotExist:
                     # Check what templates exist for this pack
-                    existing_templates = Template.objects.filter(graphic_pack=pack)
+                    queryset = _get_template_queryset()
+                    existing_templates = queryset.filter(graphic_pack=pack)
                     existing_content_types = [t.content_type for t in existing_templates]
                     logger.error(f"No {post_type} template found (exact or case-insensitive). Available templates for pack {pack.id}: {existing_content_types}")
                     return Response({
@@ -1526,7 +1555,7 @@ class DebugTemplatesView(APIView):
                 packs_data = []
                 
                 for pack in packs:
-                    templates = Template.objects.filter(graphic_pack=pack)
+                    templates = _get_template_queryset().filter(graphic_pack=pack)
                     templates_data = []
                     
                     for template in templates:
@@ -1866,7 +1895,7 @@ class CreateTestDataView(APIView):
 
             # Check if matchday template already exists for this pack
             try:
-                existing_template = Template.objects.get(
+                existing_template = _get_template_queryset().get(
                     graphic_pack=pack,
                     content_type='matchday'
                 )
@@ -2062,7 +2091,7 @@ class TemplateDebugView(APIView):
             # Try ORM
             try:
                 pack = GraphicPack.objects.get(id=pack_id)
-                orm_templates = Template.objects.filter(graphic_pack=pack)
+                orm_templates = _get_template_queryset().filter(graphic_pack=pack)
                 logger.info(f"ORM found {orm_templates.count()} templates")
                 
                 template_data = []
@@ -2079,7 +2108,7 @@ class TemplateDebugView(APIView):
                 
                 # Try to get matchday template specifically
                 try:
-                    matchday_template = Template.objects.get(
+                    matchday_template = _get_template_queryset().get(
                         graphic_pack=pack,
                         content_type='matchday'
                     )
@@ -2522,7 +2551,7 @@ class GraphicPackDeleteView(APIView):
                 )
             
             # Delete all templates associated with this pack
-            templates = Template.objects.filter(graphic_pack=graphic_pack)
+            templates = _get_template_queryset().filter(graphic_pack=graphic_pack)
             templates_count = templates.count()
             templates.delete()
             
@@ -2547,7 +2576,7 @@ class TemplateDeleteView(APIView):
     def delete(self, request, template_id):
         try:
             try:
-                template = Template.objects.get(id=template_id)
+                template = _get_template_queryset().get(id=template_id)
             except Template.DoesNotExist:
                 return Response(
                     {"error": "Template not found."},

@@ -2723,6 +2723,11 @@ class TemplateCreateView(APIView):
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
             
+            # Get homeoraway from request (default to 'Default' if not provided)
+            homeoraway = request.data.get('homeoraway', 'Default')
+            if homeoraway not in ['Default', 'Home', 'Away']:
+                homeoraway = 'Default'
+            
             # Create template
             template = Template.objects.create(
                 graphic_pack=graphic_pack,
@@ -2730,7 +2735,8 @@ class TemplateCreateView(APIView):
                 file_url=upload_result['secure_url'],
                 image_url=upload_result['secure_url'],  # Save to image_url as well
                 file_name=file.name,
-                file_size=file.size
+                file_size=file.size,
+                homeoraway=homeoraway
             )
             
             return Response({

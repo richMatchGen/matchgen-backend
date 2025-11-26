@@ -54,6 +54,12 @@ class Template(models.Model):
         ("alert", "Alert"),
         ("player", "Player"),
     ]
+    
+    HOME_OR_AWAY_CHOICES = [
+        ('Default', 'Default'),
+        ('Home', 'Home'),
+        ('Away', 'Away'),
+    ]
 
     graphic_pack = models.ForeignKey(
         GraphicPack, on_delete=models.CASCADE, related_name="templates"
@@ -66,6 +72,14 @@ class Template(models.Model):
     file_url = models.URLField(max_length=500, blank=True, null=True, help_text="URL of the uploaded file")
     file_name = models.CharField(max_length=255, blank=True, null=True, help_text="Original filename")
     file_size = models.IntegerField(blank=True, null=True, help_text="File size in bytes")
+    
+    # Home or Away field
+    homeoraway = models.CharField(
+        max_length=20,
+        choices=HOME_OR_AWAY_CHOICES,
+        default='Default',
+        help_text="Whether this template is for Home, Away, or Default (both)"
+    )
     
     # New JSON field to store template configuration
     template_config = models.JSONField(default=dict, blank=True)

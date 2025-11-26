@@ -1897,7 +1897,7 @@ class AdminFixtureTaskListView(APIView):
 class AdminUploadPostView(APIView):
     """Admin endpoint to upload Matchday, Upcoming Fixture, or Starting XI posts"""
     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser]
+    # Accept JSON data since we're just uploading a URL string, not a file
     
     def post(self, request):
         """Upload a post URL for a fixture"""

@@ -2759,8 +2759,28 @@ class TemplateCreateView(APIView):
             if homeoraway not in ['Default', 'Home', 'Away']:
                 homeoraway = 'Default'
             
-            # Create template - try with homeoraway first, fallback if migration hasn't been run
+            # Check if homeoraway column exists in database
+            from django.db import connection
+            column_exists = False
             try:
+                with connection.cursor() as cursor:
+                    # Use proper table name from Django's db_table
+                    table_name = Template._meta.db_table
+                    cursor.execute("""
+                        SELECT column_name 
+                        FROM information_schema.columns 
+                        WHERE table_name=%s 
+                        AND column_name='homeoraway'
+                    """, [table_name])
+                    column_exists = cursor.fetchone() is not None
+                    logger.info(f"homeoraway column exists: {column_exists} for table {table_name}")
+            except Exception as schema_check_error:
+                logger.warning(f"Could not check for homeoraway column: {str(schema_check_error)}")
+                # Assume it doesn't exist if we can't check
+                column_exists = False
+            
+            # Create template - only include homeoraway if column exists
+            if column_exists:
                 template = Template.objects.create(
                     graphic_pack=graphic_pack,
                     content_type=content_type,
@@ -2770,22 +2790,35 @@ class TemplateCreateView(APIView):
                     file_size=file.size,
                     homeoraway=homeoraway
                 )
-            except Exception as db_error:
-                # If error is about missing column (migration not run), try without homeoraway
-                error_str = str(db_error).lower()
-                if 'homeoraway' in error_str or 'column' in error_str or 'does not exist' in error_str:
-                    logger.warning(f"homeoraway field not available in database, creating template without it: {str(db_error)}")
-                    template = Template.objects.create(
-                        graphic_pack=graphic_pack,
-                        content_type=content_type,
-                        file_url=upload_result['secure_url'],
-                        image_url=upload_result['secure_url'],
-                        file_name=file.name,
-                        file_size=file.size
-                    )
-                else:
-                    # Re-raise if it's a different error
-                    raise
+            else:
+                # Migration hasn't been run yet - create without homeoraway using raw SQL
+                logger.info("homeoraway column not found in database, creating template without it using raw SQL")
+                from django.db import connection
+                from django.utils import timezone
+                import json
+                
+                table_name = Template._meta.db_table
+                with connection.cursor() as cursor:
+                    cursor.execute(f"""
+                        INSERT INTO {table_name} 
+                        (graphic_pack_id, content_type, image_url, sport, file_url, file_name, file_size, template_config, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        RETURNING id
+                    """, [
+                        graphic_pack.id,
+                        content_type,
+                        upload_result['secure_url'],
+                        '',  # sport
+                        upload_result['secure_url'],  # file_url
+                        file.name,
+                        file.size,
+                        json.dumps({}),  # template_config as empty JSON
+                        timezone.now(),  # created_at
+                        timezone.now()   # updated_at
+                    ])
+                    template_id = cursor.fetchone()[0]
+                    template = Template.objects.get(id=template_id)
+                    logger.info(f"Template created successfully without homeoraway field: {template_id}")
             
             return Response({
                 "message": "Template created successfully.",

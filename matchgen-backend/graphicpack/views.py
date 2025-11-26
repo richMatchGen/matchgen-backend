@@ -2817,8 +2817,18 @@ class TemplateCreateView(APIView):
                         timezone.now()   # updated_at
                     ])
                     template_id = cursor.fetchone()[0]
-                    template = Template.objects.get(id=template_id)
                     logger.info(f"Template created successfully without homeoraway field: {template_id}")
+                    
+                    # Return response without fetching via ORM to avoid SELECT on non-existent homeoraway column
+                    return Response({
+                        "message": "Template created successfully.",
+                        "template": {
+                            "id": template_id,
+                            "content_type": content_type,
+                            "file_url": upload_result['secure_url'],
+                            "file_name": file.name
+                        }
+                    }, status=status.HTTP_201_CREATED)
             
             return Response({
                 "message": "Template created successfully.",

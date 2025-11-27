@@ -1897,6 +1897,38 @@ class AdminFixtureTaskListView(APIView):
             )
 
 
+def _player_bespoke_columns_exist():
+    """Check if player bespoke graphic columns exist in the database."""
+    from django.db import connection
+    from content.models import Player
+    try:
+        with connection.cursor() as cursor:
+            table_name = Player._meta.db_table
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name=%s 
+                AND column_name IN ('cutout_url', 'highlight_home_url', 'highlight_away_url', 'potm_url')
+            """, [table_name])
+            results = cursor.fetchall()
+            # Check if all 4 columns exist
+            column_names = [row[0] for row in results]
+            required_columns = ['cutout_url', 'highlight_home_url', 'highlight_away_url', 'potm_url']
+            return all(col in column_names for col in required_columns)
+    except Exception as e:
+        logger.warning(f"Could not check for player bespoke columns: {str(e)}")
+        return False
+
+
+def _get_player_queryset():
+    """Get a Player queryset that handles missing bespoke graphic columns."""
+    from content.models import Player
+    if not _player_bespoke_columns_exist():
+        # Columns don't exist - defer them to avoid SELECT error
+        return Player.objects.defer('cutout_url', 'highlight_home_url', 'highlight_away_url', 'potm_url')
+    return Player.objects.all()
+
+
 class AdminPlayerTaskListView(APIView):
     """Get all players from Premium clubs with Bespoke template packages"""
     permission_classes = [IsAuthenticated]
@@ -1921,10 +1953,13 @@ class AdminPlayerTaskListView(APIView):
                 selected_pack__is_bespoke=True
             ).select_related('selected_pack')
             
-            # Get all players for these clubs
-            players = Player.objects.filter(
+            # Get all players for these clubs - use helper to handle missing columns
+            players = _get_player_queryset().filter(
                 club__in=eligible_clubs
             ).select_related('club', 'club__selected_pack').order_by('club__name', 'squad_no', 'name')
+            
+            # Check if columns exist to determine default values
+            columns_exist = _player_bespoke_columns_exist()
             
             players_data = []
             for player in players:
@@ -1938,12 +1973,26 @@ class AdminPlayerTaskListView(APIView):
                     "position": player.position,
                     "player_pic": player.player_pic,
                     "formatted_pic": player.formatted_pic,
-                    "cutout_url": player.cutout_url,
-                    "highlight_home_url": player.highlight_home_url,
-                    "highlight_away_url": player.highlight_away_url,
-                    "potm_url": player.potm_url,
                     "graphic_pack_name": player.club.selected_pack.name if player.club.selected_pack else None,
                 }
+                
+                # Only include bespoke graphic URLs if columns exist
+                if columns_exist:
+                    player_info.update({
+                        "cutout_url": getattr(player, 'cutout_url', None),
+                        "highlight_home_url": getattr(player, 'highlight_home_url', None),
+                        "highlight_away_url": getattr(player, 'highlight_away_url', None),
+                        "potm_url": getattr(player, 'potm_url', None),
+                    })
+                else:
+                    # Columns don't exist yet - return None for all
+                    player_info.update({
+                        "cutout_url": None,
+                        "highlight_home_url": None,
+                        "highlight_away_url": None,
+                        "potm_url": None,
+                    })
+                
                 players_data.append(player_info)
             
             return Response({
@@ -2028,16 +2077,30 @@ class AdminUploadPlayerImageView(APIView):
                     "error": "No image URL available after upload."
                 }, status=status.HTTP_400_BAD_REQUEST)
             
-            # Update the appropriate field
-            if image_type == 'cutout':
-                player.cutout_url = image_url
-            elif image_type == 'highlight_home':
-                player.highlight_home_url = image_url
-            elif image_type == 'highlight_away':
-                player.highlight_away_url = image_url
-            elif image_type == 'potm':
-                player.potm_url = image_url
+            # Check if columns exist
+            columns_exist = _player_bespoke_columns_exist()
             
+            if not columns_exist:
+                return Response({
+                    "error": "Player bespoke graphic columns do not exist. Please run migrations first."
+                }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+            
+            # Map image_type to field name
+            field_mapping = {
+                'cutout': 'cutout_url',
+                'highlight_home': 'highlight_home_url',
+                'highlight_away': 'highlight_away_url',
+                'potm': 'potm_url'
+            }
+            
+            field_name = field_mapping.get(image_type)
+            if not field_name:
+                return Response({
+                    "error": "Invalid image_type mapping."
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Update the appropriate field
+            setattr(player, field_name, image_url)
             player.save()
             
             return Response({

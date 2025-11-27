@@ -835,71 +835,106 @@ class SocialMediaPostGenerator(APIView):
             logger.info(f"Found match: {match.opponent} vs {match.club.name}")
             
             # Get the template for this post type (case-insensitive lookup)
-            logger.info(f"Looking for template with graphic_pack={pack.id} and content_type='{post_type}'")
-            # Select template with home/away awareness
-            queryset = _get_template_queryset().filter(
-                graphic_pack=pack,
-                content_type__iexact=post_type
-            )
+            # For startingXI posts, check if match has starting_xi_post_url first
+            # If it exists, we can skip template lookup and use the bespoke graphic directly
+            if post_type in ['startingXI', 'starting_xi'] and match.starting_xi_post_url:
+                logger.info(f"Match has starting_xi_post_url for Starting XI post, will use bespoke graphic: {match.starting_xi_post_url}")
+                # Create a dummy template object - we'll create the actual BespokeTemplate later
+                class DummyTemplate:
+                    def __init__(self):
+                        self.id = None
+                        self.content_type = 'startingXI'
+                        self.graphic_pack = pack
+                        self.sport = ''
+                        self.template_config = {}
+                
+                template = DummyTemplate()
+            else:
+                logger.info(f"Looking for template with graphic_pack={pack.id} and content_type='{post_type}'")
+                # Select template with home/away awareness
+                queryset = _get_template_queryset().filter(
+                    graphic_pack=pack,
+                    content_type__iexact=post_type
+                )
 
-            if not queryset.exists():
-                existing_templates = _get_template_queryset().filter(graphic_pack=pack)
-                existing_content_types = [t.content_type for t in existing_templates]
-                logger.error(f"No {post_type} template found (exact or case-insensitive). Available templates for pack {pack.id}: {existing_content_types}")
-                return Response({
-                    "error": f"No {post_type} template found in selected graphic pack",
-                    "available_templates": existing_content_types,
-                    "graphic_pack_id": pack.id,
-                    "graphic_pack_name": pack.name
-                }, status=status.HTTP_404_NOT_FOUND)
+                if not queryset.exists():
+                    existing_templates = _get_template_queryset().filter(graphic_pack=pack)
+                    existing_content_types = [t.content_type for t in existing_templates]
+                    logger.error(f"No {post_type} template found (exact or case-insensitive). Available templates for pack {pack.id}: {existing_content_types}")
+                    return Response({
+                        "error": f"No {post_type} template found in selected graphic pack",
+                        "available_templates": existing_content_types,
+                        "graphic_pack_id": pack.id,
+                        "graphic_pack_name": pack.name
+                    }, status=status.HTTP_404_NOT_FOUND)
 
-            template = None
-            homeoraway_supported = _homeoraway_column_exists()
-            match_home_away = (match.home_away or '').upper()
+                template = None
+                homeoraway_supported = _homeoraway_column_exists()
+                match_home_away = (match.home_away or '').upper()
 
-            if homeoraway_supported:
-                if match_home_away == 'AWAY':
-                    template = queryset.filter(homeoraway__iexact='Away').first()
-                    if not template:
+                if homeoraway_supported:
+                    if match_home_away == 'AWAY':
+                        template = queryset.filter(homeoraway__iexact='Away').first()
+                        if not template:
+                            template = queryset.filter(homeoraway__iexact='Default').first()
+                    else:
                         template = queryset.filter(homeoraway__iexact='Default').first()
-                else:
-                    template = queryset.filter(homeoraway__iexact='Default').first()
-                    if not template:
-                        template = queryset.filter(homeoraway__iexact='Home').first()
+                        if not template:
+                            template = queryset.filter(homeoraway__iexact='Home').first()
 
-            if not template:
-                template = queryset.first()
+                if not template:
+                    template = queryset.first()
 
-            if not template:
-                logger.error(f"No template could be selected for post_type={post_type}, pack={pack.id}")
-                return Response({
-                    "error": f"No valid template found for {post_type}",
-                    "graphic_pack_id": pack.id,
-                    "graphic_pack_name": pack.name
-                }, status=status.HTTP_404_NOT_FOUND)
+                if not template:
+                    logger.error(f"No template could be selected for post_type={post_type}, pack={pack.id}")
+                    return Response({
+                        "error": f"No valid template found for {post_type}",
+                        "graphic_pack_id": pack.id,
+                        "graphic_pack_name": pack.name
+                    }, status=status.HTTP_404_NOT_FOUND)
             
-            logger.info(f"Selected template {template.id} for post_type {post_type} (home_away={match_home_away}, supports_homeoraway={homeoraway_supported})")
+            # Log template selection (handle case where template might be a DummyTemplate)
+            if hasattr(template, 'id') and template.id:
+                homeoraway_supported = _homeoraway_column_exists()
+                match_home_away = (match.home_away or '').upper()
+                logger.info(f"Selected template {template.id} for post_type {post_type} (home_away={match_home_away}, supports_homeoraway={homeoraway_supported})")
+            else:
+                logger.info(f"Using bespoke graphic for post_type {post_type} (no template lookup needed)")
             
-            # For matchday posts, check if match has starting_xi_post_url (bespoke graphic)
-            # If it exists, use that instead of the template image
+            # For matchday and startingXI posts, check if match has bespoke graphics
+            # If they exist, use those instead of the template image
+            bespoke_template = None
             if post_type == 'matchday' and match.starting_xi_post_url:
-                logger.info(f"Match has starting_xi_post_url, using bespoke graphic: {match.starting_xi_post_url}")
+                logger.info(f"Match has starting_xi_post_url, using bespoke graphic for matchday: {match.starting_xi_post_url}")
                 # Create a temporary template-like object with the bespoke URL
                 # This allows us to use the bespoke graphic while still using the pack's text elements
                 class BespokeTemplate:
                     def __init__(self, image_url, original_template):
                         self.image_url = image_url
-                        self.id = original_template.id if original_template else None
+                        self.id = original_template.id if original_template and hasattr(original_template, 'id') else None
                         self.content_type = 'matchday'
-                        self.graphic_pack = original_template.graphic_pack if original_template else pack
+                        self.graphic_pack = original_template.graphic_pack if original_template and hasattr(original_template, 'graphic_pack') else pack
                         # Copy other template attributes that might be needed
                         self.sport = getattr(original_template, 'sport', '') if original_template else ''
                         self.template_config = getattr(original_template, 'template_config', {}) if original_template else {}
                 
                 bespoke_template = BespokeTemplate(match.starting_xi_post_url, template)
                 logger.info(f"Using bespoke template image URL: {bespoke_template.image_url} (from match.starting_xi_post_url)")
-            else:
-                bespoke_template = None
+            elif post_type in ['startingXI', 'starting_xi'] and match.starting_xi_post_url:
+                logger.info(f"Match has starting_xi_post_url, using bespoke graphic for Starting XI: {match.starting_xi_post_url}")
+                # Create a temporary template-like object with the bespoke URL
+                class BespokeTemplate:
+                    def __init__(self, image_url, original_template):
+                        self.image_url = image_url
+                        self.id = original_template.id if original_template and hasattr(original_template, 'id') else None
+                        self.content_type = 'startingXI'
+                        self.graphic_pack = original_template.graphic_pack if original_template and hasattr(original_template, 'graphic_pack') else pack
+                        # Copy other template attributes that might be needed
+                        self.sport = getattr(original_template, 'sport', '') if original_template else ''
+                        self.template_config = getattr(original_template, 'template_config', {}) if original_template else {}
+                
+                bespoke_template = BespokeTemplate(match.starting_xi_post_url, template)
+                logger.info(f"Using bespoke template image URL: {bespoke_template.image_url} (from match.starting_xi_post_url)")
             
             logger.info(f"Starting {post_type} post generation...")
             logger.info(f"=== {post_type.upper()} POST GENERATION STARTED ===")

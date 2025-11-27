@@ -3,6 +3,7 @@ import base64
 import requests
 import stripe
 import time
+from datetime import timedelta
 from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.utils import timezone
@@ -14,7 +15,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.exceptions import ValidationError
-from rest_framework.parsers import MultiPartParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.db import transaction
@@ -22,6 +23,7 @@ from django.core.mail import send_mail
 from django.conf import settings
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
+import cloudinary.uploader
 
 from .models import (
     User, Club, UserRole, ClubMembership, Feature, 
@@ -1844,7 +1846,8 @@ class AdminFixtureTaskListView(APIView):
             from graphicpack.models import GraphicPack
             from django.utils import timezone
             
-            now = timezone.now()
+            today = timezone.now().date()
+            end_date = today + timedelta(days=10)
             
             # Get clubs that are on Premium Plans (prem) with Bespoke template packages
             eligible_clubs = Club.objects.filter(
@@ -1856,7 +1859,7 @@ class AdminFixtureTaskListView(APIView):
             # Get upcoming fixtures for these clubs
             upcoming_fixtures = Match.objects.filter(
                 club__in=eligible_clubs,
-                date__gte=now,
+                date__range=(today, end_date),
                 status='SCHEDULED'
             ).select_related('club', 'club__selected_pack').order_by('date', 'time_start')
             
@@ -1897,7 +1900,7 @@ class AdminFixtureTaskListView(APIView):
 class AdminUploadPostView(APIView):
     """Admin endpoint to upload Matchday, Upcoming Fixture, or Starting XI posts"""
     permission_classes = [IsAuthenticated]
-    # Accept JSON data since we're just uploading a URL string, not a file
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
     
     def post(self, request):
         """Upload a post URL for a fixture"""
@@ -1913,15 +1916,21 @@ class AdminUploadPostView(APIView):
             fixture_id = request.data.get('fixture_id')
             post_type = request.data.get('post_type')  # 'matchday', 'upcoming_fixture', 'starting_xi'
             post_url = request.data.get('post_url')
+            uploaded_file = request.FILES.get('file')
             
-            if not fixture_id or not post_type or not post_url:
+            if not fixture_id or not post_type:
                 return Response({
-                    "error": "Missing required fields: fixture_id, post_type, and post_url are required."
+                    "error": "Missing required fields: fixture_id and post_type are required."
                 }, status=status.HTTP_400_BAD_REQUEST)
-            
+
             if post_type not in ['matchday', 'upcoming_fixture', 'starting_xi']:
                 return Response({
                     "error": "Invalid post_type. Must be one of: matchday, upcoming_fixture, starting_xi"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if not uploaded_file and not post_url:
+                return Response({
+                    "error": "Either an image file or a post_url must be provided."
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             try:
@@ -1931,6 +1940,31 @@ class AdminUploadPostView(APIView):
                     "error": "Fixture not found."
                 }, status=status.HTTP_404_NOT_FOUND)
             
+            # Upload file to Cloudinary if provided
+            if uploaded_file:
+                try:
+                    upload_result = cloudinary.uploader.upload(
+                        uploaded_file,
+                        folder=f"admin_posts/{post_type}",
+                        resource_type="auto",
+                        overwrite=False,
+                        use_filename=True,
+                        unique_filename=True,
+                    )
+                    post_url = upload_result.get('secure_url')
+                except Exception as cloudinary_error:
+                    logger.error(f"Cloudinary upload failed: {str(cloudinary_error)}", exc_info=True)
+                    return Response(
+                        {"error": "Failed to upload image. Please try again."},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    )
+
+            # Ensure we have a URL after optional upload
+            if not post_url:
+                return Response({
+                    "error": "Post URL could not be determined."
+                }, status=status.HTTP_400_BAD_REQUEST)
+
             # Update the appropriate field
             if post_type == 'matchday':
                 fixture.matchday_post_url = post_url

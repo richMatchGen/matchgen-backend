@@ -880,15 +880,38 @@ class SocialMediaPostGenerator(APIView):
             
             logger.info(f"Selected template {template.id} for post_type {post_type} (home_away={match_home_away}, supports_homeoraway={homeoraway_supported})")
             
+            # For matchday posts, check if match has starting_xi_post_url (bespoke graphic)
+            # If it exists, use that instead of the template image
+            if post_type == 'matchday' and match.starting_xi_post_url:
+                logger.info(f"Match has starting_xi_post_url, using bespoke graphic: {match.starting_xi_post_url}")
+                # Create a temporary template-like object with the bespoke URL
+                # This allows us to use the bespoke graphic while still using the pack's text elements
+                class BespokeTemplate:
+                    def __init__(self, image_url, original_template):
+                        self.image_url = image_url
+                        self.id = original_template.id if original_template else None
+                        self.content_type = 'matchday'
+                        self.graphic_pack = original_template.graphic_pack if original_template else pack
+                        # Copy other template attributes that might be needed
+                        self.sport = getattr(original_template, 'sport', '') if original_template else ''
+                        self.template_config = getattr(original_template, 'template_config', {}) if original_template else {}
+                
+                bespoke_template = BespokeTemplate(match.starting_xi_post_url, template)
+                logger.info(f"Using bespoke template image URL: {bespoke_template.image_url} (from match.starting_xi_post_url)")
+            else:
+                bespoke_template = None
+            
             logger.info(f"Starting {post_type} post generation...")
             logger.info(f"=== {post_type.upper()} POST GENERATION STARTED ===")
             logger.info(f"Generating {post_type} post for match {match_id}, club {club.name}")
-            logger.info(f"Template image URL: {template.image_url}")
+            logger.info(f"Template image URL: {bespoke_template.image_url if bespoke_template else template.image_url}")
             logger.info(f"Selected pack: {pack.name} (ID: {pack.id})")
             
             # Generate the post
             try:
-                image_url = self._generate_social_media_post(match, club, pack, template, post_type, request)
+                # Use bespoke template if available, otherwise use regular template
+                template_to_use = bespoke_template if bespoke_template else template
+                image_url = self._generate_social_media_post(match, club, pack, template_to_use, post_type, request)
                 
                 logger.info(f"{post_type.capitalize()} post generated successfully")
                 

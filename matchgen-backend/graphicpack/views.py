@@ -924,9 +924,11 @@ class SocialMediaPostGenerator(APIView):
             else:
                 logger.info(f"Using bespoke graphic for post_type {post_type} (no template lookup needed)")
             
-            # For matchday and startingXI posts, check if match has bespoke graphics
+            # For matchday, startingXI, and goal posts, check if match/player has bespoke graphics
             # If they exist, use those instead of the template image
             bespoke_template = None
+            logger.info(f"Checking for bespoke templates: post_type={post_type}, pack.is_bespoke={pack.is_bespoke if hasattr(pack, 'is_bespoke') else 'N/A'}")
+            
             if post_type == 'matchday' and match.starting_xi_post_url:
                 logger.info(f"Match has starting_xi_post_url, using bespoke graphic for matchday: {match.starting_xi_post_url}")
                 # Create a temporary template-like object with the bespoke URL
@@ -960,20 +962,36 @@ class SocialMediaPostGenerator(APIView):
                 logger.info(f"Using bespoke template image URL: {bespoke_template.image_url} (from match.starting_xi_post_url)")
             elif post_type == 'goal' and pack.is_bespoke:
                 # For goal posts with bespoke packs, check if player has highlight graphics
+                logger.info(f"=== GOAL POST BESPOKE CHECK ===")
+                logger.info(f"post_type='{post_type}', pack.is_bespoke={pack.is_bespoke}")
+                
                 goal_scorer = request.data.get('goal_scorer', '') if request else ''
+                logger.info(f"Goal post with bespoke pack - goal_scorer from request: '{goal_scorer}'")
+                logger.info(f"Request data keys: {list(request.data.keys()) if request else 'No request'}")
+                logger.info(f"Full request.data: {request.data if request else 'No request'}")
+                
                 if goal_scorer:
                     try:
                         from content.models import Player
                         
                         # Check if player bespoke columns exist
-                        if _player_bespoke_columns_exist():
+                        columns_exist = _player_bespoke_columns_exist()
+                        logger.info(f"Player bespoke columns exist: {columns_exist}")
+                        
+                        if columns_exist:
                             # Find the player by name in the club's players
+                            logger.info(f"Searching for player '{goal_scorer}' in club {club.name} (ID: {club.id})")
+                            all_players = Player.objects.filter(club=club)
+                            logger.info(f"Total players in club: {all_players.count()}")
+                            logger.info(f"Player names in club: {[p.name for p in all_players[:10]]}")
+                            
                             player = Player.objects.filter(
                                 club=club,
                                 name__iexact=goal_scorer
                             ).first()
                             
                             if player:
+                                logger.info(f"Found player: {player.name} (ID: {player.id})")
                                 # Determine which highlight URL to use based on home/away
                                 match_home_away = (match.home_away or '').upper()
                                 highlight_url = None
@@ -987,7 +1005,7 @@ class SocialMediaPostGenerator(APIView):
                                     logger.info(f"Match is HOME (or unset), checking player.highlight_home_url: {highlight_url}")
                                 
                                 if highlight_url:
-                                    logger.info(f"Player {goal_scorer} has highlight graphic, using bespoke graphic for goal post: {highlight_url}")
+                                    logger.info(f"✓ Player {goal_scorer} has highlight graphic, using bespoke graphic for goal post: {highlight_url}")
                                     # Create a temporary template-like object with the bespoke URL
                                     class BespokeTemplate:
                                         def __init__(self, image_url, original_template):
@@ -1000,16 +1018,18 @@ class SocialMediaPostGenerator(APIView):
                                             self.template_config = getattr(original_template, 'template_config', {}) if original_template else {}
                                     
                                     bespoke_template = BespokeTemplate(highlight_url, template)
-                                    logger.info(f"Using bespoke template image URL: {bespoke_template.image_url} (from player.{'highlight_away_url' if match_home_away == 'AWAY' else 'highlight_home_url'})")
+                                    logger.info(f"✓✓✓ Using bespoke template image URL: {bespoke_template.image_url} (from player.{'highlight_away_url' if match_home_away == 'AWAY' else 'highlight_home_url'})")
                                 else:
-                                    logger.info(f"Player {goal_scorer} found but no highlight graphic available (home_away={match_home_away})")
+                                    logger.warning(f"✗ Player {goal_scorer} found but no highlight graphic available (home_away={match_home_away}, highlight_home_url={getattr(player, 'highlight_home_url', None)}, highlight_away_url={getattr(player, 'highlight_away_url', None)})")
                             else:
-                                logger.warning(f"Player '{goal_scorer}' not found in club {club.name} players")
+                                logger.warning(f"✗ Player '{goal_scorer}' not found in club {club.name} players. Available players: {[p.name for p in all_players[:5]]}")
                         else:
-                            logger.info("Player bespoke columns do not exist yet, skipping bespoke graphic check")
+                            logger.info("✗ Player bespoke columns do not exist yet, skipping bespoke graphic check")
                     except Exception as e:
-                        logger.error(f"Error checking for player bespoke graphics: {str(e)}", exc_info=True)
+                        logger.error(f"✗✗✗ Error checking for player bespoke graphics: {str(e)}", exc_info=True)
                         # Continue with regular template if there's an error
+                else:
+                    logger.warning(f"✗ No goal_scorer provided in request for goal post")
             
             logger.info(f"Starting {post_type} post generation...")
             logger.info(f"=== {post_type.upper()} POST GENERATION STARTED ===")

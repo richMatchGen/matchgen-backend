@@ -1897,6 +1897,164 @@ class AdminFixtureTaskListView(APIView):
             )
 
 
+class AdminPlayerTaskListView(APIView):
+    """Get all players from Premium clubs with Bespoke template packages"""
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        """Get task list of players for eligible clubs"""
+        try:
+            # Check if user is admin/staff
+            if not (request.user.is_staff or request.user.is_superuser):
+                return Response({
+                    "error": "Access denied. Admin privileges required."
+                }, status=status.HTTP_403_FORBIDDEN)
+            
+            from users.models import Club
+            from content.models import Player
+            from graphicpack.models import GraphicPack
+            
+            # Get clubs that are on Premium Plans (prem) with Bespoke template packages
+            eligible_clubs = Club.objects.filter(
+                subscription_tier='prem',
+                subscription_active=True,
+                selected_pack__is_bespoke=True
+            ).select_related('selected_pack')
+            
+            # Get all players for these clubs
+            players = Player.objects.filter(
+                club__in=eligible_clubs
+            ).select_related('club', 'club__selected_pack').order_by('club__name', 'squad_no', 'name')
+            
+            players_data = []
+            for player in players:
+                player_info = {
+                    "id": player.id,
+                    "club_id": player.club.id,
+                    "club_name": player.club.name,
+                    "club_logo": player.club.logo,
+                    "name": player.name,
+                    "squad_no": player.squad_no,
+                    "position": player.position,
+                    "player_pic": player.player_pic,
+                    "formatted_pic": player.formatted_pic,
+                    "cutout_url": player.cutout_url,
+                    "highlight_home_url": player.highlight_home_url,
+                    "highlight_away_url": player.highlight_away_url,
+                    "potm_url": player.potm_url,
+                    "graphic_pack_name": player.club.selected_pack.name if player.club.selected_pack else None,
+                }
+                players_data.append(player_info)
+            
+            return Response({
+                "count": len(players_data),
+                "players": players_data
+            })
+            
+        except Exception as e:
+            logger.error(f"Error fetching admin player task list: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while fetching player task list."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class AdminUploadPlayerImageView(APIView):
+    """Admin endpoint to upload player images (cutout, highlight-home, highlight-away, potm)"""
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    
+    def post(self, request):
+        """Upload a player image URL or file"""
+        try:
+            # Check if user is admin/staff
+            if not (request.user.is_staff or request.user.is_superuser):
+                return Response({
+                    "error": "Access denied. Admin privileges required."
+                }, status=status.HTTP_403_FORBIDDEN)
+            
+            from content.models import Player
+            import cloudinary.uploader
+            
+            player_id = request.data.get('player_id')
+            image_type = request.data.get('image_type')  # 'cutout', 'highlight_home', 'highlight_away', 'potm'
+            image_url = request.data.get('image_url')
+            uploaded_file = request.FILES.get('file')
+            
+            if not player_id or not image_type:
+                return Response({
+                    "error": "Missing required fields: player_id and image_type are required."
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if image_type not in ['cutout', 'highlight_home', 'highlight_away', 'potm']:
+                return Response({
+                    "error": "Invalid image_type. Must be one of: cutout, highlight_home, highlight_away, potm"
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            if not uploaded_file and not image_url:
+                return Response({
+                    "error": "Either an image file or an image_url must be provided."
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            try:
+                player = Player.objects.get(id=player_id)
+            except Player.DoesNotExist:
+                return Response({
+                    "error": "Player not found."
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            # Upload file to Cloudinary if provided
+            if uploaded_file:
+                try:
+                    upload_result = cloudinary.uploader.upload(
+                        uploaded_file,
+                        folder=f"admin_players/{image_type}",
+                        resource_type="auto",
+                        overwrite=False,
+                        use_filename=True,
+                        unique_filename=True,
+                    )
+                    image_url = upload_result.get('secure_url')
+                except Exception as cloudinary_error:
+                    logger.error(f"Cloudinary upload failed: {str(cloudinary_error)}", exc_info=True)
+                    return Response(
+                        {"error": "Failed to upload image. Please try again."},
+                        status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    )
+            
+            # Ensure we have a URL after optional upload
+            if not image_url:
+                return Response({
+                    "error": "No image URL available after upload."
+                }, status=status.HTTP_400_BAD_REQUEST)
+            
+            # Update the appropriate field
+            if image_type == 'cutout':
+                player.cutout_url = image_url
+            elif image_type == 'highlight_home':
+                player.highlight_home_url = image_url
+            elif image_type == 'highlight_away':
+                player.highlight_away_url = image_url
+            elif image_type == 'potm':
+                player.potm_url = image_url
+            
+            player.save()
+            
+            return Response({
+                "message": f"{image_type.replace('_', ' ').title()} image uploaded successfully.",
+                "player_id": player.id,
+                "image_type": image_type,
+                "image_url": image_url
+            })
+            
+        except Exception as e:
+            logger.error(f"Error uploading player image: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "An error occurred while uploading the player image."},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
 class AdminUploadPostView(APIView):
     """Admin endpoint to upload Matchday, Upcoming Fixture, or Starting XI posts"""
     permission_classes = [IsAuthenticated]

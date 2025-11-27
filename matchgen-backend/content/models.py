@@ -87,6 +87,12 @@ class Player(models.Model):
     formatted_pic = models.URLField(max_length=500, blank=True, null=True)
     sponsor = models.URLField(max_length=500, blank=True, null=True)
     position = models.CharField(max_length=255)
+    
+    # Admin-uploaded bespoke graphics
+    cutout_url = models.URLField(max_length=500, blank=True, null=True, help_text="URL for uploaded player cutout image")
+    highlight_home_url = models.URLField(max_length=500, blank=True, null=True, help_text="URL for uploaded highlight image (Home)")
+    highlight_away_url = models.URLField(max_length=500, blank=True, null=True, help_text="URL for uploaded highlight image (Away)")
+    potm_url = models.URLField(max_length=500, blank=True, null=True, help_text="URL for uploaded Player of the Match image")
 
     def __str__(self):
         return self.name

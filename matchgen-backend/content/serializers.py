@@ -44,6 +44,10 @@ class PlayerSerializer(serializers.ModelSerializer):
             "formatted_pic",
             "position",
             "sponsor",
+            "cutout_url",
+            "highlight_home_url",
+            "highlight_away_url",
+            "potm_url",
         ]
         read_only_fields = ["id", "club"]  # club is set by the view, not the client
 

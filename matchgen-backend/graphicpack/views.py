@@ -836,36 +836,49 @@ class SocialMediaPostGenerator(APIView):
             
             # Get the template for this post type (case-insensitive lookup)
             logger.info(f"Looking for template with graphic_pack={pack.id} and content_type='{post_type}'")
-            try:
-                # Use queryset that handles missing homeoraway column
-                queryset = _get_template_queryset()
-                # Try exact match first
-                template = queryset.get(
-                    graphic_pack=pack,
-                    content_type=post_type
-                )
-                logger.info(f"Found {post_type} template (exact match): {template.id}")
-            except Template.DoesNotExist:
-                # Try case-insensitive lookup
-                try:
-                    queryset = _get_template_queryset()
-                    template = queryset.get(
-                        graphic_pack=pack,
-                        content_type__iexact=post_type
-                    )
-                    logger.info(f"Found {post_type} template (case-insensitive match): {template.id}")
-                except Template.DoesNotExist:
-                    # Check what templates exist for this pack
-                    queryset = _get_template_queryset()
-                    existing_templates = queryset.filter(graphic_pack=pack)
-                    existing_content_types = [t.content_type for t in existing_templates]
-                    logger.error(f"No {post_type} template found (exact or case-insensitive). Available templates for pack {pack.id}: {existing_content_types}")
-                    return Response({
-                        "error": f"No {post_type} template found in selected graphic pack",
-                        "available_templates": existing_content_types,
-                        "graphic_pack_id": pack.id,
-                        "graphic_pack_name": pack.name
-                    }, status=status.HTTP_404_NOT_FOUND)
+            # Select template with home/away awareness
+            queryset = _get_template_queryset().filter(
+                graphic_pack=pack,
+                content_type__iexact=post_type
+            )
+
+            if not queryset.exists():
+                existing_templates = _get_template_queryset().filter(graphic_pack=pack)
+                existing_content_types = [t.content_type for t in existing_templates]
+                logger.error(f"No {post_type} template found (exact or case-insensitive). Available templates for pack {pack.id}: {existing_content_types}")
+                return Response({
+                    "error": f"No {post_type} template found in selected graphic pack",
+                    "available_templates": existing_content_types,
+                    "graphic_pack_id": pack.id,
+                    "graphic_pack_name": pack.name
+                }, status=status.HTTP_404_NOT_FOUND)
+
+            template = None
+            homeoraway_supported = _homeoraway_column_exists()
+            match_home_away = (match.home_away or '').upper()
+
+            if homeoraway_supported:
+                if match_home_away == 'AWAY':
+                    template = queryset.filter(homeoraway__iexact='Away').first()
+                    if not template:
+                        template = queryset.filter(homeoraway__iexact='Default').first()
+                else:
+                    template = queryset.filter(homeoraway__iexact='Default').first()
+                    if not template:
+                        template = queryset.filter(homeoraway__iexact='Home').first()
+
+            if not template:
+                template = queryset.first()
+
+            if not template:
+                logger.error(f"No template could be selected for post_type={post_type}, pack={pack.id}")
+                return Response({
+                    "error": f"No valid template found for {post_type}",
+                    "graphic_pack_id": pack.id,
+                    "graphic_pack_name": pack.name
+                }, status=status.HTTP_404_NOT_FOUND)
+            
+            logger.info(f"Selected template {template.id} for post_type {post_type} (home_away={match_home_away}, supports_homeoraway={homeoraway_supported})")
             
             logger.info(f"Starting {post_type} post generation...")
             logger.info(f"=== {post_type.upper()} POST GENERATION STARTED ===")

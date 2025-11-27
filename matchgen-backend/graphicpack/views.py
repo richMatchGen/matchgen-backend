@@ -3129,7 +3129,7 @@ class TemplatesByPackView(APIView):
 
             # Get all templates for this pack
             try:
-                templates = Template.objects.filter(graphic_pack=pack)
+                templates = _get_template_queryset().filter(graphic_pack=pack)
                 logger.info(f"Found {templates.count()} templates for pack {pack.name}")
                 
                 templates_data = []
@@ -3140,7 +3140,8 @@ class TemplatesByPackView(APIView):
                         "image_url": template.image_url,
                         "sport": template.sport,
                         "template_config": template.template_config,
-                        "has_config": bool(template.template_config)
+                        "has_config": bool(template.template_config),
+                        "homeoraway": getattr(template, 'homeoraway', 'Default')  # Safely get homeoraway if it exists
                     })
                 
                 logger.info(f"Returning {len(templates_data)} templates")

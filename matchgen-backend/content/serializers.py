@@ -25,6 +25,8 @@ class MatchSerializer(serializers.ModelSerializer):
             "matchday_post_url",
             "upcoming_fixture_post_url",
             "starting_xi_post_url",
+            "halftime_post_url",
+            "fulltime_post_url",
         ]
         read_only_fields = ["id", "club"]  # club is set by the view, not the client
 
@@ -74,6 +76,8 @@ class FixturesSerializer(serializers.ModelSerializer):
             "matchday_post_url",
             "upcoming_fixture_post_url",
             "starting_xi_post_url",
+            "halftime_post_url",
+            "fulltime_post_url",
         ]
         read_only_fields = ["id", "club"]
 

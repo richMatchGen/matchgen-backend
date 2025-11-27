@@ -2135,7 +2135,7 @@ class AdminUploadPostView(APIView):
             from content.models import Match
             
             fixture_id = request.data.get('fixture_id')
-            post_type = request.data.get('post_type')  # 'matchday', 'upcoming_fixture', 'starting_xi'
+            post_type = request.data.get('post_type')  # 'matchday', 'upcoming_fixture', 'starting_xi', 'halftime', 'fulltime'
             post_url = request.data.get('post_url')
             uploaded_file = request.FILES.get('file')
             
@@ -2144,9 +2144,9 @@ class AdminUploadPostView(APIView):
                     "error": "Missing required fields: fixture_id and post_type are required."
                 }, status=status.HTTP_400_BAD_REQUEST)
 
-            if post_type not in ['matchday', 'upcoming_fixture', 'starting_xi']:
+            if post_type not in ['matchday', 'upcoming_fixture', 'starting_xi', 'halftime', 'fulltime']:
                 return Response({
-                    "error": "Invalid post_type. Must be one of: matchday, upcoming_fixture, starting_xi"
+                    "error": "Invalid post_type. Must be one of: matchday, upcoming_fixture, starting_xi, halftime, fulltime"
                 }, status=status.HTTP_400_BAD_REQUEST)
             
             if not uploaded_file and not post_url:
@@ -2193,6 +2193,10 @@ class AdminUploadPostView(APIView):
                 fixture.upcoming_fixture_post_url = post_url
             elif post_type == 'starting_xi':
                 fixture.starting_xi_post_url = post_url
+            elif post_type == 'halftime':
+                fixture.halftime_post_url = post_url
+            elif post_type == 'fulltime':
+                fixture.fulltime_post_url = post_url
             
             fixture.save()
             

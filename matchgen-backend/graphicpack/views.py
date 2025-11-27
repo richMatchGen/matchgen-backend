@@ -50,6 +50,29 @@ def _get_template_queryset():
     return Template.objects.all()
 
 
+def _player_bespoke_columns_exist():
+    """Check if player bespoke graphic columns exist in the database."""
+    from django.db import connection
+    from content.models import Player
+    try:
+        with connection.cursor() as cursor:
+            table_name = Player._meta.db_table
+            cursor.execute("""
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name=%s 
+                AND column_name IN ('cutout_url', 'highlight_home_url', 'highlight_away_url', 'potm_url')
+            """, [table_name])
+            results = cursor.fetchall()
+            # Check if all 4 columns exist
+            column_names = [row[0] for row in results]
+            required_columns = ['cutout_url', 'highlight_home_url', 'highlight_away_url', 'potm_url']
+            return all(col in column_names for col in required_columns)
+    except Exception as e:
+        logger.warning(f"Could not check for player bespoke columns: {str(e)}")
+        return False
+
+
 def apply_image_color_modifications(img, element):
     """Apply color modifications to an image based on element settings."""
     if element.image_color_filter == 'none':
@@ -935,6 +958,58 @@ class SocialMediaPostGenerator(APIView):
                 
                 bespoke_template = BespokeTemplate(match.starting_xi_post_url, template)
                 logger.info(f"Using bespoke template image URL: {bespoke_template.image_url} (from match.starting_xi_post_url)")
+            elif post_type == 'goal' and pack.is_bespoke:
+                # For goal posts with bespoke packs, check if player has highlight graphics
+                goal_scorer = request.data.get('goal_scorer', '') if request else ''
+                if goal_scorer:
+                    try:
+                        from content.models import Player
+                        
+                        # Check if player bespoke columns exist
+                        if _player_bespoke_columns_exist():
+                            # Find the player by name in the club's players
+                            player = Player.objects.filter(
+                                club=club,
+                                name__iexact=goal_scorer
+                            ).first()
+                            
+                            if player:
+                                # Determine which highlight URL to use based on home/away
+                                match_home_away = (match.home_away or '').upper()
+                                highlight_url = None
+                                
+                                if match_home_away == 'AWAY':
+                                    highlight_url = getattr(player, 'highlight_away_url', None)
+                                    logger.info(f"Match is AWAY, checking player.highlight_away_url: {highlight_url}")
+                                else:
+                                    # Default to HOME for HOME or unset matches
+                                    highlight_url = getattr(player, 'highlight_home_url', None)
+                                    logger.info(f"Match is HOME (or unset), checking player.highlight_home_url: {highlight_url}")
+                                
+                                if highlight_url:
+                                    logger.info(f"Player {goal_scorer} has highlight graphic, using bespoke graphic for goal post: {highlight_url}")
+                                    # Create a temporary template-like object with the bespoke URL
+                                    class BespokeTemplate:
+                                        def __init__(self, image_url, original_template):
+                                            self.image_url = image_url
+                                            self.id = original_template.id if original_template and hasattr(original_template, 'id') else None
+                                            self.content_type = 'goal'
+                                            self.graphic_pack = original_template.graphic_pack if original_template and hasattr(original_template, 'graphic_pack') else pack
+                                            # Copy other template attributes that might be needed
+                                            self.sport = getattr(original_template, 'sport', '') if original_template else ''
+                                            self.template_config = getattr(original_template, 'template_config', {}) if original_template else {}
+                                    
+                                    bespoke_template = BespokeTemplate(highlight_url, template)
+                                    logger.info(f"Using bespoke template image URL: {bespoke_template.image_url} (from player.{'highlight_away_url' if match_home_away == 'AWAY' else 'highlight_home_url'})")
+                                else:
+                                    logger.info(f"Player {goal_scorer} found but no highlight graphic available (home_away={match_home_away})")
+                            else:
+                                logger.warning(f"Player '{goal_scorer}' not found in club {club.name} players")
+                        else:
+                            logger.info("Player bespoke columns do not exist yet, skipping bespoke graphic check")
+                    except Exception as e:
+                        logger.error(f"Error checking for player bespoke graphics: {str(e)}", exc_info=True)
+                        # Continue with regular template if there's an error
             
             logger.info(f"Starting {post_type} post generation...")
             logger.info(f"=== {post_type.upper()} POST GENERATION STARTED ===")

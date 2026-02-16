@@ -949,8 +949,8 @@ class MyClubView(APIView, RateLimitMixin):
             logger.info(f"MyClubView called by user {request.user.email} at {timezone.now()}")
             logger.info(f"Request headers: {dict(request.headers)}")
             
-            # Check rate limiting
-            if not self.check_rate_limit(request.user.id, "my_club", limit_seconds=3):
+            # Check rate limiting (increased from 3 to 5 seconds to prevent false positives)
+            if not self.check_rate_limit(request.user.id, "my_club", limit_seconds=5):
                 return Response(
                     {
                         "error": "Too many requests. Please wait a few seconds.",

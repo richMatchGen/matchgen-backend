@@ -121,6 +121,22 @@ class GraphicPackListView(ListAPIView):
             return Response([], status=200)
 
 
+class AdminGraphicPackListView(ListAPIView):
+    """List all graphic packs for authenticated admin/upload flows (includes bespoke packs)."""
+    queryset = GraphicPack.objects.all()
+    serializer_class = GraphicPackSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        try:
+            response = super().get(request, *args, **kwargs)
+            logger.info(f"Admin graphic packs list response OK for user {request.user.id}")
+            return response
+        except Exception as e:
+            logger.error(f"Error in AdminGraphicPackListView: {str(e)}", exc_info=True)
+            return Response([], status=200)
+
+
 class GraphicPackDetailView(RetrieveAPIView):
     """Get a single graphic pack with its templates."""
     queryset = GraphicPack.objects.all()

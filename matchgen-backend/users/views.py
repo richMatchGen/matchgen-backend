@@ -45,6 +45,83 @@ from .permissions import (
 logger = logging.getLogger(__name__)
 User = get_user_model()
 
+
+def send_verification_code_email(user, code):
+    """
+    Send 6-digit verification code via SendGrid (EMAIL_HOST_PASSWORD = API key).
+
+    Returns True only if SendGrid accepts the message (HTTP 202). Returns False if
+    mail is not configured, SendGrid returns an error (e.g. 401 credits exceeded),
+    or the request fails — in those cases the code may be printed to server logs only.
+    """
+    try:
+        subject = "Your MatchGen Verification Code"
+        message = f"""
+            Your verification code is: {code}
+
+            This code will expire in 10 minutes.
+
+            If you didn't request this code, please ignore this email.
+
+            Best regards,
+            The MatchGen Team
+            """
+
+        email_user = getattr(settings, "EMAIL_HOST_USER", None)
+        email_password = getattr(settings, "EMAIL_HOST_PASSWORD", None)
+
+        if not email_user or not email_password:
+            logger.warning(
+                "Email settings not configured. Skipping email send for %s",
+                user.email,
+            )
+            logger.info("Verification code for %s: %s", user.email, code)
+            print(f"\n🔐 VERIFICATION CODE FOR {user.email}:")
+            print(f"{code}")
+            print("Use this code to verify the account.\n")
+            return False
+
+        sendgrid_url = "https://api.sendgrid.com/v3/mail/send"
+        headers = {
+            "Authorization": f"Bearer {email_password}",
+            "Content-Type": "application/json",
+        }
+        data = {
+            "personalizations": [
+                {"to": [{"email": user.email}], "subject": subject}
+            ],
+            "from": {"email": settings.DEFAULT_FROM_EMAIL},
+            "content": [{"type": "text/plain", "value": message}],
+        }
+        response = requests.post(
+            sendgrid_url, headers=headers, json=data, timeout=15
+        )
+
+        if response.status_code == 202:
+            logger.info(
+                "Verification code email sent successfully to %s", user.email
+            )
+            return True
+
+        logger.error(
+            "SendGrid API error: %s - %s",
+            response.status_code,
+            response.text,
+        )
+        print(f"\n🔐 VERIFICATION CODE FOR {user.email}:")
+        print(f"{code}")
+        print("Use this code to verify the account.\n")
+        return False
+    except Exception as e:
+        logger.error("Error in send_verification_code_email: %s", str(e), exc_info=True)
+        try:
+            print(f"\n🔐 VERIFICATION CODE FOR {user.email}:")
+            print(f"{code}")
+            print("Use this code to verify the account.\n")
+        except Exception:
+            pass
+        return False
+
 # Simple rate limiting for debugging
 class RateLimitMixin:
     def check_rate_limit(self, user_id, endpoint, limit_seconds=5):
@@ -394,17 +471,25 @@ class RegisterView(APIView):
                 user.is_superuser = False
             
             # Send verification code automatically
-            self._send_verification_code_after_registration(user)
-            
+            email_sent = self._send_verification_code_after_registration(user)
+
             logger.info(f"User created successfully: {user.email}")
-            
+
             return Response(
                 {
-                    "message": "Account created successfully! Please check your email to verify your account.",
+                    "message": (
+                        "Account created successfully! Please check your email to verify your account."
+                        if email_sent
+                        else (
+                            "Account created successfully, but we could not send a verification email. "
+                            "Try Resend verification in a few minutes, or contact support. "
+                            "(Operators: check SendGrid plan/credits and API key.)"
+                        )
+                    ),
                     "user_id": user.id,
-                    "email_verification_sent": True
-                }, 
-                status=status.HTTP_201_CREATED
+                    "email_verification_sent": email_sent,
+                },
+                status=status.HTTP_201_CREATED,
             )
         except Exception as e:
             logger.error(f"Registration error: {str(e)}", exc_info=True)
@@ -506,95 +591,34 @@ class RegisterView(APIView):
             logger.info(f"Verification URL for {user.email}: {verification_url}")
 
     def _send_verification_code_after_registration(self, user):
-        """Send verification code after user registration."""
-        try:
-            # Generate a 6-digit verification code
-            import random
-            verification_code = str(random.randint(100000, 999999))
-            
-            # Store the code in cache with 10-minute expiry
-            cache_key = f"verification_code_{user.email}"
-            cache.set(cache_key, verification_code, 600)  # 10 minutes
-            
-            # Send the code via email
-            self._send_verification_code_email(user, verification_code)
-            
-            logger.info(f"Verification code sent to {user.email}")
-            
-        except Exception as e:
-            logger.error(f"Error sending verification code after registration: {str(e)}")
-            print(f"\n🔐 VERIFICATION CODE FOR {user.email}:")
-            print(f"Use this code to verify the account.\n")
+        """Send verification code after registration. Returns True if SendGrid accepted (HTTP 202)."""
+        import random
 
-    def _send_verification_code_email(self, user, code):
-        """Send verification code email to user."""
+        verification_code = str(random.randint(100000, 999999))
+        cache_key = f"verification_code_{user.email}"
+        cache.set(cache_key, verification_code, 600)
+
         try:
-            subject = "Your MatchGen Verification Code"
-            message = f"""
-            Your verification code is: {code}
-            
-            This code will expire in 10 minutes.
-            
-            If you didn't request this code, please ignore this email.
-            
-            Best regards,
-            The MatchGen Team
-            """
-            
-            # Check if email settings are configured
-            email_user = getattr(settings, 'EMAIL_HOST_USER', None)
-            email_password = getattr(settings, 'EMAIL_HOST_PASSWORD', None)
-            
-            if not email_user or not email_password:
-                logger.warning(f"Email settings not configured. Skipping email send for {user.email}")
-                logger.info(f"Verification code for {user.email}: {code}")
-                print(f"\n🔐 VERIFICATION CODE FOR {user.email}:")
-                print(f"{code}")
-                print(f"Use this code to verify the account.\n")
-                return
-            
-            # Try to send email with SendGrid API
-            try:
-                import requests
-                
-                sendgrid_url = "https://api.sendgrid.com/v3/mail/send"
-                headers = {
-                    "Authorization": f"Bearer {email_password}",
-                    "Content-Type": "application/json"
-                }
-                
-                data = {
-                    "personalizations": [{
-                        "to": [{"email": user.email}],
-                        "subject": subject
-                    }],
-                    "from": {"email": settings.DEFAULT_FROM_EMAIL},
-                    "content": [{
-                        "type": "text/plain",
-                        "value": message
-                    }]
-                }
-                
-                response = requests.post(sendgrid_url, headers=headers, json=data)
-                
-                if response.status_code == 202:
-                    logger.info(f"Verification code email sent successfully to {user.email}")
-                else:
-                    logger.error(f"SendGrid API error: {response.status_code} - {response.text}")
-                    print(f"\n🔐 VERIFICATION CODE FOR {user.email}:")
-                    print(f"{code}")
-                    print(f"Use this code to verify the account.\n")
-            except Exception as e:
-                logger.error(f"Error sending email via SendGrid: {str(e)}")
-                print(f"\n🔐 VERIFICATION CODE FOR {user.email}:")
-                print(f"{code}")
-                print(f"Use this code to verify the account.\n")
-                
+            email_sent = send_verification_code_email(user, verification_code)
+            if email_sent:
+                logger.info("Verification code emailed to %s", user.email)
+            else:
+                logger.warning(
+                    "Verification code for %s not delivered by email (SendGrid error, "
+                    "credits exhausted, or missing mail config).",
+                    user.email,
+                )
+            return email_sent
         except Exception as e:
-            logger.error(f"Error in _send_verification_code_email: {str(e)}")
+            logger.error(
+                "Error sending verification code after registration: %s",
+                str(e),
+                exc_info=True,
+            )
             print(f"\n🔐 VERIFICATION CODE FOR {user.email}:")
-            print(f"{code}")
-            print(f"Use this code to verify the account.\n")
+            print(f"{verification_code}")
+            print("Use this code to verify the account.\n")
+            return False
 
 
 class LoginView(generics.GenericAPIView):
@@ -2656,91 +2680,39 @@ class SendVerificationCodeView(APIView):
             # Store the code in cache with 10-minute expiry
             cache_key = f"verification_code_{email}"
             cache.set(cache_key, verification_code, 600)  # 10 minutes
-            
-            # Send the code via email
-            self._send_verification_code_email(user, verification_code)
-            
-            logger.info(f"Verification code sent to {email}")
-            return Response({
-                'message': 'Verification code sent successfully',
-                'email': email
-            }, status=status.HTTP_200_OK)
-            
+
+            sent = send_verification_code_email(user, verification_code)
+            if sent:
+                logger.info("Verification code sent to %s", email)
+                return Response(
+                    {
+                        "message": "Verification code sent successfully",
+                        "email": email,
+                        "email_verification_sent": True,
+                    },
+                    status=status.HTTP_200_OK,
+                )
+
+            logger.warning(
+                "Verification code for %s not delivered (SendGrid or mail config).",
+                email,
+            )
+            return Response(
+                {
+                    "error": (
+                        "Could not send email. The mail service may be unavailable or out of credits. "
+                        "Please try again later or contact support."
+                    ),
+                    "email_verification_sent": False,
+                },
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+
         except User.DoesNotExist:
             return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
         except Exception as e:
             logger.error(f"Error sending verification code: {str(e)}")
             return Response({'error': 'Failed to send verification code'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-    
-    def _send_verification_code_email(self, user, code):
-        """Send verification code email to user."""
-        try:
-            subject = "Your MatchGen Verification Code"
-            message = f"""
-            Your verification code is: {code}
-            
-            This code will expire in 10 minutes.
-            
-            If you didn't request this code, please ignore this email.
-            
-            Best regards,
-            The MatchGen Team
-            """
-            
-            # Check if email settings are configured
-            email_user = getattr(settings, 'EMAIL_HOST_USER', None)
-            email_password = getattr(settings, 'EMAIL_HOST_PASSWORD', None)
-            
-            if not email_user or not email_password:
-                logger.warning(f"Email settings not configured. Skipping email send for {user.email}")
-                logger.info(f"Verification code for {user.email}: {code}")
-                print(f"\n🔐 VERIFICATION CODE FOR {user.email}:")
-                print(f"{code}")
-                print(f"Use this code to verify the account.\n")
-                return
-            
-            # Try to send email with SendGrid API
-            try:
-                import requests
-                
-                sendgrid_url = "https://api.sendgrid.com/v3/mail/send"
-                headers = {
-                    "Authorization": f"Bearer {email_password}",
-                    "Content-Type": "application/json"
-                }
-                
-                data = {
-                    "personalizations": [{
-                        "to": [{"email": user.email}],
-                        "subject": subject
-                    }],
-                    "from": {"email": settings.DEFAULT_FROM_EMAIL},
-                    "content": [{
-                        "type": "text/plain",
-                        "value": message
-                    }]
-                }
-                
-                response = requests.post(sendgrid_url, headers=headers, json=data)
-                
-                if response.status_code == 202:
-                    logger.info(f"Verification code email sent successfully to {user.email}")
-                else:
-                    logger.error(f"SendGrid API error: {response.status_code} - {response.text}")
-                    print(f"\n🔐 VERIFICATION CODE FOR {user.email}:")
-                    print(f"{code}")
-                    print(f"Use this code to verify the account.\n")
-            except Exception as e:
-                logger.error(f"Error sending email via SendGrid: {str(e)}")
-                print(f"\n🔐 VERIFICATION CODE FOR {user.email}:")
-                print(f"{code}")
-                print(f"Use this code to verify the account.\n")
-                
-        except Exception as e:
-            logger.error(f"Error in _send_verification_code_email: {str(e)}")
-            print(f"\n🔐 VERIFICATION CODE FOR {user.email}:")
-            print(f"{code}")
-            print(f"Use this code to verify the account.\n")
 
 
 class VerifyEmailCodeView(APIView):

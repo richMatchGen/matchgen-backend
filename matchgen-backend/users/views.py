@@ -949,8 +949,8 @@ class MyClubView(APIView, RateLimitMixin):
             logger.info(f"MyClubView called by user {request.user.email} at {timezone.now()}")
             logger.info(f"Request headers: {dict(request.headers)}")
             
-            # Check rate limiting (increased from 3 to 5 seconds to prevent false positives)
-            if not self.check_rate_limit(request.user.id, "my_club", limit_seconds=5):
+            # Throttle repeat calls (SPA may hit this from several components; 5s was too strict)
+            if not self.check_rate_limit(request.user.id, "my_club", limit_seconds=2):
                 return Response(
                     {
                         "error": "Too many requests. Please wait a few seconds.",

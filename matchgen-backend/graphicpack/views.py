@@ -25,54 +25,6 @@ from .serializers import GraphicPackSerializer, TextElementSerializer, MediaItem
 logger = logging.getLogger(__name__)
 
 
-def _homeoraway_column_exists():
-    """Check if homeoraway column exists in the database."""
-    from django.db import connection
-    try:
-        with connection.cursor() as cursor:
-            table_name = Template._meta.db_table
-            cursor.execute("""
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name=%s 
-                AND column_name='homeoraway'
-            """, [table_name])
-            return cursor.fetchone() is not None
-    except Exception:
-        return False
-
-
-def _get_template_queryset():
-    """Get a Template queryset that handles missing homeoraway column."""
-    if not _homeoraway_column_exists():
-        # Column doesn't exist - defer it to avoid SELECT error
-        return Template.objects.defer('homeoraway')
-    return Template.objects.all()
-
-
-def _player_bespoke_columns_exist():
-    """Check if player bespoke graphic columns exist in the database."""
-    from django.db import connection
-    from content.models import Player
-    try:
-        with connection.cursor() as cursor:
-            table_name = Player._meta.db_table
-            cursor.execute("""
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name=%s 
-                AND column_name IN ('cutout_url', 'highlight_home_url', 'highlight_away_url', 'potm_url')
-            """, [table_name])
-            results = cursor.fetchall()
-            # Check if all 4 columns exist
-            column_names = [row[0] for row in results]
-            required_columns = ['cutout_url', 'highlight_home_url', 'highlight_away_url', 'potm_url']
-            return all(col in column_names for col in required_columns)
-    except Exception as e:
-        logger.warning(f"Could not check for player bespoke columns: {str(e)}")
-        return False
-
-
 def apply_image_color_modifications(img, element):
     """Apply color modifications to an image based on element settings."""
     if element.image_color_filter == 'none':
@@ -153,67 +105,20 @@ def get_font(font_family, font_size, font_weight='normal'):
 
 
 class GraphicPackListView(ListAPIView):
-    """List all available graphic packs (excluding bespoke packs)."""
+    """List all available graphic packs."""
+    queryset = GraphicPack.objects.all()
     serializer_class = GraphicPackSerializer
     permission_classes = [AllowAny]
-    
-    def get_queryset(self):
-        """Filter out bespoke packs from general template selection."""
-        return GraphicPack.objects.filter(is_bespoke=False, is_active=True)
 
-
-class AdminGraphicPackListView(ListAPIView):
-    """List all graphic packs including bespoke ones (admin only)."""
-    serializer_class = GraphicPackSerializer
-    permission_classes = [IsAuthenticated]
-    
-    def get_queryset(self):
-        """Return all graphic packs including bespoke ones."""
-        # Allow all authenticated users to see all packs on the upload page
-        # This is needed for the /upload-graphic-pack page to show all packs
-        # Use select_related and prefetch_related to optimize queries
-        return GraphicPack.objects.select_related('assigned_club').prefetch_related('templates').all().order_by('-created_at')
-
-    def list(self, request, *args, **kwargs):
-        """Override list to add better error handling."""
+    def get(self, request, *args, **kwargs):
+        """Override get to add debug logging and error handling."""
         try:
-            queryset = self.filter_queryset(self.get_queryset())
-            page = self.paginate_queryset(queryset)
-            
-            if page is not None:
-                serializer = self.get_serializer(page, many=True)
-                return self.get_paginated_response(serializer.data)
-            
-            serializer = self.get_serializer(queryset, many=True)
-            logger.info(f"Successfully fetched {len(serializer.data)} graphic packs")
-            return Response(serializer.data)
+            response = super().get(request, *args, **kwargs)
+            logger.info(f"Graphic packs response: {response.data}")
+            return response
         except Exception as e:
-            logger.error(f"Error in AdminGraphicPackListView: {str(e)}", exc_info=True)
-            # Try to return at least basic pack info without templates
-            try:
-                queryset = GraphicPack.objects.all().order_by('-created_at')
-                basic_data = []
-                for pack in queryset:
-                    basic_data.append({
-                        'id': pack.id,
-                        'name': pack.name,
-                        'description': pack.description or '',
-                        'is_bespoke': getattr(pack, 'is_bespoke', False),
-                        'is_active': pack.is_active,
-                        'sport': pack.sport or '',
-                        'tier': pack.tier or '',
-                        'assigned_club': pack.assigned_club.id if pack.assigned_club else None,
-                        'assigned_club_name': pack.assigned_club.name if pack.assigned_club else None,
-                        'templates': [],
-                        'templates_count': 0
-                    })
-                return Response(basic_data)
-            except Exception as fallback_error:
-                logger.error(f"Fallback serialization also failed: {str(fallback_error)}", exc_info=True)
-                return Response(
-                    {"error": "An error occurred while fetching graphic packs. Please check server logs."},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
+            logger.error(f"Error in GraphicPackListView: {str(e)}", exc_info=True)
+            return Response([], status=200)
 
 
 class GraphicPackDetailView(RetrieveAPIView):
@@ -233,7 +138,7 @@ class GraphicPackDetailView(RetrieveAPIView):
                 pack = GraphicPack.objects.get(id=pack_id)
                 logger.info(f"Found graphic pack: {pack.name}")
                 
-                templates_count = _get_template_queryset().filter(graphic_pack=pack).count()
+                templates_count = Template.objects.filter(graphic_pack=pack).count()
                 logger.info(f"Found {templates_count} templates for pack {pack_id}")
                 
             except GraphicPack.DoesNotExist:
@@ -858,65 +763,25 @@ class SocialMediaPostGenerator(APIView):
             logger.info(f"Found match: {match.opponent} vs {match.club.name}")
             
             # Get the template for this post type (case-insensitive lookup)
-            # For startingXI posts, check if match has starting_xi_post_url first
-            # If it exists, we can skip template lookup and use the bespoke graphic directly
-            # For goal posts with bespoke packs, check if player has highlight graphics first
-            goal_scorer_for_template = request.data.get('goal_scorer', '') if request else ''
-            goal_player_highlight_url = None
-            
-            if post_type == 'goal' and pack.is_bespoke and goal_scorer_for_template:
-                try:
-                    from content.models import Player
-                    if _player_bespoke_columns_exist():
-                        player = Player.objects.filter(
-                            club=club,
-                            name__iexact=goal_scorer_for_template
-                        ).first()
-                        if player:
-                            match_home_away = (match.home_away or '').upper()
-                            if match_home_away == 'AWAY':
-                                goal_player_highlight_url = getattr(player, 'highlight_away_url', None)
-                            else:
-                                goal_player_highlight_url = getattr(player, 'highlight_home_url', None)
-                            if goal_player_highlight_url:
-                                logger.info(f"Goal post: Found player highlight graphic, will use bespoke graphic: {goal_player_highlight_url}")
-                except Exception as e:
-                    logger.warning(f"Error checking for goal player highlight: {str(e)}")
-            
-            if post_type in ['startingXI', 'starting_xi'] and match.starting_xi_post_url:
-                logger.info(f"Match has starting_xi_post_url for Starting XI post, will use bespoke graphic: {match.starting_xi_post_url}")
-                # Create a dummy template object - we'll create the actual BespokeTemplate later
-                class DummyTemplate:
-                    def __init__(self):
-                        self.id = None
-                        self.content_type = 'startingXI'
-                        self.graphic_pack = pack
-                        self.sport = ''
-                        self.template_config = {}
-                
-                template = DummyTemplate()
-            elif post_type == 'goal' and goal_player_highlight_url:
-                logger.info(f"Goal post: Using player highlight graphic, skipping template lookup")
-                # Create a dummy template object - we'll create the actual BespokeTemplate later
-                class DummyTemplate:
-                    def __init__(self):
-                        self.id = None
-                        self.content_type = 'goal'
-                        self.graphic_pack = pack
-                        self.sport = ''
-                        self.template_config = {}
-                
-                template = DummyTemplate()
-            else:
-                logger.info(f"Looking for template with graphic_pack={pack.id} and content_type='{post_type}'")
-                # Select template with home/away awareness
-                queryset = _get_template_queryset().filter(
+            logger.info(f"Looking for template with graphic_pack={pack.id} and content_type='{post_type}'")
+            try:
+                # Try exact match first
+                template = Template.objects.get(
                     graphic_pack=pack,
-                    content_type__iexact=post_type
+                    content_type=post_type
                 )
-
-                if not queryset.exists():
-                    existing_templates = _get_template_queryset().filter(graphic_pack=pack)
+                logger.info(f"Found {post_type} template (exact match): {template.id}")
+            except Template.DoesNotExist:
+                # Try case-insensitive lookup
+                try:
+                    template = Template.objects.get(
+                        graphic_pack=pack,
+                        content_type__iexact=post_type
+                    )
+                    logger.info(f"Found {post_type} template (case-insensitive match): {template.id}")
+                except Template.DoesNotExist:
+                    # Check what templates exist for this pack
+                    existing_templates = Template.objects.filter(graphic_pack=pack)
                     existing_content_types = [t.content_type for t in existing_templates]
                     logger.error(f"No {post_type} template found (exact or case-insensitive). Available templates for pack {pack.id}: {existing_content_types}")
                     return Response({
@@ -925,104 +790,16 @@ class SocialMediaPostGenerator(APIView):
                         "graphic_pack_id": pack.id,
                         "graphic_pack_name": pack.name
                     }, status=status.HTTP_404_NOT_FOUND)
-
-                template = None
-                homeoraway_supported = _homeoraway_column_exists()
-                match_home_away = (match.home_away or '').upper()
-
-                if homeoraway_supported:
-                    if match_home_away == 'AWAY':
-                        template = queryset.filter(homeoraway__iexact='Away').first()
-                        if not template:
-                            template = queryset.filter(homeoraway__iexact='Default').first()
-                    else:
-                        template = queryset.filter(homeoraway__iexact='Default').first()
-                        if not template:
-                            template = queryset.filter(homeoraway__iexact='Home').first()
-
-                if not template:
-                    template = queryset.first()
-
-                if not template:
-                    logger.error(f"No template could be selected for post_type={post_type}, pack={pack.id}")
-                    return Response({
-                        "error": f"No valid template found for {post_type}",
-                        "graphic_pack_id": pack.id,
-                        "graphic_pack_name": pack.name
-                    }, status=status.HTTP_404_NOT_FOUND)
-            
-            # Log template selection (handle case where template might be a DummyTemplate)
-            if hasattr(template, 'id') and template.id:
-                homeoraway_supported = _homeoraway_column_exists()
-                match_home_away = (match.home_away or '').upper()
-                logger.info(f"Selected template {template.id} for post_type {post_type} (home_away={match_home_away}, supports_homeoraway={homeoraway_supported})")
-            else:
-                logger.info(f"Using bespoke graphic for post_type {post_type} (no template lookup needed)")
-            
-            # For matchday, startingXI, and goal posts, check if match/player has bespoke graphics
-            # If they exist, use those instead of the template image
-            bespoke_template = None
-            logger.info(f"Checking for bespoke templates: post_type={post_type}, pack.is_bespoke={pack.is_bespoke if hasattr(pack, 'is_bespoke') else 'N/A'}")
-            
-            if post_type == 'matchday' and match.starting_xi_post_url:
-                logger.info(f"Match has starting_xi_post_url, using bespoke graphic for matchday: {match.starting_xi_post_url}")
-                # Create a temporary template-like object with the bespoke URL
-                # This allows us to use the bespoke graphic while still using the pack's text elements
-                class BespokeTemplate:
-                    def __init__(self, image_url, original_template):
-                        self.image_url = image_url
-                        self.id = original_template.id if original_template and hasattr(original_template, 'id') else None
-                        self.content_type = 'matchday'
-                        self.graphic_pack = original_template.graphic_pack if original_template and hasattr(original_template, 'graphic_pack') else pack
-                        # Copy other template attributes that might be needed
-                        self.sport = getattr(original_template, 'sport', '') if original_template else ''
-                        self.template_config = getattr(original_template, 'template_config', {}) if original_template else {}
-                
-                bespoke_template = BespokeTemplate(match.starting_xi_post_url, template)
-                logger.info(f"Using bespoke template image URL: {bespoke_template.image_url} (from match.starting_xi_post_url)")
-            elif post_type in ['startingXI', 'starting_xi'] and match.starting_xi_post_url:
-                logger.info(f"Match has starting_xi_post_url, using bespoke graphic for Starting XI: {match.starting_xi_post_url}")
-                # Create a temporary template-like object with the bespoke URL
-                class BespokeTemplate:
-                    def __init__(self, image_url, original_template):
-                        self.image_url = image_url
-                        self.id = original_template.id if original_template and hasattr(original_template, 'id') else None
-                        self.content_type = 'startingXI'
-                        self.graphic_pack = original_template.graphic_pack if original_template and hasattr(original_template, 'graphic_pack') else pack
-                        # Copy other template attributes that might be needed
-                        self.sport = getattr(original_template, 'sport', '') if original_template else ''
-                        self.template_config = getattr(original_template, 'template_config', {}) if original_template else {}
-                
-                bespoke_template = BespokeTemplate(match.starting_xi_post_url, template)
-                logger.info(f"Using bespoke template image URL: {bespoke_template.image_url} (from match.starting_xi_post_url)")
-            elif post_type == 'goal' and goal_player_highlight_url:
-                # Use the pre-fetched player highlight URL for goal posts
-                logger.info(f"Goal post: Using pre-fetched player highlight graphic: {goal_player_highlight_url}")
-                # Create a temporary template-like object with the bespoke URL
-                class BespokeTemplate:
-                    def __init__(self, image_url, original_template):
-                        self.image_url = image_url
-                        self.id = original_template.id if original_template and hasattr(original_template, 'id') else None
-                        self.content_type = 'goal'
-                        self.graphic_pack = original_template.graphic_pack if original_template and hasattr(original_template, 'graphic_pack') else pack
-                        # Copy other template attributes that might be needed
-                        self.sport = getattr(original_template, 'sport', '') if original_template else ''
-                        self.template_config = getattr(original_template, 'template_config', {}) if original_template else {}
-                
-                bespoke_template = BespokeTemplate(goal_player_highlight_url, template)
-                logger.info(f"✓✓✓ Using bespoke template image URL: {bespoke_template.image_url} (from player highlight)")
             
             logger.info(f"Starting {post_type} post generation...")
             logger.info(f"=== {post_type.upper()} POST GENERATION STARTED ===")
             logger.info(f"Generating {post_type} post for match {match_id}, club {club.name}")
-            logger.info(f"Template image URL: {bespoke_template.image_url if bespoke_template else template.image_url}")
+            logger.info(f"Template image URL: {template.image_url}")
             logger.info(f"Selected pack: {pack.name} (ID: {pack.id})")
             
             # Generate the post
             try:
-                # Use bespoke template if available, otherwise use regular template
-                template_to_use = bespoke_template if bespoke_template else template
-                image_url = self._generate_social_media_post(match, club, pack, template_to_use, post_type, request)
+                image_url = self._generate_social_media_post(match, club, pack, template, post_type, request)
                 
                 logger.info(f"{post_type.capitalize()} post generated successfully")
                 
@@ -1702,7 +1479,7 @@ class DebugTemplatesView(APIView):
                 packs_data = []
                 
                 for pack in packs:
-                    templates = _get_template_queryset().filter(graphic_pack=pack)
+                    templates = Template.objects.filter(graphic_pack=pack)
                     templates_data = []
                     
                     for template in templates:
@@ -2042,7 +1819,7 @@ class CreateTestDataView(APIView):
 
             # Check if matchday template already exists for this pack
             try:
-                existing_template = _get_template_queryset().get(
+                existing_template = Template.objects.get(
                     graphic_pack=pack,
                     content_type='matchday'
                 )
@@ -2238,7 +2015,7 @@ class TemplateDebugView(APIView):
             # Try ORM
             try:
                 pack = GraphicPack.objects.get(id=pack_id)
-                orm_templates = _get_template_queryset().filter(graphic_pack=pack)
+                orm_templates = Template.objects.filter(graphic_pack=pack)
                 logger.info(f"ORM found {orm_templates.count()} templates")
                 
                 template_data = []
@@ -2255,7 +2032,7 @@ class TemplateDebugView(APIView):
                 
                 # Try to get matchday template specifically
                 try:
-                    matchday_template = _get_template_queryset().get(
+                    matchday_template = Template.objects.get(
                         graphic_pack=pack,
                         content_type='matchday'
                     )
@@ -2698,7 +2475,7 @@ class GraphicPackDeleteView(APIView):
                 )
             
             # Delete all templates associated with this pack
-            templates = _get_template_queryset().filter(graphic_pack=graphic_pack)
+            templates = Template.objects.filter(graphic_pack=graphic_pack)
             templates_count = templates.count()
             templates.delete()
             
@@ -2723,7 +2500,7 @@ class TemplateDeleteView(APIView):
     def delete(self, request, template_id):
         try:
             try:
-                template = _get_template_queryset().get(id=template_id)
+                template = Template.objects.get(id=template_id)
             except Template.DoesNotExist:
                 return Response(
                     {"error": "Template not found."},
@@ -2755,7 +2532,6 @@ class GraphicPackCreateView(APIView):
             assigned_club_id = request.data.get('assigned_club_id')
             preview_image_url = request.data.get('preview_image_url')
             is_active = request.data.get('is_active', True)
-            is_bespoke = request.data.get('is_bespoke', False)
             
             if not name:
                 return Response(
@@ -2784,8 +2560,7 @@ class GraphicPackCreateView(APIView):
                 tier=tier,
                 assigned_club=assigned_club,
                 preview_image_url=preview_image_url,
-                is_active=is_active,
-                is_bespoke=is_bespoke
+                is_active=is_active
             )
             
             return Response({
@@ -2930,81 +2705,15 @@ class TemplateCreateView(APIView):
                     status=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 )
             
-            # Get homeoraway from request (default to 'Default' if not provided)
-            homeoraway = request.data.get('homeoraway', 'Default')
-            if homeoraway not in ['Default', 'Home', 'Away']:
-                homeoraway = 'Default'
-            
-            # Check if homeoraway column exists in database
-            from django.db import connection
-            column_exists = False
-            try:
-                with connection.cursor() as cursor:
-                    # Use proper table name from Django's db_table
-                    table_name = Template._meta.db_table
-                    cursor.execute("""
-                        SELECT column_name 
-                        FROM information_schema.columns 
-                        WHERE table_name=%s 
-                        AND column_name='homeoraway'
-                    """, [table_name])
-                    column_exists = cursor.fetchone() is not None
-                    logger.info(f"homeoraway column exists: {column_exists} for table {table_name}")
-            except Exception as schema_check_error:
-                logger.warning(f"Could not check for homeoraway column: {str(schema_check_error)}")
-                # Assume it doesn't exist if we can't check
-                column_exists = False
-            
-            # Create template - only include homeoraway if column exists
-            if column_exists:
-                template = Template.objects.create(
-                    graphic_pack=graphic_pack,
-                    content_type=content_type,
-                    file_url=upload_result['secure_url'],
-                    image_url=upload_result['secure_url'],  # Save to image_url as well
-                    file_name=file.name,
-                    file_size=file.size,
-                    homeoraway=homeoraway
-                )
-            else:
-                # Migration hasn't been run yet - create without homeoraway using raw SQL
-                logger.info("homeoraway column not found in database, creating template without it using raw SQL")
-                from django.db import connection
-                from django.utils import timezone
-                import json
-                
-                table_name = Template._meta.db_table
-                with connection.cursor() as cursor:
-                    cursor.execute(f"""
-                        INSERT INTO {table_name} 
-                        (graphic_pack_id, content_type, image_url, sport, file_url, file_name, file_size, template_config, created_at, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                        RETURNING id
-                    """, [
-                        graphic_pack.id,
-                        content_type,
-                        upload_result['secure_url'],
-                        '',  # sport
-                        upload_result['secure_url'],  # file_url
-                        file.name,
-                        file.size,
-                        json.dumps({}),  # template_config as empty JSON
-                        timezone.now(),  # created_at
-                        timezone.now()   # updated_at
-                    ])
-                    template_id = cursor.fetchone()[0]
-                    logger.info(f"Template created successfully without homeoraway field: {template_id}")
-                    
-                    # Return response without fetching via ORM to avoid SELECT on non-existent homeoraway column
-                    return Response({
-                        "message": "Template created successfully.",
-                        "template": {
-                            "id": template_id,
-                            "content_type": content_type,
-                            "file_url": upload_result['secure_url'],
-                            "file_name": file.name
-                        }
-                    }, status=status.HTTP_201_CREATED)
+            # Create template
+            template = Template.objects.create(
+                graphic_pack=graphic_pack,
+                content_type=content_type,
+                file_url=upload_result['secure_url'],
+                image_url=upload_result['secure_url'],  # Save to image_url as well
+                file_name=file.name,
+                file_size=file.size
+            )
             
             return Response({
                 "message": "Template created successfully.",
@@ -3276,7 +2985,7 @@ class TemplatesByPackView(APIView):
 
             # Get all templates for this pack
             try:
-                templates = _get_template_queryset().filter(graphic_pack=pack)
+                templates = Template.objects.filter(graphic_pack=pack)
                 logger.info(f"Found {templates.count()} templates for pack {pack.name}")
                 
                 templates_data = []
@@ -3287,8 +2996,7 @@ class TemplatesByPackView(APIView):
                         "image_url": template.image_url,
                         "sport": template.sport,
                         "template_config": template.template_config,
-                        "has_config": bool(template.template_config),
-                        "homeoraway": getattr(template, 'homeoraway', 'Default')  # Safely get homeoraway if it exists
+                        "has_config": bool(template.template_config)
                     })
                 
                 logger.info(f"Returning {len(templates_data)} templates")
@@ -3692,24 +3400,13 @@ class MediaItemUploadView(APIView):
     def post(self, request):
         """Upload a media file to Cloudinary and create a MediaItem record."""
         try:
-            # Get club - either from request data or user's club
-            club_id = request.data.get('club_id')
-            if club_id:
-                # Use specified club
-                try:
-                    club = Club.objects.get(id=club_id)
-                except Club.DoesNotExist:
-                    return Response({
-                        "error": f"Club with ID {club_id} not found"
-                    }, status=status.HTTP_404_NOT_FOUND)
-            else:
-                # Use user's club as fallback
-                try:
-                    club = Club.objects.get(user=request.user)
-                except Club.DoesNotExist:
-                    return Response({
-                        "error": "No club found for this user. Please specify a club_id or create a club first."
-                    }, status=status.HTTP_404_NOT_FOUND)
+            # Get user's club
+            try:
+                club = Club.objects.get(user=request.user)
+            except Club.DoesNotExist:
+                return Response({
+                    "error": "No club found for this user"
+                }, status=status.HTTP_404_NOT_FOUND)
             
             # Validate required fields
             file = request.FILES.get('file')

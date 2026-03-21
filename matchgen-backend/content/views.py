@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 from urllib.parse import urljoin, urlparse
 
+from django.conf import settings
 from django.utils import timezone
 from django.core.cache import cache
 from rest_framework import generics, status
@@ -18,7 +19,7 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.decorators import api_view, permission_classes
-from users.models import Club
+from users.models import Club, ClubMembership
 
 from .models import Match, Player, FullTimeSubscription
 from .serializers import FixturesSerializer, MatchSerializer, PlayerSerializer
@@ -1050,64 +1051,135 @@ class FAFulltimeScraperView(APIView):
             return datetime.now()
 
 
+# Official Match Summary API (requires api_token + site_id). See:
+# https://play-cricket.ecb.co.uk/hc/en-us/articles/360000130385-Match-Summary-API
+PLAY_CRICKET_MATCHES_URL = "https://www.play-cricket.com/api/v2/matches.json"
+
+
 class PlayCricketAPIView(APIView):
-    """Import fixtures from Play Cricket API."""
+    """Import fixtures via Play Cricket Match Summary API v2 (api_token + site_id required)."""
+
     permission_classes = [IsAuthenticated]
+
+    def _resolve_club_for_import(self, request):
+        user = request.user
+        club = Club.objects.filter(user=user).first()
+        if club:
+            return club
+        membership = ClubMembership.objects.filter(
+            user=user, status="active"
+        ).select_related("club").first()
+        return membership.club if membership else None
 
     def post(self, request):
         try:
-            team_id = request.data.get('team_id')
-            if not team_id:
-                return Response(
-                    {"error": "Play Cricket team ID is required."}, 
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            site_id = request.data.get("site_id")
+            team_id = request.data.get("team_id")
+            season = request.data.get("season") or str(datetime.now().year)
+            api_token = (
+                request.data.get("api_token")
+                or getattr(settings, "PLAY_CRICKET_API_TOKEN", None)
+                or ""
+            )
+            if isinstance(api_token, str):
+                api_token = api_token.strip()
 
-            # Get user's club
-            try:
-                club = Club.objects.get(user=request.user)
-            except Club.DoesNotExist:
+            if not api_token:
                 return Response(
-                    {"error": "Club not found for this user. Please create a club first."},
+                    {
+                        "error": (
+                            "Play Cricket API token is required. Club admins request access from the ECB, "
+                            "then paste the token here or set PLAY_CRICKET_API_TOKEN on the server."
+                        ),
+                        "help_url": "https://play-cricket.ecb.co.uk/hc/en-us/sections/360000978518-API-Experienced-Developers-Only",
+                    },
                     status=status.HTTP_400_BAD_REQUEST,
                 )
 
-            # Fetch fixtures from Play Cricket API
-            fixtures_data = self.fetch_play_cricket_fixtures(team_id)
-            
+            if not site_id:
+                return Response(
+                    {
+                        "error": (
+                            "Play Cricket site ID (club ID) is required. Find it in your club site footer "
+                            "(e.g. “Site ID 1597”). It is not the same as a team XI ID."
+                        ),
+                        "help_url": "https://play-cricket.ecb.co.uk/hc/en-us/articles/27546034983197-How-to-find-your-Play-Cricket-Club-ID",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            club = self._resolve_club_for_import(request)
+            if not club:
+                return Response(
+                    {"error": "Club not found for this user. Please create or join a club first."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            fixtures_data, err = self.fetch_play_cricket_fixtures_v2(
+                site_id=site_id,
+                api_token=api_token,
+                season=str(season),
+                team_id=team_id,
+                club_name=club.name,
+            )
+
+            if err:
+                return Response(
+                    {"error": err.get("error", "Play Cricket request failed")},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
             if not fixtures_data:
                 return Response(
-                    {"error": "No fixtures found for the provided team ID."},
+                    {
+                        "error": (
+                            "No fixtures returned for this site and season. "
+                            "Check site ID, season, optional team filter, and that your API token "
+                            "is valid for this club site."
+                        ),
+                    },
                     status=status.HTTP_404_NOT_FOUND,
                 )
 
-            # Create matches
             matches_created = []
             errors = []
 
             for fixture in fixtures_data:
                 try:
-                    match = Match.objects.create(
-                        club=club,
-                        opponent=fixture.get('opponent', ''),
-                        date=fixture.get('date'),
-                        location=fixture.get('location', ''),
-                        venue=fixture.get('venue', ''),
-                        time_start=fixture.get('time_start', ''),
-                        match_type=fixture.get('match_type', 'League'),
-                        home_away=fixture.get('home_away', 'HOME')
-                    )
+                    pc_id = fixture.pop("pc_match_id", None)
+                    defaults = {
+                        "opponent": fixture.get("opponent", ""),
+                        "date": fixture.get("date"),
+                        "location": fixture.get("location", ""),
+                        "venue": fixture.get("venue", ""),
+                        "time_start": fixture.get("time_start", ""),
+                        "match_type": fixture.get("match_type", "League"),
+                        "home_away": fixture.get("home_away", "HOME"),
+                        "source": "other",
+                    }
+                    if pc_id:
+                        match, _ = Match.objects.update_or_create(
+                            club=club,
+                            fixture_key=f"pc_{pc_id}",
+                            defaults=defaults,
+                        )
+                    else:
+                        match = Match.objects.create(club=club, **defaults)
                     matches_created.append(match.id)
                 except Exception as e:
                     errors.append(f"Error creating match: {str(e)}")
-                    logger.warning(f"Error creating match from Play Cricket data: {str(e)}")
+                    logger.warning("Error creating match from Play Cricket data: %s", str(e))
 
-            logger.info(f"Play Cricket API completed. {len(matches_created)} matches created, {len(errors)} errors")
-            
+            logger.info(
+                "Play Cricket API completed. %s matches saved, %s errors",
+                len(matches_created),
+                len(errors),
+            )
+
             response_data = {
                 "created": matches_created,
                 "total_found": len(fixtures_data),
-                "message": f"Successfully imported {len(matches_created)} fixtures from Play Cricket"
+                "message": f"Successfully imported {len(matches_created)} fixtures from Play Cricket",
             }
             if errors:
                 response_data["errors"] = errors
@@ -1115,74 +1187,138 @@ class PlayCricketAPIView(APIView):
             return Response(response_data, status=status.HTTP_201_CREATED)
 
         except Exception as e:
-            logger.error(f"Play Cricket API error: {str(e)}", exc_info=True)
+            logger.error("Play Cricket API error: %s", str(e), exc_info=True)
             return Response(
                 {"error": "An error occurred while fetching Play Cricket fixtures."},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-    def fetch_play_cricket_fixtures(self, team_id):
-        """Fetch fixture data from Play Cricket API."""
-        try:
-            # Play Cricket API endpoint for team fixtures
-            api_url = f"https://play-cricket.ecb.co.uk/api/v1/teams/{team_id}/matches"
-            
-            headers = {
-                'User-Agent': 'MatchGen/1.0',
-                'Accept': 'application/json'
-            }
-            
-            response = requests.get(api_url, headers=headers, timeout=30)
-            response.raise_for_status()
-            
-            data = response.json()
-            fixtures = []
-            
-            if 'data' in data:
-                for match in data['data']:
-                    fixture_data = self.parse_play_cricket_match(match)
-                    if fixture_data:
-                        fixtures.append(fixture_data)
-            
-            return fixtures
-            
-        except requests.RequestException as e:
-            logger.error(f"Error fetching Play Cricket data: {str(e)}")
-            return []
-        except Exception as e:
-            logger.error(f"Error parsing Play Cricket data: {str(e)}")
-            return []
+    def fetch_play_cricket_fixtures_v2(
+        self, site_id, api_token, season, team_id=None, club_name=""
+    ):
+        params = {
+            "api_token": api_token,
+            "site_id": site_id,
+            "season": season,
+        }
+        if team_id:
+            params["team_id"] = team_id
 
-    def parse_play_cricket_match(self, match_data):
-        """Parse match data from Play Cricket API."""
+        resp = None
         try:
-            # Extract match details
-            match_date = match_data.get('match_date')
-            if match_date:
-                match_date = datetime.fromisoformat(match_date.replace('Z', '+00:00'))
-            
-            home_team = match_data.get('home_team', {}).get('name', '')
-            away_team = match_data.get('away_team', {}).get('name', '')
-            venue = match_data.get('ground', {}).get('name', '')
-            
-            # Determine opponent and home/away status
-            # This would need to be customized based on the club name
-            opponent = away_team if home_team else home_team
-            home_away = 'HOME' if home_team else 'AWAY'
-            
-            return {
-                'date': match_date,
-                'opponent': opponent,
-                'venue': venue,
-                'location': venue,
-                'time_start': match_data.get('start_time', ''),
-                'home_away': home_away,
-                'match_type': match_data.get('competition', {}).get('name', 'League')
+            resp = requests.get(
+                PLAY_CRICKET_MATCHES_URL,
+                params=params,
+                headers={"User-Agent": "MatchGen/1.0", "Accept": "application/json"},
+                timeout=60,
+            )
+            snippet = (resp.text or "")[:2000]
+            logger.info("Play Cricket matches API status=%s snippet=%s", resp.status_code, snippet)
+            resp.raise_for_status()
+            data = resp.json()
+        except requests.HTTPError:
+            err_msg = "Play Cricket API request failed"
+            if resp is not None:
+                try:
+                    body = resp.json()
+                    if isinstance(body, dict):
+                        err_msg = body.get("description") or body.get("error") or err_msg
+                except Exception:
+                    err_msg = resp.text[:500] or err_msg
+            logger.error("Play Cricket HTTP error: %s", err_msg)
+            return None, {"error": err_msg}
+        except requests.RequestException as e:
+            logger.error("Play Cricket request failed: %s", str(e))
+            return None, {"error": f"Network error: {e}"}
+        except ValueError as e:
+            logger.error("Play Cricket invalid JSON: %s", str(e))
+            return None, {"error": "Invalid JSON from Play Cricket"}
+
+        if isinstance(data, dict) and data.get("error"):
+            return None, {
+                "error": data.get("description")
+                or data.get("error")
+                or "Play Cricket API error"
             }
-            
+
+        matches = data.get("matches") if isinstance(data, dict) else None
+        if not matches:
+            return [], None
+
+        fixtures = []
+        for m in matches:
+            parsed = self.parse_play_cricket_match_summary(m, club_name)
+            if parsed:
+                fixtures.append(parsed)
+        return fixtures, None
+
+    def parse_play_cricket_match_summary(self, m, club_name):
+        """Parse one row from Match Summary API v2."""
+        try:
+            opponent, home_away = self._infer_opponent_home_away(club_name, m)
+            match_date = self._parse_pc_datetime(
+                m.get("match_date"), m.get("match_time")
+            )
+            venue = (m.get("ground_name") or "").strip()
+            comp = (
+                m.get("competition_type")
+                or m.get("competition_name")
+                or m.get("league_name")
+                or "League"
+            )
+            time_start = (m.get("match_time") or "").strip() or "12:00"
+            return {
+                "pc_match_id": m.get("id"),
+                "opponent": opponent,
+                "date": match_date,
+                "venue": venue,
+                "location": venue,
+                "time_start": time_start,
+                "home_away": home_away,
+                "match_type": str(comp)[:255],
+            }
         except Exception as e:
-            logger.warning(f"Error parsing Play Cricket match: {str(e)}")
+            logger.warning("parse_play_cricket_match_summary: %s", str(e))
             return None
+
+    def _infer_opponent_home_away(self, club_name, m):
+        home_club = (m.get("home_club_name") or "").strip()
+        away_club = (m.get("away_club_name") or "").strip()
+        home_team = (m.get("home_team_name") or "").strip()
+        away_team = (m.get("away_team_name") or "").strip()
+        home_full = f"{home_club} {home_team}".strip() if home_club else home_team
+        away_full = f"{away_club} {away_team}".strip() if away_club else away_team
+        cn = (club_name or "").lower().strip()
+
+        if cn and home_club and cn in home_club.lower():
+            return away_full or away_club or "Opponent", "HOME"
+        if cn and away_club and cn in away_club.lower():
+            return home_full or home_club or "Opponent", "AWAY"
+        if home_full and away_full:
+            return away_full, "HOME"
+        return away_full or home_full or "Opponent", "HOME"
+
+    def _parse_pc_datetime(self, date_str, time_str):
+        if not date_str:
+            return timezone.now()
+        s = str(date_str).strip()
+        t = (str(time_str).strip() if time_str else "") or "12:00"
+        for fmt in ("%d/%m/%Y", "%Y-%m-%d"):
+            try:
+                d = datetime.strptime(s, fmt)
+                if ":" in t:
+                    parts = t.split(":")
+                    h = int(parts[0])
+                    mi = int(parts[1]) if len(parts) > 1 else 0
+                    d = d.replace(hour=h, minute=mi, second=0, microsecond=0)
+                else:
+                    d = d.replace(hour=12, minute=0, second=0, microsecond=0)
+                if timezone.is_naive(d):
+                    return timezone.make_aware(d, timezone.get_current_timezone())
+                return d
+            except (ValueError, TypeError, IndexError):
+                continue
+        return timezone.now()
 
 
 class EnhancedBulkUploadMatchesView(APIView):
@@ -1348,10 +1484,15 @@ class FixtureImportOptionsView(APIView):
                 },
                 "play_cricket": {
                     "name": "Play Cricket API",
-                    "description": "Import fixtures from Play Cricket API for cricket clubs",
-                    "required_fields": ["team_id"],
-                    "note": "Get your team ID from your Play Cricket club page URL",
-                    "api_docs": "https://play-cricket.ecb.co.uk/hc/en-us/articles/360000141669-Match-Detail-API",
+                    "description": "Import fixtures via ECB Match Summary API v2 (official)",
+                    "required_fields": ["site_id"],
+                    "optional_fields": ["api_token", "team_id", "season"],
+                    "note": (
+                        "site_id is your club site ID (footer, e.g. Site ID 1597). "
+                        "Request api_token from ECB. Optional team_id filters to one XI (e.g. 1st XI)."
+                    ),
+                    "api_docs": "https://play-cricket.ecb.co.uk/hc/en-us/articles/360000130385-Match-Summary-API",
+                    "club_id_help": "https://play-cricket.ecb.co.uk/hc/en-us/articles/27546034983197-How-to-find-your-Play-Cricket-Club-ID",
                     "status": "specialized"
                 }
             }
